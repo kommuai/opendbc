@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+from cereal import car, log
+from opendbc.car import get_safety_config, structs
+from opendbc.car.interfaces import CarInterfaceBase
+from opendbc.car.byd.carstate import CarState
+from opendbc.car.byd.carcontroller import CarController
+from opendbc.car.byd.values import CAR
+
+EventName = log.OnroadEvent.EventName
+
+class CarInterface(CarInterfaceBase):
+  CarState = CarState
+  CarController = CarController
+
+  @staticmethod
+  def _get_params(ret, candidate, fingerprint, car_fw, alpha_long, is_release, docs):
+    ret.brand = "byd"
+
+    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.byd)]
+    ret.safetyConfigs[0].safetyParam = 1
+
+    ret.steerControlType = car.CarParams.SteerControlType.angle
+    ret.steerLimitTimer = 0.6              # time before steerLimitAlert is issued
+    ret.steerActuatorDelay = 0.01          # Steering wheel actuator delay in seconds
+
+    ret.lateralTuning.init('pid')
+
+    ret.centerToFront = ret.wheelbase * 0.44
+    ret.tireStiffnessFactor = 0.9871
+
+    ret.openpilotLongitudinalControl = True
+    # TODO: angle based vehicle needs pid tuning?
+    ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.], [530]]
+    ret.lateralTuning.pid.kpBP = [0., 5., 20.]
+    ret.lateralTuning.pid.kiBP = [0., 5., 20.]
+    ret.longitudinalTuning.kpBP = [0., 5., 20.]
+    ret.longitudinalTuning.kiBP = [0., 5., 20.]
+    ret.longitudinalTuning.kpV = [0.8, 0.7, 0.6]
+    ret.longitudinalTuning.kiV = [0.5, 0.4, 0.3]
+
+    ret.lateralTuning.pid.kf = 0.00015
+
+    ret.wheelSpeedFactor = 0.66 # was 0.695
+
+    if candidate == CAR.ATTO3:
+      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
+    elif candidate == CAR.M6:
+      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
+
+      ret.longitudinalTuning.kpV = [1.2, 1.0, 0.8]
+
+      ret.safetyConfigs[0].safetyParam = 3
+    elif candidate in (CAR.SEAL, CAR.SEALION7):
+      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
+
+      ret.safetyConfigs[0].safetyParam = 2
+      ret.openpilotLongitudinalControl = False
+      ret.radarUnavailable = True
+    else:
+      ret.dashcamOnly = True
+      ret.safetyModel = car.CarParams.SafetyModel.noOutput
+
+    ret.startingState = True
+    ret.startAccel = 3.0
+    ret.minEnableSpeed = -1
+    ret.enableBsm = True
+    ret.stoppingDecelRate = 0.2 # reach stopping target smoothly
+
+    return ret
+
+  # returns a car.CarState
+  def _update(self, c):
+    ret = self.CS.update(self.cp, self.cp_cam)
+
+    # events
+    events = self.create_common_events(ret)
+    ret.events = events.to_msg()
+
+    return ret
+
+  # pass in a car.CarControl to be called at 100hz
+  def apply(self, c, now_nanos):
+    return self.CC.update(c, self.CS, now_nanos)

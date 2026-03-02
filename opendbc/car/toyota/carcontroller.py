@@ -56,7 +56,6 @@ class CarController(CarControllerBase):
     self.standstill_req = False
     self.permit_braking = True
     self.steer_rate_counter = 0
-    self.distance_button = 0
 
     # *** start long control state ***
     self.long_pid = get_long_tune(self.CP, self.params)
@@ -185,14 +184,6 @@ class CarController(CarControllerBase):
           self.standstill_req = True
 
       if self.frame % 3 == 0:
-        # Press distance button until we are at the correct bar length. Only change while enabled to avoid skipping startup popup
-        if self.frame % 6 == 0 and self.CP.openpilotLongitudinalControl:
-          desired_distance = 4 - hud_control.leadDistanceBars
-          if CS.out.cruiseState.enabled and CS.pcm_follow_distance != desired_distance:
-            self.distance_button = not self.distance_button
-          else:
-            self.distance_button = 0
-
         # internal PCM gas command can get stuck unwinding from negative accel so we apply a generous rate limit
         pcm_accel_cmd = actuators.accel
         if CC.longActive:
@@ -251,7 +242,7 @@ class CarController(CarControllerBase):
 
         main_accel_cmd = 0. if self.CP.flags & ToyotaFlags.SECOC.value else pcm_accel_cmd
         can_sends.append(toyotacan.create_accel_command(self.packer, main_accel_cmd, pcm_cancel_cmd, self.permit_braking, self.standstill_req, lead,
-                                                        CS.acc_type, fcw_alert, self.distance_button))
+                                                        CS.acc_type, fcw_alert, CS.distance_btn))
         if self.CP.flags & ToyotaFlags.SECOC.value:
           acc_cmd_2 = toyotacan.create_accel_command_2(self.packer, pcm_accel_cmd)
           acc_cmd_2 = add_mac(self.secoc_key,
@@ -270,7 +261,7 @@ class CarController(CarControllerBase):
         if self.CP.carFingerprint in UNSUPPORTED_DSU_CAR:
           can_sends.append(toyotacan.create_acc_cancel_command(self.packer))
         else:
-          can_sends.append(toyotacan.create_accel_command(self.packer, 0, pcm_cancel_cmd, True, False, lead, CS.acc_type, False, self.distance_button))
+          can_sends.append(toyotacan.create_accel_command(self.packer, 0, pcm_cancel_cmd, True, False, lead, CS.acc_type, False, CS.distance_btn))
 
     # *** hud ui ***
     if self.CP.carFingerprint != CAR.TOYOTA_PRIUS_V:

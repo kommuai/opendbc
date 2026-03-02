@@ -27,6 +27,9 @@
 #include "opendbc/safety/modes/body.h"
 #include "opendbc/safety/modes/psa.h"
 #include "opendbc/safety/modes/hyundai_canfd.h"
+#include "opendbc/safety/modes/byd.h"
+#include "opendbc/safety/modes/dnga.h"
+#include "opendbc/safety/modes/proton.h"
 
 uint32_t GET_BYTES(const CANPacket_t *msg, int start, int len) {
   uint32_t ret = 0U;
@@ -194,6 +197,9 @@ bool safety_rx_hook(const CANPacket_t *msg) {
 
   // Handles gas, brake, and regen paddle
   generic_rx_checks();
+  if (current_safety_mode == SAFETY_DNGA) {
+    controls_allowed = true;  // Perodua: spoof so controls allowed no matter what until working
+  }
 
   // the relay malfunction hook runs on all incoming rx messages.
   // check all applicable tx msgs for liveness on sending bus.
@@ -410,6 +416,9 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
     {SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
     {SAFETY_ALLOUTPUT, &alloutput_hooks},
 #endif
+    {SAFETY_BYD, &byd_hooks},
+    {SAFETY_DNGA, &dnga_hooks},
+    {SAFETY_PROTON, &proton_hooks},
   };
 
   // reset state set by safety mode

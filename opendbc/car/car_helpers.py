@@ -5,7 +5,7 @@ from opendbc.car import gen_empty_fingerprint
 from opendbc.car.can_definitions import CanRecvCallable, CanSendCallable
 from opendbc.car.carlog import carlog
 from opendbc.car.structs import CarParams, CarParamsT
-from opendbc.car.fingerprints import eliminate_incompatible_cars, all_legacy_fingerprint_cars
+from opendbc.car.fingerprints import eliminate_incompatible_cars, all_legacy_fingerprint_cars, best_match_from_candidates
 from opendbc.car.fw_versions import ObdCallback, get_fw_versions_ordered, get_present_ecus, match_fw_to_car
 from opendbc.car.mock.values import CAR as MOCK
 from opendbc.car.values import BRANDS
@@ -37,6 +37,11 @@ def _get_interface_names() -> dict[str, list[str]]:
 # imports from directory opendbc/car/<name>/
 interface_names = _get_interface_names()
 interfaces = load_interfaces(interface_names)
+
+
+def supported_cars() -> list[str]:
+  """Return list of supported car model names (for UI/settings)."""
+  return list(interfaces.keys())
 
 
 def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, dict]]:
@@ -76,6 +81,14 @@ def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, di
       done = failed or succeeded
 
       frame += 1
+
+  # Multiple candidates can remain (e.g. MYVI and QC both match). Pick the one with smallest matching fingerprint.
+  if car_fingerprint is None and frame > 200:
+    for b in candidate_cars:
+      if candidate_cars[b]:
+        observed = finger.get(b, {})
+        car_fingerprint = best_match_from_candidates(candidate_cars[b], observed)
+        break
 
   return car_fingerprint, finger
 

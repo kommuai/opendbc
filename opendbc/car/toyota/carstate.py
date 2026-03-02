@@ -44,6 +44,7 @@ class CarState(CarStateBase):
 
     self.lkas_button = 0
     self.distance_button = 0
+    self.distance_btn = 0  # passthrough to ACC_CONTROL for CAN (0 or 1)
 
     self.pcm_follow_distance = 0
 
@@ -146,9 +147,18 @@ class CarState(CarStateBase):
       conversion_factor = CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS
       ret.cruiseState.speedCluster = cluster_set_speed * conversion_factor
 
+    # Map cluster follow distance (DISTANCE_LINES 1–4) to longitudinal personality so UI reflects cluster
+    try:
+      distance_lines = int(cp.vl["PCM_CRUISE_SM"]["DISTANCE_LINES"])
+      personality = min(2, max(0, distance_lines - 1))  # 1=aggressive, 2=standard, 3–4=relaxed
+      self.set_long_personality(personality)
+    except (KeyError, TypeError):
+      pass
+
     if self.CP.carFingerprint in TSS2_CAR and not self.CP.flags & ToyotaFlags.DISABLE_RADAR.value:
       self.acc_type = cp_acc.vl["ACC_CONTROL"]["ACC_TYPE"]
       ret.stockFcw = bool(cp_acc.vl["PCS_HUD"]["FCW"])
+      self.distance_btn = 1 if cp_acc.vl["ACC_CONTROL"]["DISTANCE"] == 1 else 0
 
     # some TSS2 cars have low speed lockout permanently set, so ignore on those cars
     # these cars are identified by an ACC_TYPE value of 2.

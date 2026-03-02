@@ -14,7 +14,7 @@ from opendbc.car.can_definitions import CanData, CanRecvCallable, CanSendCallabl
 from opendbc.car.common.basedir import BASEDIR
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.common.simple_kalman import KF1D, get_kalman_gain
-from opendbc.car.values import PLATFORMS
+from opendbc.car.values import BRANDS, PLATFORMS
 from opendbc.can import CANParser
 
 GearShifter = structs.CarState.GearShifter
@@ -349,6 +349,15 @@ class CarStateBase(ABC):
           return True
     return False
 
+  def set_long_personality(self, personality: int):
+    """Write LongitudinalPersonality to params (0=aggressive, 1=standard, 2=relaxed) so UI/controls reflect cluster."""
+    personality = int(np.clip(personality, 0, 2))
+    try:
+      from openpilot.common.params import Params
+      Params().put_nonblocking('LongitudinalPersonality', personality)
+    except (ImportError, ModuleNotFoundError):
+      pass
+
   @staticmethod
   def parse_gear_shifter(gear: str | None) -> structs.CarState.GearShifter:
     if gear is None:
@@ -380,14 +389,14 @@ INTERFACE_ATTR_FILE = {
 
 
 def get_interface_attr(attr: str, combine_brands: bool = False, ignore_none: bool = False) -> dict[str | StrEnum, Any]:
-  # read all the folders in opendbc/car and return a dict where:
-  # - keys are all the car models or brand names
-  # - values are attr values from all car folders
+  # Return attr from each brand. Use BRANDS so all platforms (dnga, byd, proton, etc.) are included
+  # regardless of filesystem/BASEDIR (e.g. when opendbc is used as a package).
   result = {}
-  for car_folder in sorted([x[0] for x in os.walk(BASEDIR)]):
+  for brand in BRANDS:
     try:
-      brand_name = car_folder.split('/')[-1]
-      brand_values = __import__(f'opendbc.car.{brand_name}.{INTERFACE_ATTR_FILE.get(attr, "values")}', fromlist=[attr])
+      brand_name = brand.__module__.split('.')[-2]
+      mod_name = f'opendbc.car.{brand_name}.{INTERFACE_ATTR_FILE.get(attr, "values")}'
+      brand_values = __import__(mod_name, fromlist=[attr])
       if hasattr(brand_values, attr) or not ignore_none:
         attr_data = getattr(brand_values, attr, None)
       else:
