@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
-from cereal import car, log
-from opendbc.car import get_safety_config, structs
+from cereal import car
+from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
-from opendbc.car.proton.carstate import CarState
 from opendbc.car.proton.carcontroller import CarController
+from opendbc.car.proton.carstate import CarState
 from opendbc.car.proton.values import CAR
 
 from openpilot.common.features import Features
-
-EventName = log.OnroadEvent.EventName
-LANE_CHANGE_SPEED_MIN = 18.0
-
-# Default max lateral accel when platform not in shared torque_data
-PROTON_DEFAULT_MAX_LAT_ACCEL = 2.0
 
 
 class CarInterface(CarInterfaceBase):
@@ -27,20 +21,20 @@ class CarInterface(CarInterfaceBase):
     ret.safetyConfigs[0].safetyParam = 2 if Features().has("stock-acc") else 1
 
     ret.steerControlType = car.CarParams.SteerControlType.torque
-    ret.steerLimitTimer = 0.1              # time before steerLimitAlert is issued
-    ret.steerActuatorDelay = 0.30          # Steering wheel actuator delay in seconds
+    ret.steerLimitTimer = 0.1
+    ret.steerActuatorDelay = 0.30
 
-    ret.lateralTuning.init('pid')
+    ret.lateralTuning.init("pid")
 
-    ret.lateralTuning.pid.kpBP = [0., 5., 25., 35., 40.]
+    ret.lateralTuning.pid.kpBP = [0.0, 5.0, 25.0, 35.0, 40.0]
     ret.lateralTuning.pid.kpV = [0.05, 0.05, 0.15, 0.15, 0.16]
-    ret.lateralTuning.pid.kiBP = [0., 5., 20., 30.]
+    ret.lateralTuning.pid.kiBP = [0.0, 5.0, 20.0, 30.0]
     ret.lateralTuning.pid.kiV = [0.05, 0.10, 0.20, 0.40]
     ret.lateralTuning.pid.kf = 0.00007
 
-    ret.longitudinalTuning.kpBP = [0., 5., 20.]
+    ret.longitudinalTuning.kpBP = [0.0, 5.0, 20.0]
     ret.longitudinalTuning.kpV = [0.7, 0.5, 0.4]
-    ret.longitudinalTuning.kiBP = [0., 5., 20.]
+    ret.longitudinalTuning.kiBP = [0.0, 5.0, 20.0]
     ret.longitudinalTuning.kiV = [0.2, 0.15, 0.1]
 
     ret.centerToFront = ret.wheelbase * 0.44
@@ -50,15 +44,15 @@ class CarInterface(CarInterfaceBase):
     ret.wheelSpeedFactor = 1.02
 
     if candidate == CAR.X50:
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.], [545]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [545]]
       ret.longitudinalTuning.kpV = [0.5, 0.4, 0.3]
       ret.longitudinalTuning.kiV = [0.05, 0.05, 0.05]
     elif candidate == CAR.S70:
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.], [530]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [530]]
     elif candidate == CAR.X70:
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.], [500]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [500]]
     elif candidate == CAR.X90:
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.], [256]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [256]]
       ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05, 0.05]
     else:
       ret.dashcamOnly = True
@@ -69,20 +63,15 @@ class CarInterface(CarInterfaceBase):
     ret.startAccel = 1.2
     ret.minEnableSpeed = -1
     ret.enableBsm = True
-    ret.stoppingDecelRate = 0.3 # reach stopping target smoothly
+    ret.stoppingDecelRate = 0.3
 
     return ret
 
-  # returns a car.CarState
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp_cam)
-
-    # events
     events = self.create_common_events(ret)
-
     ret.events = events.to_msg()
     return ret
 
-  # pass in a car.CarControl to be called at 100hz
   def apply(self, c, now_nanos):
     return self.CC.update(c, self.CS, now_nanos)

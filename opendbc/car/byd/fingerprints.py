@@ -1,4 +1,9 @@
 # ruff: noqa: E501
+"""BYD CAN fingerprints.
+
+Mappings are kept explicit for deterministic fingerprint matching.
+"""
+
 from cereal import car
 from opendbc.car.byd.values import CAR
 

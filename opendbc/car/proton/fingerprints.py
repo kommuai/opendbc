@@ -1,4 +1,9 @@
 # ruff: noqa: E501
+"""Proton CAN fingerprints.
+
+Data is intentionally explicit static mapping for deterministic fingerprint matching.
+"""
+
 from cereal import car
 from opendbc.car.proton.values import CAR
 

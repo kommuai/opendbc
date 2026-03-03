@@ -1,9 +1,14 @@
-import numpy as np
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.dnga.values import CANBUS
 
-# Match bukapilot release_ka2: LKAS/ACC/HUD sent on main bus (0). Panda TX whitelist is bus 0 only. Parser reads from cam_bus (2).
+# Match bukapilot release_ka2:
+# LKAS/ACC/HUD are transmitted on bus 0 while parsing camera messages from bus 2.
 MAIN_BUS = CANBUS.main_bus
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+  return max(minimum, min(maximum, value))
+
 
 def create_can_steer_command(packer, steer, steer_req, cnt):
   values = {
@@ -13,33 +18,31 @@ def create_can_steer_command(packer, steer, steer_req, cnt):
     "SET_ME_1": 1,
     "SET_ME_1_2": 1,
   }
-
   return packer.make_can_msg("STEERING_LKAS", MAIN_BUS, values)
 
-def create_brake_command(packer, enabled, decel_req, pump, decel_cmd, aeb):
 
-  # Value overflow check
-  # MAGNITUDE a max value 2.0 to prevent overflow, maximum seen on porto is 1.56
-  # PUMP_REACTION{N} has a max value of 1.2, maximum seen on porto is 1.0
-  decel_cmd = float(np.clip(decel_cmd, 0., 1.56))
-  pump = float(np.clip(pump, 0., 1.0))
+def create_brake_command(packer, enabled, decel_req, pump, decel_cmd, aeb):
+  # Keep command values in observed stock-safe ranges.
+  decel_cmd = _clamp(float(decel_cmd), 0.0, 1.56)
+  pump = _clamp(float(pump), 0.0, 1.0)
+  braking_active = bool(enabled and decel_req)
 
   values = {
     "PUMP_REACTION1": pump if enabled else 0,
-    "BRAKE_REQ": decel_req and enabled,
-    "MAGNITUDE": (-1* decel_cmd) if (enabled and decel_req) else 0,
+    "BRAKE_REQ": braking_active,
+    "MAGNITUDE": -decel_cmd if braking_active else 0,
     "SET_ME_1_WHEN_ENGAGE": 1 if enabled else 0,
-    "PUMP_REACTION2": -1* pump if enabled else 0,
+    "PUMP_REACTION2": -pump if enabled else 0,
     "AEB_REQ1": 1 if aeb else 0,
     "AEB_REQ2": 1 if aeb else 0,
     "AEB_REQ3": 1 if aeb else 0,
     "AEB_1019": aeb,
   }
-
   return packer.make_can_msg("ACC_BRAKE", MAIN_BUS, values)
 
+
 def create_accel_command(packer, set_speed, acc_rdy, enabled, is_lead, des_speed, brake_amt, brake_pump, distance_val):
-  is_braking = (brake_amt > 0.0 or brake_pump > 0.0)
+  is_braking = brake_amt > 0.0 or brake_pump > 0.0
 
   values = {
     "SET_SPEED": set_speed * CV.MS_TO_KPH,
@@ -47,17 +50,16 @@ def create_accel_command(packer, set_speed, acc_rdy, enabled, is_lead, des_speed
     "IS_LEAD": is_lead,
     "IS_ACCEL": (not is_braking) and enabled,
     "IS_DECEL": is_braking and enabled,
-    "SET_ME_1_2": acc_rdy,  # rdy button
+    "SET_ME_1_2": acc_rdy,  # ready button state
     "SET_ME_1": 1,
     "SET_0_WHEN_ENGAGE": not enabled,
     "SET_1_WHEN_ENGAGE": enabled,
     "ACC_CMD": des_speed * CV.MS_TO_KPH if enabled else 0,
   }
-
   return packer.make_can_msg("ACC_CMD_HUD", MAIN_BUS, values)
 
-def create_hud(packer, lkas_rdy, enabled, llane_visible, rlane_visible, ldw, fcw, aeb, front_depart, ldp_off, fcw_off):
 
+def create_hud(packer, lkas_rdy, enabled, llane_visible, rlane_visible, ldw, fcw, aeb, front_depart, ldp_off, fcw_off):
   values = {
     "LKAS_SET": lkas_rdy,
     "LKAS_ENGAGED": enabled,
@@ -71,11 +73,10 @@ def create_hud(packer, lkas_rdy, enabled, llane_visible, rlane_visible, ldw, fcw
     "FRONT_DEPART": front_depart,
     "FCW_DISABLE": fcw_off,
   }
-
   return packer.make_can_msg("LKAS_HUD", MAIN_BUS, values)
 
-def dnga_buttons(packer, set_button, res_button, cancel_button):
 
+def dnga_buttons(packer, set_button, res_button, cancel_button):
   values = {
     "SET_MINUS": set_button,
     "RES_PLUS": res_button,
@@ -85,5 +86,4 @@ def dnga_buttons(packer, set_button, res_button, cancel_button):
     "NEW_SIGNAL_2": 1,
     "CANCEL": cancel_button,
   }
-
   return packer.make_can_msg("PCM_BUTTONS", MAIN_BUS, values)

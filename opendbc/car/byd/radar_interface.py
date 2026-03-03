@@ -40,6 +40,8 @@ def _create_radar_can_parser(car_fingerprint):
 
 
 class RadarInterface(RadarInterfaceBase):
+  """BYD radar parser with confidence and persistence filtering."""
+
   def __init__(self, CP):
     super().__init__(CP)
 

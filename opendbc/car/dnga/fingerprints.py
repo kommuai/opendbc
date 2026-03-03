@@ -1,4 +1,9 @@
 # ruff: noqa: E501
+"""DNGA CAN fingerprints.
+
+The dictionaries are kept as explicit static data for deterministic matching.
+"""
+
 from cereal import car
 from opendbc.car.dnga.values import CAR
 

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 @dataclass
 class AngleRateLimit:
-  speed_bp: list
-  angle_v: list
+  speed_bp: list[float]
+  angle_v: list[float]
 
   def __getitem__(self, i):
     return (self.speed_bp, self.angle_v)[i]
