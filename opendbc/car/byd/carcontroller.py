@@ -130,7 +130,7 @@ class CarController(CarControllerBase):
     if pcm_cancel_cmd:
       can_sends.append(send_buttons(self.packer, 0, 1, self.button_send_bus))
 
-    new_actuators = actuators.copy()
+    new_actuators = actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle
 
     self.frame += 1

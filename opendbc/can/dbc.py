@@ -17,6 +17,8 @@ from opendbc.car.volkswagen.mqbcan import volkswagen_mqb_meb_checksum, xor_check
 from opendbc.car.tesla.teslacan import tesla_checksum
 from opendbc.car.body.bodycan import body_checksum
 from opendbc.car.psa.psacan import psa_checksum
+from opendbc.car.proton.protoncan import proton_checksum
+from opendbc.car.byd.bydcan import byd_checksum
 
 
 class SignalType:
@@ -34,6 +36,8 @@ class SignalType:
   TESLA_CHECKSUM = 11
   PSA_CHECKSUM = 12
   VOLKSWAGEN_MLB_CHECKSUM = 13
+  PROTON_CHECKSUM = 14
+  BYD_CHECKSUM = 15
 
 
 @dataclass
@@ -177,7 +181,7 @@ class ChecksumState:
 def get_checksum_state(dbc_name: str) -> ChecksumState | None:
   if dbc_name.startswith(("honda_", "acura_")):
     return ChecksumState(4, 2, 3, 5, False, SignalType.HONDA_CHECKSUM, honda_checksum)
-  elif dbc_name.startswith(("toyota_", "lexus_")):
+  elif dbc_name.startswith(("toyota_", "lexus_", "dnga_")):
     return ChecksumState(8, -1, 7, -1, False, SignalType.TOYOTA_CHECKSUM, toyota_checksum)
   elif dbc_name.startswith("hyundai_canfd_generated"):
     return ChecksumState(16, -1, 0, -1, True, SignalType.HKG_CAN_FD_CHECKSUM, hkg_can_fd_checksum)
@@ -199,6 +203,10 @@ def get_checksum_state(dbc_name: str) -> ChecksumState | None:
     return ChecksumState(8, -1, 0, -1, True, SignalType.TESLA_CHECKSUM, tesla_checksum, tesla_setup_signal)
   elif dbc_name.startswith("psa_"):
     return ChecksumState(4, 4, 7, 3, False, SignalType.PSA_CHECKSUM, psa_checksum)
+  elif dbc_name.startswith("proton_"):
+    return ChecksumState(8, 4, 7, -1, False, SignalType.PROTON_CHECKSUM, proton_checksum)
+  elif dbc_name.startswith("byd_"):
+    return ChecksumState(8, 4, 7, -1, False, SignalType.BYD_CHECKSUM, byd_checksum)
   return None
 
 

@@ -1,3 +1,19 @@
+def byd_checksum(address: int, sig, d: bytearray) -> int:
+  """BYD nibble-sum checksum. byte_key 0xAF; checksum in last byte."""
+  byte_key = 0xAF
+  sum_first = 0
+  sum_second = 0
+  for i in range(len(d) - 1):
+    sum_first += d[i] >> 4
+    sum_second += d[i] & 0xF
+  remainder = (sum_second >> 4) & 0xFF
+  sum_first += byte_key & 0xF
+  sum_second += byte_key >> 4
+  inv_first = (-sum_first + 0x9) & 0xF
+  inv_second = (-sum_second + 0x9) & 0xF
+  return (((inv_first + (5 - remainder)) & 0xF) << 4 | inv_second) & 0xFF
+
+
 def create_can_steer_command(packer, steer_angle, steer_req, is_standstill, ecu_fault, recovery_btn):
 
   set_me_xe = 0xE if is_standstill else 0xB

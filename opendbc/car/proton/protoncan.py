@@ -1,3 +1,14 @@
+from opendbc.car.crc import CRC8H2F
+
+
+def proton_checksum(address: int, sig, d: bytearray) -> int:
+  """CRC8 8H2F/AUTOSAR. Checksum in last byte; CRC over bytes 0..size-2, final XOR 0xFF."""
+  crc = 0xFF
+  for i in range(len(d) - 1):
+    crc ^= d[i]
+    crc = CRC8H2F[crc]
+  return crc ^ 0xFF
+
 
 def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, wheel_touch_warning_2,
     lks_aux, lks_audio, lks_tactile, lks_assist_mode, lka_enable, stock_ldw_ste, steer_enabled, new_lka):
