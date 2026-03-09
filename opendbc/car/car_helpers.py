@@ -1,3 +1,4 @@
+import re
 import os
 import time
 
@@ -8,10 +9,57 @@ from opendbc.car.structs import CarParams, CarParamsT
 from opendbc.car.fingerprints import eliminate_incompatible_cars, all_legacy_fingerprint_cars, best_match_from_candidates
 from opendbc.car.fw_versions import ObdCallback, get_fw_versions_ordered, get_present_ecus, match_fw_to_car
 from opendbc.car.mock.values import CAR as MOCK
-from opendbc.car.values import BRANDS
+from opendbc.car.values import BRANDS, PLATFORMS
 from opendbc.car.vin import get_vin, is_valid_vin, VIN_UNKNOWN
+from openpilot.common.params import Params
 
 FRAME_FINGERPRINT = 100  # 1s
+
+params = Params()
+
+# Brands are matched by module name and platform membership
+unsupported_brands = {
+  "body", "chrysler", "ford", "gm", "hyundai",
+  "kia", "mazda", "nissan", "psa", "rivian",
+  "subaru", "tesla", "volkswagen"
+}
+
+# Platform keys match if any part of the string is in the list
+unsupported_platforms = {
+  "ACURA", "GENESIS", "HONDA_CITY_7G", "HONDA_CIVIC_BOSCH", "HONDA_CRV_HYBRID",
+  "HONDA_E", "HONDA_FIT", "HONDA_FREED", "HONDA_INSIGHT", "HONDA_NBOX",
+  "HONDA_ODYSSEY", "HONDA_PASSPORT", "HONDA_PILOT", "HONDA_RIDGELINE", "LEXUS_CTH",
+  "LEXUS_GS", "LEXUS_IS", "LEXUS_LC", "LEXUS_LS", "LEXUS_RC",
+  "QC", "TOYOTA_AVALON", "TOYOTA_CHR", "TOYOTA_HIGHLANDER", "TOYOTA_MIRAI",
+  "TOYOTA_PRIUS", "TOYOTA_RAV4", "TOYOTA_SIENNA", "TOYOTA_YARIS"
+}
+
+# Car names match if all words in a phrase appear in the car name
+unsupported_cars = {
+  "(South America only)", "Honda Accord 2018-22", "Honda Civic 201.*", "Honda Civic Hatchback",
+  "Honda CR-V 2015-16", "Honda Inspire", "Lexus ES 2017-18", "Lexus NX 2018-19",
+  "Lexus RX 201.*", "Toyota Corolla 201.*"
+}
+
+CAR_MAPPING = {
+  pkey: [
+    name for cdoc in getattr(platform.config, "car_docs", [])
+    if (name := getattr(cdoc, "name", None)) and not any(re.search(".*".join(uc.split()), name) for uc in unsupported_cars)
+  ]
+  for pkey, platform in PLATFORMS.items()
+  if not any(b.__module__.split(".")[-2] in unsupported_brands and platform in b for b in BRANDS)
+     and not any(up in pkey for up in unsupported_platforms)
+}
+
+def supported_cars() -> list[str]:
+  return sorted(n for ns in CAR_MAPPING.values() for n in ns)
+
+def car_name_to_platform(car_name: str) -> str | None:
+  return next((p for p, ns in CAR_MAPPING.items() if car_name in ns), None)
+
+# Remove previously set CarName if invalid
+if (car_name := params.get("CarName")) and car_name_to_platform(car_name) is None:
+  params.remove("CarName")
 
 
 def load_interfaces(brand_names):
@@ -37,11 +85,6 @@ def _get_interface_names() -> dict[str, list[str]]:
 # imports from directory opendbc/car/<name>/
 interface_names = _get_interface_names()
 interfaces = load_interfaces(interface_names)
-
-
-def supported_cars() -> list[str]:
-  """Return list of supported car model names (for UI/settings)."""
-  return list(interfaces.keys())
 
 
 def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, dict]]:
@@ -100,6 +143,9 @@ def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_mu
   skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
   disable_fw_cache = os.environ.get('DISABLE_FW_CACHE', False)
   ecu_rx_addrs = set()
+
+  if not fixed_fingerprint and (car_name := params.get("CarName")):
+    fixed_fingerprint = car_name_to_platform(car_name)
 
   start_time = time.monotonic()
   if not skip_fw_query:
