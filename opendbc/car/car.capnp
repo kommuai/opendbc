@@ -195,6 +195,7 @@ struct CarState {
   steerFaultPermanent @36 :Bool;
 
   invalidLkasSetting @55 :Bool;    # stock LKAS is incorrectly configured (i.e. on or off)
+  lkaDisabled @61 :Bool;          # LKA/LKAS disabled by car or driver (DNGA, Proton, etc.); used by ALC/desire
   stockAeb @30 :Bool;
   stockLkas @59 :Bool;
   stockFcw @31 :Bool;
@@ -635,6 +636,9 @@ struct CarParams {
     fcaGiorgio @32;
     rivian @33;
     volkswagenMeb @34;
+    proton @35;
+    byd @36;
+    dnga @37;
   }
 
   enum SteerControlType {
