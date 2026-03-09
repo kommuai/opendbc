@@ -280,8 +280,6 @@ class CarStateBase(ABC):
     self.cluster_speed_hyst_gap = 0.0
     self.cluster_min_speed = 0.0  # min speed before dropping to 0
     self.secoc_key: bytes = b"00" * 16
-    self._cached_long_personality: int | None = None
-    self._params_handle = None
 
     Q = [[0.0, 0.0], [0.0, 100.0]]
     R = 0.3
@@ -350,21 +348,6 @@ class CarStateBase(ABC):
         if b.type in (ButtonType.accelCruise, ButtonType.decelCruise) and not b.pressed:
           return True
     return False
-
-  def set_long_personality(self, personality: int):
-    """Write LongitudinalPersonality to params (0=aggressive, 1=standard, 2=relaxed) so UI/controls reflect cluster."""
-    personality = int(np.clip(personality, 0, 2))
-    if personality == self._cached_long_personality:
-      return
-
-    try:
-      if self._params_handle is None:
-        from openpilot.common.params import Params
-        self._params_handle = Params()
-      self._params_handle.put_nonblocking('LongitudinalPersonality', personality)
-      self._cached_long_personality = personality
-    except (ImportError, ModuleNotFoundError):
-      pass
 
   @staticmethod
   def parse_gear_shifter(gear: str | None) -> structs.CarState.GearShifter:

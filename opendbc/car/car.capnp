@@ -216,6 +216,7 @@ struct CarState {
   # button presses
   buttonEvents @11 :List(ButtonEvent);
   buttonEnable @57 :Bool;  # user is requesting enable, usually one frame. set if pcmCruise=False
+  personality @62 :Int8 = -1;  # optional carstate-provided longitudinal personality override
   leftBlinker @20 :Bool;
   rightBlinker @21 :Bool;
   genericToggle @23 :Bool;

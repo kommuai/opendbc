@@ -1,10 +1,17 @@
 from cereal import car
 from opendbc.can import CANDefine, CANParser
-from opendbc.car import Bus
+from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.byd.values import DBC, CANBUS, HUD_MULTIPLIER, CAR
 
+ButtonType = car.CarState.ButtonEvent.Type
+BYD_DISTANCE_TO_PERSONALITY = {
+  1: 0,  # 1 bar
+  2: 1,  # 2 bar
+  4: 2,  # 3 bar
+  8: 2,  # 4 bar
+}
 
 class CarState(CarStateBase):
   def __init__(self, CP):
@@ -27,6 +34,7 @@ class CarState(CarStateBase):
     self.pt5 = 0
     self.lkas_rdy_btn = False
     self.op_long = True
+    self.distance_val = 1
 
   def _select_long_parser(self, cp, cp_cam):
     if self.CP.carFingerprint in (CAR.ATTO3, CAR.M6):
@@ -39,6 +47,8 @@ class CarState(CarStateBase):
     cp = can_parsers[Bus.pt]
     cp_cam = can_parsers[Bus.cam]
     ret = car.CarState.new_message()
+    ret.buttonEvents = []
+    ret.personality = -1
 
     self.tsr = cp_cam.vl["LKAS_HUD_ADAS"]["TSR"]
     self.lka_on = cp_cam.vl["LKAS_HUD_ADAS"]["STEER_ACTIVE_ACTIVE_LOW"]
@@ -100,8 +110,12 @@ class CarState(CarStateBase):
       [parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"], parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"]]
     )
 
-    distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long else 1
-    self.set_long_personality(2 if distance_val in (4, 8) else distance_val - 1)
+    prev_distance_val = self.distance_val
+    self.distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long else 1
+    ret.personality = BYD_DISTANCE_TO_PERSONALITY.get(self.distance_val, -1)
+    if self.distance_val != prev_distance_val:
+      ret.buttonEvents = create_button_events(1, 0, {1: ButtonType.gapAdjustCruise}) + \
+                         create_button_events(0, 1, {1: ButtonType.gapAdjustCruise})
 
     if (cp.vl["PCM_BUTTONS"]["SET_BTN"] != 0 or cp.vl["PCM_BUTTONS"]["RES_BTN"] != 0) and not ret.brakePressed:
       self.is_cruise_latch = True

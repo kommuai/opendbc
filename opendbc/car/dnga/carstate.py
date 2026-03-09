@@ -11,6 +11,11 @@ SEC_HOLD_TO_STEP_SPEED = 0.6
 SHORT_PRESS_SEC = 1.0
 CRUISE_MIN_KPH = 30
 CRUISE_MAX_KPH = 140
+DNGA_DISTANCE_TO_PERSONALITY = {
+  2: 0,  # 1 bar
+  1: 1,  # 2 bar
+  0: 2,  # 3 bar
+}
 
 class CarState(CarStateBase):
   def __init__(self, CP):
@@ -122,6 +127,7 @@ class CarState(CarStateBase):
     cp_cam = can_parsers[Bus.cam]
     self.camera_bus_valid = cp_cam.can_valid
     ret = car.CarState.new_message()
+    ret.personality = -1
 
     self.lkaDisabled = not self.lkas_latch
 
@@ -190,11 +196,11 @@ class CarState(CarStateBase):
     if cp_cam.can_valid:
       ret.cruiseState.available = bool(cp_cam.vl["ACC_CMD_HUD"]["SET_ME_1_2"])
       self.distance_val = int(cp_cam.vl["ACC_CMD_HUD"]["FOLLOW_DISTANCE"])
+      ret.personality = DNGA_DISTANCE_TO_PERSONALITY.get(self.distance_val, -1)
 
     prev_distance_button = self.distance_button
     self.distance_button = cp.vl["BUTTONS"]["DISTANCE_BTN"]
     ret.buttonEvents = create_button_events(self.distance_button, prev_distance_button, {1: ButtonType.gapAdjustCruise})
-    self.set_long_personality(1 if self.distance_val == 1 else (2 - self.distance_val))
 
     minus_button, plus_button, hybrid_cancel = self._read_cruise_buttons(cp)
 

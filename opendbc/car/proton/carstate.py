@@ -1,7 +1,7 @@
 from cereal import car
 from opendbc.can import CANDefine, CANParser
 from opendbc.car.common.conversions import Conversions as CV
-from opendbc.car import Bus
+from opendbc.car import Bus, create_button_events
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.proton.values import DBC, HUD_MULTIPLIER, CANBUS, CAR
 from time import monotonic
@@ -23,6 +23,12 @@ def _params_get_bool_default_false():
 
 
 BLINKER_MIN = 2.25
+ButtonType = car.CarState.ButtonEvent.Type
+PROTON_DISTANCE_TO_PERSONALITY = {
+  1: 0,  # 1 bar
+  2: 1,  # 2 bar
+  3: 2,  # 3 bar
+}
 
 class Dir(Enum):
   LEFT = auto()
@@ -63,6 +69,7 @@ class CarState(CarStateBase):
     self.cur_blinker = None
     self.blinker_on_alc_speed = False
     self.blinker_start_time = 0
+    self.distance_val = 1
 
   def set_cur_blinker(self, alc_below_min_speed, right_blinker):
     self.blinker_start_time = monotonic()
@@ -116,6 +123,8 @@ class CarState(CarStateBase):
     cp = can_parsers[Bus.pt]
     cp_cam = can_parsers[Bus.cam]
     ret = car.CarState.new_message()
+    ret.buttonEvents = []
+    ret.personality = -1
 
     self._update_lks_state(cp_cam)
 
@@ -170,8 +179,12 @@ class CarState(CarStateBase):
       ret.cruiseState.available = True
 
     self.res_btn_pressed = bool(cp.vl["ACC_BUTTONS"]["RES_BUTTON"])
-    distance_val = int(cp_cam.vl["PCM_BUTTONS"]["SET_DISTANCE"])
-    self.set_long_personality(distance_val - 1)
+    prev_distance_val = self.distance_val
+    self.distance_val = int(cp_cam.vl["PCM_BUTTONS"]["SET_DISTANCE"])
+    ret.personality = PROTON_DISTANCE_TO_PERSONALITY.get(self.distance_val, -1)
+    if self.distance_val != prev_distance_val:
+      ret.buttonEvents = create_button_events(1, 0, {1: ButtonType.gapAdjustCruise}) + \
+                         create_button_events(0, 1, {1: ButtonType.gapAdjustCruise})
 
     self.cruise_speed = int(cp_cam.vl["PCM_BUTTONS"]["ACC_SET_SPEED"]) * CV.KPH_TO_MS
     ret.cruiseState.speedCluster = self.cruise_speed
