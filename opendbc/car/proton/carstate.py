@@ -22,7 +22,7 @@ def _params_get_bool_default_false():
     return False
 
 
-BLINKER_MIN = 2.25
+BLINKER_MIN = 2.25 # Minimum turn signal length in seconds
 
 class Dir(Enum):
   LEFT = auto()
@@ -67,9 +67,16 @@ class CarState(CarStateBase):
   def set_cur_blinker(self, alc_below_min_speed, right_blinker):
     self.blinker_start_time = monotonic()
     self.cur_blinker = Dir.RIGHT if right_blinker else Dir.LEFT
-    self.blinker_on_alc_speed = not alc_below_min_speed
+    self.blinker_on_alc_speed = not alc_below_min_speed # Check when blinker on / direction change, if ALC speed was enough
 
   def _update_lks_state(self, cp_cam):
+    """
+    Lane Keep Assist (LKA)
+    Warning Only:         LKS Assist True,  Auxiliary False
+    Departure Prevention: LKS Assist True,  Auxiliary True
+    Centering Control:    LKS Assist False, Auxiliary False
+    """
+
     self.lks_audio = bool(cp_cam.vl["ADAS_LKAS"]["LKS_WARNING_AUDIO_TYPE"])
     self.lks_tactile = bool(cp_cam.vl["ADAS_LKAS"]["LKS_WARNING_TACTILE_TYPE"])
     self.lks_assist_mode = bool(cp_cam.vl["ADAS_LKAS"]["LKS_ASSIST_MODE"])
@@ -87,30 +94,32 @@ class CarState(CarStateBase):
     self.stock_steer_dir = bool(cp_cam.vl["ADAS_LKAS"]["STEER_DIR"])
 
     self.hand_on_wheel_warning = bool(cp_cam.vl["ADAS_LKAS"]["HAND_ON_WHEEL_WARNING"])
-    self.hand_on_wheel_warning_2 = bool(cp_cam.vl["ADAS_LKAS"]["WHEEL_WARNING_CHIME"])
+    self.hand_on_wheel_warning_2 = bool(cp_cam.vl["ADAS_LKAS"]["WHEEL_WARNING_CHIME"]) # The second warning before ICC disengage
     self.stock_acc_cmd = cp_cam.vl["ACC_CMD"]["CMD"]
 
   def _apply_blinker_minimum_time(self, ret):
     left_blinker = ret.leftBlinker
     right_blinker = ret.rightBlinker
     one_blinker = left_blinker != right_blinker
+
+    # Use minimum blinker time if ALC speed not enough
     alc_below_min_speed = ret.vEgo < LANE_CHANGE_SPEED_MIN or not self.is_alc_enabled
 
     if self.cur_blinker is None:
       self.blinker_on_alc_speed = False
-      if one_blinker:
+      if one_blinker: # Turn signal was off and is now on
         self.set_cur_blinker(alc_below_min_speed, right_blinker)
     else:
+      # cur_blinker is left or right
       elapsed = monotonic() - self.blinker_start_time
       if not one_blinker and (self.blinker_on_alc_speed or elapsed >= BLINKER_MIN):
         self.cur_blinker = None
       elif (left_blinker and self.cur_blinker == Dir.RIGHT) or (right_blinker and self.cur_blinker == Dir.LEFT):
-        self.set_cur_blinker(alc_below_min_speed, right_blinker)
+        self.set_cur_blinker(alc_below_min_speed, right_blinker) # Change in blinker direction
 
     if alc_below_min_speed:
-      current = self.cur_blinker
-      ret.leftBlinker = current == Dir.LEFT
-      ret.rightBlinker = current == Dir.RIGHT
+      ret.leftBlinker = self.cur_blinker == Dir.LEFT
+      ret.rightBlinker = self.cur_blinker == Dir.RIGHT
 
   def update(self, can_parsers):
     cp = can_parsers[Bus.pt]
@@ -119,6 +128,7 @@ class CarState(CarStateBase):
 
     self._update_lks_state(cp_cam)
 
+    # If cruise mode is ICC, make bukapilot control steering so it won't disengage by itself.
     ret.lkaDisabled = not (self.lka_enable or self.is_icc_on)
 
     self.parse_wheel_speeds(ret,
@@ -141,7 +151,7 @@ class CarState(CarStateBase):
     ret.seatbeltUnlatched = cp.vl["SEATBELTS"]["RIGHT_SIDE_SEATBELT_ACTIVE_LOW"] == 1
 
     if self.CP.carFingerprint == CAR.X90:
-      ret.gearShifter = 2
+      ret.gearShifter = 2 # hardcode to drive because stock X90 has non standard gear
     else:
       ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
 
@@ -164,10 +174,8 @@ class CarState(CarStateBase):
     ret.stockAeb = False
     ret.stockFcw = bool(cp_cam.vl["FCW"]["STOCK_FCW_TRIGGERED"])
 
-    if self.CP.carFingerprint == CAR.X50:
-      ret.cruiseState.available = bool(cp_cam.vl["PCM_BUTTONS"]["CRUISE_AVAILABLE"])
-    else:
-      ret.cruiseState.available = True
+    #TODO: If using car signal, S70 cannot engage, X50 gas press would make it False.
+    ret.cruiseState.available = True
 
     self.res_btn_pressed = bool(cp.vl["ACC_BUTTONS"]["RES_BUTTON"])
     distance_val = int(cp_cam.vl["PCM_BUTTONS"]["SET_DISTANCE"])

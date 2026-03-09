@@ -72,8 +72,8 @@ class CarController(CarControllerBase):
     self.prev_steer_enabled = False
     self.last_steer_disable = 0.0
 
-    self.sng_next_press_frame = 0
-    self.resume_counter = 0
+    self.sng_next_press_frame = 0 # The frame where the next resume press is allowed
+    self.resume_counter = 0       # Counter for tracking the progress of a resume press
     self.is_sng_check = False
     self.resume = False
 
@@ -89,15 +89,16 @@ class CarController(CarControllerBase):
       self.last_steer_disable = monotonic()
     self.prev_steer_enabled = steer_enabled
 
+    # Stock Lane Departure Prevention / Centering Control (LKS Auxiliary / Blue line)
     lat_active = steer_enabled
     if (
       not steer_enabled
       and CS.stock_ldp_cmd > 0
       and not ((CS.out.rightBlinker and CS.stock_ldp_right) or (CS.out.leftBlinker and CS.stock_ldp_left))
     ):
-      # Prevent sudden LDP/LKA torque when switching from openpilot to stock.
+      # Prevents sudden pull from LDP/ICC/LKA Centering after steer disable.
       blend = _clip((monotonic() - self.last_steer_disable - 0.55) / 0.5, 0.0, 1.0)
-      apply_steer = round(CS.stock_ldp_cmd * (-1 if CS.stock_steer_dir else 1) * blend) & ~1
+      apply_steer = round(CS.stock_ldp_cmd * (-1 if CS.stock_steer_dir else 1) * blend) & ~1 # Ensure cmd LSB 0 for 11-bit cmd
       lat_active = True
 
     return apply_steer, lat_active, steer_enabled
@@ -131,7 +132,7 @@ class CarController(CarControllerBase):
       self.last_cancel_press = 0
       return
 
-    if self.frame > self.last_cancel_press + 15 and not brake_pressed:
+    if self.frame > self.last_cancel_press + 15 and not (CS.out.brakePressed and not CS.cruise_standstill):
       can_sends.append(send_buttons(self.packer, True))
       self.cancel_press_cnt += 1
       if self.cancel_press_cnt == 2:
@@ -148,6 +149,7 @@ class CarController(CarControllerBase):
     apply_steer, lat_active, steer_enabled = self._compute_steer(CC, CS)
 
     if (self.frame % 2) == 0:
+      # stock lane departure settings
       ldw_steering = CS.stock_ldw_steering
       if self.always_lks_tactile:
         ldw_steering = ldw_steering or CS.has_audio_ldw
@@ -158,8 +160,9 @@ class CarController(CarControllerBase):
       standstill_request = CS.out.standstill and CC.longActive
       self._update_sng(CC, CS, can_sends)
 
-      # X90 expects even-numbered steer command scaling.
       is_x90 = self.CP.carFingerprint == CAR.X90
+
+      # TODO: Remove line below and test on X90 since stock LKA last bit is always 0 for any Proton car.
       steer_cmd = (round(apply_steer) * 2) if (is_x90 and CC.latActive) else apply_steer
 
       can_sends.append(
@@ -192,7 +195,7 @@ class CarController(CarControllerBase):
           accel_cmd = min(CS.stock_acc_cmd * mult, accel_cmd)
 
         can_sends.append(
-          create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume)
+          create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume, CS.out.brakePressed)
         )
 
     self._update_cancel_spam(pcm_cancel_cmd, CS.out.brakePressed, can_sends)
