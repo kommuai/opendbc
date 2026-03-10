@@ -26,7 +26,7 @@ class DNGAFlags(IntFlag):
 
 
 class CAR(Platforms):
-  ALZA = DNGAPlatformConfig(
+  PERODUA_ALZA = DNGAPlatformConfig(
     [
       CarInfo("Perodua Alza 2020-24", "All", support_type=SupportType.DASHCAM),
       CarInfo("Toyota Veloz 2020-24", "All", support_type=SupportType.DASHCAM),
@@ -34,7 +34,7 @@ class CAR(Platforms):
     CarSpecs(mass=1170.0, wheelbase=2.750, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
-  ATIVA = DNGAPlatformConfig(
+  PERODUA_ATIVA = DNGAPlatformConfig(
     [
       CarInfo("Perodua Ativa 2020-24", "All", support_type=SupportType.DASHCAM),
       CarInfo("Perodua Ativa Hybrid 2020-24", "All", support_type=SupportType.DASHCAM),
@@ -42,11 +42,11 @@ class CAR(Platforms):
     ],
     CarSpecs(mass=1035.0, wheelbase=2.525, steerRatio=17.0),
   )
-  MYVI = DNGAPlatformConfig(
+  PERODUA_MYVI = DNGAPlatformConfig(
     [CarInfo("Perodua Myvi 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
   )
-  VIOS = DNGAPlatformConfig(
+  TOYOTA_VIOS = DNGAPlatformConfig(
     [CarInfo("Toyota Vios 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
@@ -60,10 +60,10 @@ class CAR(Platforms):
 BRAKE_SCALE = defaultdict(
   lambda: 1.0,
   {
-    CAR.ALZA: 0.65,
-    CAR.ATIVA: 0.714,
-    CAR.MYVI: 0.714,
-    CAR.VIOS: 0.68,
+    CAR.PERODUA_ALZA: 0.65,
+    CAR.PERODUA_ATIVA: 0.714,
+    CAR.PERODUA_MYVI: 0.714,
+    CAR.TOYOTA_VIOS: 0.68,
     CAR.QC: 0.714,
   },
 )

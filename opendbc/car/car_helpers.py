@@ -125,7 +125,7 @@ def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, di
 
       frame += 1
 
-  # Multiple candidates can remain (e.g. MYVI and QC both match). Pick the one with smallest matching fingerprint.
+  # Multiple candidates can remain (e.g. PERODUA_MYVI and QC both match). Pick the one with smallest matching fingerprint.
   if car_fingerprint is None and frame > 200:
     for b in candidate_cars:
       if candidate_cars[b]:

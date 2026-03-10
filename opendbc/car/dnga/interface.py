@@ -46,18 +46,18 @@ class CarInterface(CarInterfaceBase):
     lateral_kf = 0.00015
     long_kp_v = [2.2, 2.0, 1.8]
 
-    if candidate == CAR.ALZA:
+    if candidate == CAR.PERODUA_ALZA:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.14, 0.18], [0.18, 0.25]]
       lateral_kf = 0.00015
       long_kp_v = [0.1, 1.2, 1.2]
       wheel_speed_factor = 1.425
-    elif candidate == CAR.ATIVA:
+    elif candidate == CAR.PERODUA_ATIVA:
       lateral_kf = 0.000188
       wheel_speed_factor = 1.505
-    elif candidate == CAR.MYVI:
+    elif candidate == CAR.PERODUA_MYVI:
       lateral_kf = 0.00012
       wheel_speed_factor = 1.31
-    elif candidate == CAR.VIOS:
+    elif candidate == CAR.TOYOTA_VIOS:
       lateral_kf = 0.00018
       wheel_speed_factor = 1.43
     elif candidate == CAR.QC:

@@ -19,19 +19,19 @@ class CANBUS:
 
 
 class CAR(Platforms):
-  ATTO3 = BYDPlatformConfig(
+  BYD_ATTO3 = BYDPlatformConfig(
     [CarInfo("BYD Atto 3 2020-24", "ALL", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=2090.0, wheelbase=2.72, steerRatio=16.0),
   )
-  M6 = BYDPlatformConfig(
+  BYD_M6 = BYDPlatformConfig(
     [CarInfo("BYD M6 2020-24", "ALL", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=2374.0, wheelbase=2.80, steerRatio=16.0),
   )
-  SEAL = BYDPlatformConfig(
+  BYD_SEAL = BYDPlatformConfig(
     [CarInfo("BYD Seal 2020-24", "ALL", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=2180.0, wheelbase=2.92, steerRatio=16.0),
   )
-  SEALION7 = BYDPlatformConfig(
+  BYD_SEALION7 = BYDPlatformConfig(
     [CarInfo("BYD Sealion 7 2020-24", "ALL", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
   )
@@ -42,10 +42,10 @@ DBC = CAR.create_dbc_map()
 ACCEL_MULT = defaultdict(
   lambda: 1,
   {
-    CAR.ATTO3: 25,
-    CAR.M6: 25,
-    CAR.SEAL: 1,
-    CAR.SEALION7: 1,
+    CAR.BYD_ATTO3: 25,
+    CAR.BYD_M6: 25,
+    CAR.BYD_SEAL: 1,
+    CAR.BYD_SEALION7: 1,
   },
 )
 

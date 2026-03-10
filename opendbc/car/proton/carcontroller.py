@@ -51,7 +51,7 @@ class CarControllerParams:
     self.STEER_MAX = CP.lateralParams.torqueV[0]
     assert len(CP.lateralParams.torqueV) == 1
 
-    if CP.carFingerprint == CAR.X90:
+    if CP.carFingerprint == CAR.PROTON_X90:
       self.STEER_DELTA_UP = 4
       self.STEER_DELTA_DOWN = 8
     else:
@@ -160,7 +160,7 @@ class CarController(CarControllerBase):
       standstill_request = CS.out.standstill and CC.longActive
       self._update_sng(CC, CS, can_sends)
 
-      is_x90 = self.CP.carFingerprint == CAR.X90
+      is_x90 = self.CP.carFingerprint == CAR.PROTON_X90
 
       # TODO: Remove line below and test on X90 since stock LKA last bit is always 0 for any Proton car.
       steer_cmd = (round(apply_steer) * 2) if (is_x90 and CC.latActive) else apply_steer

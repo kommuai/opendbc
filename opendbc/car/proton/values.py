@@ -20,22 +20,22 @@ class CANBUS:
 
 
 class CAR(Platforms):
-  S70 = ProtonPlatformConfig(
+  PROTON_S70 = ProtonPlatformConfig(
     [
       CarInfo("Proton S70 2020-24", "All", support_type=SupportType.DASHCAM),
       CarInfo("Proton X50 FL 2020-24", "All", support_type=SupportType.DASHCAM),
     ],
     CarSpecs(mass=1300.0, wheelbase=2.627, steerRatio=15.0),
   )
-  X50 = ProtonPlatformConfig(
+  PROTON_X50 = ProtonPlatformConfig(
     [CarInfo("Proton X50 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1370.0, wheelbase=2.6, steerRatio=15.0),
   )
-  X70 = ProtonPlatformConfig(
+  PROTON_X70 = ProtonPlatformConfig(
     [CarInfo("Proton X70 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1610.0, wheelbase=2.67, steerRatio=15.0),
   )
-  X90 = ProtonPlatformConfig(
+  PROTON_X90 = ProtonPlatformConfig(
     [CarInfo("Proton X90 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1705.0, wheelbase=2.805, steerRatio=15.0),
   )
