@@ -19,20 +19,20 @@ class CANBUS:
 
 
 class CAR(Platforms):
-  ATTO3 = BYDPlatformConfig(
-    [CarInfo("BYD Atto 3 2020-24", "ALL", support_type=SupportType.CUSTOM)],
+  BYD_ATTO3 = BYDPlatformConfig(
+    [CarInfo("BYD Atto 3 2023-2026", "ALL", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=2090.0, wheelbase=2.72, steerRatio=16.0),
   )
-  M6 = BYDPlatformConfig(
-    [CarInfo("BYD M6 2020-24", "ALL", support_type=SupportType.CUSTOM)],
+  BYD_M6 = BYDPlatformConfig(
+    [CarInfo("BYD M6 2024-2026", "ALL", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=2374.0, wheelbase=2.80, steerRatio=16.0),
   )
-  SEAL = BYDPlatformConfig(
-    [CarInfo("BYD Seal 2020-24", "ALL", support_type=SupportType.CUSTOM)],
+  BYD_SEAL = BYDPlatformConfig(
+    [CarInfo("BYD Seal 2024-2026", "ALL", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=2180.0, wheelbase=2.92, steerRatio=16.0),
   )
-  SEALION7 = BYDPlatformConfig(
-    [CarInfo("BYD Sealion 7 2020-24", "ALL", support_type=SupportType.CUSTOM)],
+  BYD_SEALION7 = BYDPlatformConfig(
+    [CarInfo("BYD Sealion 7 2024-2026", "ALL", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
   )
 

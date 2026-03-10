@@ -24,26 +24,26 @@ class DNGAFlags(IntFlag):
 class CAR(Platforms):
   PERODUA_ALZA = DNGAPlatformConfig(
     [
-      CarInfo("Perodua Alza 2020-24", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Toyota Veloz 2020-24", "All", support_type=SupportType.CUSTOM),
+      CarInfo("Perodua Alza 2022-2026", "All", support_type=SupportType.CUSTOM),
+      CarInfo("Toyota Veloz 2022-2026", "All", support_type=SupportType.CUSTOM),
     ],
     CarSpecs(mass=1170.0, wheelbase=2.750, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
   PERODUA_ATIVA = DNGAPlatformConfig(
     [
-      CarInfo("Perodua Ativa 2020-24", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Perodua Ativa Hybrid 2020-24", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Toyota Raize 2020-24", "All", support_type=SupportType.CUSTOM),
+      CarInfo("Perodua Ativa 2021-2026", "All", support_type=SupportType.CUSTOM),
+      CarInfo("Perodua Ativa Hybrid 2022", "All", support_type=SupportType.CUSTOM),
+      CarInfo("Toyota Raize 2021-2026", "All", support_type=SupportType.CUSTOM),
     ],
     CarSpecs(mass=1035.0, wheelbase=2.525, steerRatio=17.0),
   )
   PERODUA_MYVI = DNGAPlatformConfig(
-    [CarInfo("Perodua Myvi 2020-24", "All", support_type=SupportType.CUSTOM)],
+    [CarInfo("Perodua Myvi 2022-2026", "All", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
-    [CarInfo("Toyota Vios 2020-24", "All", support_type=SupportType.CUSTOM)],
+    [CarInfo("Toyota Vios 2023-2026", "All", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
