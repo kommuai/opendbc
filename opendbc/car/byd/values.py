@@ -42,10 +42,10 @@ DBC = CAR.create_dbc_map()
 ACCEL_MULT = defaultdict(
   lambda: 1,
   {
-    CAR.ATTO3: 25,
-    CAR.M6: 25,
-    CAR.SEAL: 1,
-    CAR.SEALION7: 1,
+    CAR.BYD_ATTO3: 25,
+    CAR.BYD_M6: 25,
+    CAR.BYD_SEAL: 1,
+    CAR.BYD_SEALION7: 1,
   },
 )
 

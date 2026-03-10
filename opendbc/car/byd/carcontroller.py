@@ -48,10 +48,10 @@ class CarController(CarControllerBase):
     self.lka_cooldown = 0
     self.prev_press = False
     self.lka_latched = False
-    self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in (CAR.ATTO3, CAR.M6) else CANBUS.main_bus
+    self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6) else CANBUS.main_bus
 
   def _update_lka_latch_state(self, CS):
-    if self.CP.carFingerprint in (CAR.M6, CAR.SEAL, CAR.SEALION7):
+    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEALION7):
       rising_edge = CS.lkas_rdy_btn and not self.prev_press
       if rising_edge:
         if not self.lka_latched:
@@ -146,7 +146,7 @@ class CarController(CarControllerBase):
         if CS.out.genericToggle or (CS.out.standstill and CC.enabled and (self.frame % 100 == 0)):
           can_sends.append(send_buttons(self.packer, 1, 0, self.button_send_bus))
 
-    if self.CP.carFingerprint in (CAR.M6, CAR.SEAL):
+    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL):
       cycle_position = self.frame % SPOOF_CYCLE_FRAMES
       spoof_active = cycle_position < SPOOF_DURATION_FRAMES
 

@@ -43,15 +43,15 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = True
     ret.wheelSpeedFactor = 1.02
 
-    if candidate == CAR.X50:
+    if candidate == CAR.PROTON_X50:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [545]]
       ret.longitudinalTuning.kpV = [0.5, 0.4, 0.3]
       ret.longitudinalTuning.kiV = [0.05, 0.05, 0.05]
-    elif candidate == CAR.S70:
+    elif candidate == CAR.PROTON_S70:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [530]]
-    elif candidate == CAR.X70:
+    elif candidate == CAR.PROTON_X70:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [500]]
-    elif candidate == CAR.X90:
+    elif candidate == CAR.PROTON_X90:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [256]]
       ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05, 0.05]
     else:

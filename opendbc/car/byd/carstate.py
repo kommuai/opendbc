@@ -37,7 +37,7 @@ class CarState(CarStateBase):
     self.distance_val = 1
 
   def _select_long_parser(self, cp, cp_cam):
-    if self.CP.carFingerprint in (CAR.ATTO3, CAR.M6):
+    if self.CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6):
       self.op_long = True
       return cp_cam
     self.op_long = False
@@ -136,7 +136,7 @@ class CarState(CarStateBase):
     if not ret.cruiseState.available or ret.brakePressed or not stock_acc_on:
       self.is_cruise_latch = False
 
-    if self.CP.carFingerprint in (CAR.SEAL, CAR.SEALION7, CAR.M6):
+    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_M6):
       cruise_state = parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"]
       ret.cruiseState.enabled = cruise_state in (3, 5, 6, 7)
     else:
@@ -176,7 +176,7 @@ class CarState(CarStateBase):
       ("WHEEL_SPEED", 50),
     ]
 
-    if CP.carFingerprint in (CAR.SEAL, CAR.SEALION7):
+    if CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7):
       signals.append(("ACC_CMD", 50))
       signals.append(("ACC_HUD_ADAS", 50))
 
@@ -189,7 +189,7 @@ class CarState(CarStateBase):
       ("STEERING_MODULE_ADAS", 50),
     ]
 
-    if CP.carFingerprint in (CAR.ATTO3, CAR.M6):
+    if CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6):
       signals.append(("ACC_CMD", 50))
       signals.append(("ACC_HUD_ADAS", 50))
 

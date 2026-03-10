@@ -37,14 +37,14 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kf = 0.00015
     ret.wheelSpeedFactor = 0.66
 
-    if candidate == CAR.ATTO3:
+    if candidate == CAR.BYD_ATTO3:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-    elif candidate == CAR.M6:
+    elif candidate == CAR.BYD_M6:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
 
       ret.longitudinalTuning.kpV = [1.2, 1.0, 0.8]
       ret.safetyConfigs[0].safetyParam = 3
-    elif candidate in (CAR.SEAL, CAR.SEALION7):
+    elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7):
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
       ret.safetyConfigs[0].safetyParam = 2
       ret.openpilotLongitudinalControl = False

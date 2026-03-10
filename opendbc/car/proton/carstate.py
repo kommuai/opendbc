@@ -159,7 +159,7 @@ class CarState(CarStateBase):
 
     ret.seatbeltUnlatched = cp.vl["SEATBELTS"]["RIGHT_SIDE_SEATBELT_ACTIVE_LOW"] == 1
 
-    if self.CP.carFingerprint == CAR.X90:
+    if self.CP.carFingerprint == CAR.PROTON_X90:
       ret.gearShifter = 2 # hardcode to drive because stock X90 has non standard gear
     else:
       ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
