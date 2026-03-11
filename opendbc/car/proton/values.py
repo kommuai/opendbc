@@ -1,16 +1,18 @@
 from dataclasses import dataclass, field
 
-from cereal import car
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
-from opendbc.car.docs_definitions import CarDocs as CarInfo, SupportType
+from opendbc.car.docs_definitions import CarDocs, SupportType
 
 HUD_MULTIPLIER = 1.04
-Ecu = car.CarParams.Ecu
 
 
 @dataclass
 class ProtonPlatformConfig(PlatformConfig):
   dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("proton_general_pt", None))
+
+
+class ProtonCarDocs(CarDocs):
+  pass
 
 
 class CANBUS:
@@ -22,26 +24,25 @@ class CANBUS:
 class CAR(Platforms):
   PROTON_S70 = ProtonPlatformConfig(
     [
-      CarInfo("Proton S70 2023-2026", "All", support_type=SupportType.DASHCAM),
-      CarInfo("Proton X50 FL 2025-2026", "All", support_type=SupportType.DASHCAM),
+      ProtonCarDocs("Proton S70 2023-26", "All", support_type=SupportType.DASHCAM),
+      ProtonCarDocs("Proton X50 FL 2025-26", "All", support_type=SupportType.DASHCAM),
     ],
     CarSpecs(mass=1300.0, wheelbase=2.627, steerRatio=15.0),
   )
   PROTON_X50 = ProtonPlatformConfig(
-    [CarInfo("Proton X50 2020-2024", "All", support_type=SupportType.DASHCAM)],
+    [ProtonCarDocs("Proton X50 2020-24", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1370.0, wheelbase=2.6, steerRatio=15.0),
   )
   PROTON_X70 = ProtonPlatformConfig(
-    [CarInfo("Proton X70 FL 2024-2026", "All", support_type=SupportType.DASHCAM)],
+    [ProtonCarDocs("Proton X70 FL 2024-26", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1610.0, wheelbase=2.67, steerRatio=15.0),
   )
   PROTON_X90 = ProtonPlatformConfig(
-    [CarInfo("Proton X90 2023-2026", "All", support_type=SupportType.DASHCAM)],
+    [ProtonCarDocs("Proton X90 2023-26", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1705.0, wheelbase=2.805, steerRatio=15.0),
   )
 
 
-CAR_INFO = CAR.create_carinfo_map()
 DBC = CAR.create_dbc_map()
 
 
