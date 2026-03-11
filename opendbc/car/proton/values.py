@@ -38,7 +38,7 @@ class CAR(Platforms):
     CarSpecs(mass=1610.0, wheelbase=2.67, steerRatio=15.0),
   )
   PROTON_X90 = ProtonPlatformConfig(
-    [ProtonCarDocs("Proton X90 2023-26", "All", support_type=SupportType.DASHCAM)],
+    [ProtonCarDocs("Proton X90 2023-25", "All", support_type=SupportType.DASHCAM)],
     CarSpecs(mass=1705.0, wheelbase=2.805, steerRatio=15.0),
   )
 
