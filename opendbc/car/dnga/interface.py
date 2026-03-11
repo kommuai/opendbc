@@ -35,11 +35,11 @@ class CarInterface(CarInterfaceBase):
 
     ret.openpilotLongitudinalControl = True
     ret.longitudinalTuning.kpBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kpV = [2.2, 2.0, 1.6]
+    ret.longitudinalTuning.kpV = [1.2, 1.2, 1.0]
     # Perodua control is speed-command based; avoid longitudinal integrator windup.
     ret.longitudinalTuning.kiBP = [0.0, 5.0, 20.0]
-    #ret.longitudinalTuning.kiV = [0.211, 0.210, 0.206]
-    ret.longitudinalTuning.kiV = [0.0, 0.0, 0.0]
+    ret.longitudinalTuning.kiV = [0.211, 0.210, 0.206]
+    #ret.longitudinalTuning.kiV = [0.0, 0.0, 0.0]
 
     wheel_speed_factor = 1.0
     lateral_kf = 0.00015

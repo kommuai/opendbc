@@ -81,7 +81,7 @@ def psd_brake(apply_brake, last_pump):
 class CarControllerParams:
   STEER_STEP = 1
   ACCEL_MIN = -3.5
-  ACCEL_MAX = 1.8
+  ACCEL_MAX = 1.6 # not advisable to go higher because brake may fail
 
   def __init__(self, CP):
     self.STEER_MAX = CP.lateralParams.torqueV[0]
@@ -112,7 +112,7 @@ class CarController(CarControllerBase):
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration #acceleration - CS.stock_brake_mag if CS.out.vEgo > 0.25 else acceleration
-    speed_gain = (0.567 if CS.CP.carFingerprint == CAR.PERODUA_ATIVA else 0.557) + 0.06 * CS.out.vEgo
+    speed_gain = (0.567 if CS.CP.carFingerprint == CAR.PERODUA_ATIVA else 0.407) + 0.06 * CS.out.vEgo
     desired_speed = CS.out.vEgo + accel_cmd * speed_gain
     return accel_cmd, desired_speed
 
