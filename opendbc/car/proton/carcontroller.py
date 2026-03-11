@@ -126,7 +126,7 @@ class CarController(CarControllerBase):
       can_sends.append(send_buttons(self.packer, False))
       self.resume_counter += 1
 
-  def _update_cancel_spam(self, pcm_cancel_cmd, brake_pressed, can_sends):
+  def _update_cancel_spam(self, CS, pcm_cancel_cmd, can_sends):
     if not pcm_cancel_cmd:
       self.cancel_press_cnt = 0
       self.last_cancel_press = 0
@@ -198,7 +198,7 @@ class CarController(CarControllerBase):
           create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume, CS.out.brakePressed)
         )
 
-    self._update_cancel_spam(pcm_cancel_cmd, CS.out.brakePressed, can_sends)
+    self._update_cancel_spam(CS, pcm_cancel_cmd, can_sends)
 
     self.last_steer = apply_steer
     new_actuators = actuators.as_builder()

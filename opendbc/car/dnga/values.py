@@ -2,16 +2,19 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import IntFlag
 
-from cereal import car
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
-from opendbc.car.docs_definitions import CarDocs as CarInfo, SupportType
+from opendbc.car.docs_definitions import CarDocs, SupportType
 
 HUD_MULTIPLIER = 1.04
-Ecu = car.CarParams.Ecu
 
 @dataclass
 class DNGAPlatformConfig(PlatformConfig):
   dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("dnga_general_pt", None))
+
+
+class DNGACarDocs(CarDocs):
+  pass
+
 
 class CANBUS:
   main_bus = 0
@@ -24,31 +27,31 @@ class DNGAFlags(IntFlag):
 class CAR(Platforms):
   PERODUA_ALZA = DNGAPlatformConfig(
     [
-      CarInfo("Perodua Alza 2022-2026", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Toyota Veloz 2022-2026", "All", support_type=SupportType.CUSTOM),
+      DNGACarDocs("Perodua Alza 2022-26", "All", support_type=SupportType.CUSTOM),
+      DNGACarDocs("Toyota Veloz 2022-26", "All", support_type=SupportType.CUSTOM),
     ],
     CarSpecs(mass=1170.0, wheelbase=2.750, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
   PERODUA_ATIVA = DNGAPlatformConfig(
     [
-      CarInfo("Perodua Ativa 2021-2026", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Perodua Ativa Hybrid 2022", "All", support_type=SupportType.CUSTOM),
-      CarInfo("Toyota Raize 2021-2026", "All", support_type=SupportType.CUSTOM),
+      DNGACarDocs("Perodua Ativa 2021-26", "All", support_type=SupportType.CUSTOM),
+      DNGACarDocs("Perodua Ativa Hybrid 2022", "All", support_type=SupportType.CUSTOM),
+      DNGACarDocs("Toyota Raize 2021-26", "All", support_type=SupportType.CUSTOM),
     ],
     CarSpecs(mass=1035.0, wheelbase=2.525, steerRatio=17.0),
   )
   PERODUA_MYVI = DNGAPlatformConfig(
-    [CarInfo("Perodua Myvi 2022-2026", "All", support_type=SupportType.CUSTOM)],
+    [DNGACarDocs("Perodua Myvi 2022-26", "All", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
-    [CarInfo("Toyota Vios 2023-2026", "All", support_type=SupportType.CUSTOM)],
+    [DNGACarDocs("Toyota Vios 2023-26", "All", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
   QC = DNGAPlatformConfig(
-    [CarInfo("Quality Check 2020-24", "All", support_type=SupportType.CUSTOM)],
+    [DNGACarDocs("Quality Check 2020-24", "All", support_type=SupportType.CUSTOM)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
   )
 
@@ -66,7 +69,6 @@ BRAKE_SCALE = defaultdict(
 
 SNG_CAR = CAR.with_flags(DNGAFlags.SNG)
 HYBRID_CAR = CAR.with_flags(DNGAFlags.HYBRID)
-CAR_INFO = CAR.create_carinfo_map()
 DBC = CAR.create_dbc_map()
 
 
