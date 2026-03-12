@@ -249,10 +249,5 @@ class Platforms(str, ReprEnum, metaclass=PlatformsType):
     return {p: p.config.dbc_dict for p in cls}
 
   @classmethod
-  def create_carinfo_map(cls) -> dict[str, list]:
-    """Map platform name to car_docs (used by byd, dnga, proton)."""
-    return {p: p.config.car_docs for p in cls}
-
-  @classmethod
   def with_flags(cls, flags: IntFlag) -> set['Platforms']:
     return {p for p in cls if p.config.flags & flags}
