@@ -1,4 +1,5 @@
 from cereal import car
+import math
 from opendbc.can import CANDefine, CANParser
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car import Bus
@@ -214,19 +215,19 @@ class CarState(CarStateBase):
   @staticmethod
   def get_can_parser(CP):
     signals = [
-      ("WHEEL_SPEED", 0),
-      ("ACC_BUTTONS", 0),
-      ("PARKING_BRAKE", 0),
-      ("TRANSMISSION", 0),
-      ("GAS_PEDAL", 0),
-      ("BRAKE", 0),
-      ("STEERING_TORQUE", 0),
-      ("STEERING_MODULE", 0),
-      ("LEFT_STALK", 0),
-      ("BSM_ADAS", 0),
-      ("SEATBELTS", 0),
-      ("DOOR_LEFT_SIDE", 0),
-      ("DOOR_RIGHT_SIDE", 0),
+      ("WHEEL_SPEED", math.nan),
+      ("ACC_BUTTONS", math.nan),
+      ("PARKING_BRAKE", math.nan),
+      ("TRANSMISSION", math.nan),
+      ("GAS_PEDAL", math.nan),
+      ("BRAKE", math.nan),
+      ("STEERING_TORQUE", math.nan),
+      ("STEERING_MODULE", math.nan),
+      ("LEFT_STALK", math.nan),
+      ("BSM_ADAS", math.nan),
+      ("SEATBELTS", math.nan),
+      ("DOOR_LEFT_SIDE", math.nan),
+      ("DOOR_RIGHT_SIDE", math.nan),
     ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.main_bus)
@@ -234,12 +235,12 @@ class CarState(CarStateBase):
   @staticmethod
   def get_cam_can_parser(CP):
     signals = [
-      ("ADAS_LEAD_DETECT", 0),
-      ("ACC_CMD", 0),
-      ("ADAS_LKAS", 0),
-      ("LKAS", 0),
-      ("FCW", 0),
-      ("PCM_BUTTONS", 0),
+      ("ADAS_LEAD_DETECT", math.nan),
+      ("ACC_CMD", math.nan),
+      ("ADAS_LKAS", math.nan),
+      ("LKAS", math.nan),
+      ("FCW", math.nan),
+      ("PCM_BUTTONS", math.nan),
     ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.cam_bus)
