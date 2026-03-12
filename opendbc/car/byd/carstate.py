@@ -1,4 +1,5 @@
 from cereal import car
+import math
 from opendbc.can import CANDefine, CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
@@ -170,9 +171,9 @@ class CarState(CarStateBase):
       ("METER_CLUSTER", 20),
       ("STEER_MODULE_2", 100),
       ("STEERING_TORQUE", 50),
-      ("STALKS", 0),
+      ("STALKS", math.nan),
       ("BSM", 20),
-      ("PCM_BUTTONS", 0),
+      ("PCM_BUTTONS", math.nan),
       ("WHEEL_SPEED", 50),
     ]
 
