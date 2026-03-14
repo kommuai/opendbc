@@ -121,7 +121,8 @@ class CarController(CarControllerBase):
       self.resume_counter = 0
       return
 
-    if CC.actuators.accel > 0 and self.frame > self.sng_next_press_frame:
+    # Brake check added for resume because S70 can still increase speed when standstill if brake pressed.
+    if CC.actuators.accel > 0 and self.frame > self.sng_next_press_frame and not CS.out.brakePressed:
       self.resume = True
       can_sends.append(send_buttons(self.packer, False))
       self.resume_counter += 1
