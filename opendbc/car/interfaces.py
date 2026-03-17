@@ -365,6 +365,7 @@ class CarControllerBase(ABC):
     self.CP = CP
     self.frame = 0
     self.secoc_key: bytes = b"00" * 16
+    self.stock_longitudinal_contributing = False
 
   @abstractmethod
   def update(self, CC: structs.CarControl, CS: CarStateBase, now_nanos: int) -> tuple[structs.CarControl.Actuators, list[CanData]]:

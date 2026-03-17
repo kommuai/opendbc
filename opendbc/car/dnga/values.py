@@ -40,7 +40,7 @@ class CAR(Platforms):
   )
   PERODUA_MYVI = DNGAPlatformConfig(
     [CarInfo("Perodua Myvi 2022-2026", "All", support_type=SupportType.CUSTOM)],
-    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
+    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=18.2),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
     [CarInfo("Toyota Vios 2023-2026", "All", support_type=SupportType.CUSTOM)],

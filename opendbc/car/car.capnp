@@ -217,6 +217,7 @@ struct CarState {
   buttonEvents @11 :List(ButtonEvent);
   buttonEnable @57 :Bool;  # user is requesting enable, usually one frame. set if pcmCruise=False
   personality @62 :Int8 = -1;  # optional carstate-provided longitudinal personality override
+  stockAccelCmd @63 :Float32;  # optional stock ACC accel command observed from CAN
   leftBlinker @20 :Bool;
   rightBlinker @21 :Bool;
   genericToggle @23 :Bool;
@@ -451,6 +452,7 @@ struct CarOutput {
   # the CarController are reflected in actuatorsOutput
   # and matches what is sent to the car
   actuatorsOutput @0 :CarControl.Actuators;
+  stockLongitudinalContributing @1 :Bool;
 }
 
 # ****** car param ******

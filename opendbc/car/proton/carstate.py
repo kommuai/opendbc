@@ -136,6 +136,7 @@ class CarState(CarStateBase):
     ret.personality = -1
 
     self._update_lks_state(cp_cam)
+    ret.stockAccelCmd = float(self.stock_acc_cmd)
 
     # If cruise mode is ICC, make bukapilot control steering so it won't disengage by itself.
     ret.lkaDisabled = not (self.lka_enable or self.is_icc_on)

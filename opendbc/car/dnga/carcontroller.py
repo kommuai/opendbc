@@ -23,6 +23,7 @@ PUMP_RESET_INTERVAL = 1.5
 PUMP_RESET_DURATION = 0.1
 BRAKE_MAG_COMP_BP = [0.0, 0.3, 0.5, 1.25]
 BRAKE_MAG_COMP_V = [1.0, 1.0, 1.25, 1.5]
+REENGAGE_SET_MINUS_DELTA_KPH = 25.0
 
 
 class BrakingStatus(IntEnum):
@@ -122,20 +123,29 @@ class CarController(CarControllerBase):
     else:
       base_brake = abs(acceleration * self.brake_scale)
       magnitude_compensation = float(np.interp(base_brake, BRAKE_MAG_COMP_BP, BRAKE_MAG_COMP_V))
-      apply_brake = float(np.clip(base_brake * magnitude_compensation, 0.0, 1.32))
+      apply_brake = float(np.clip(base_brake * magnitude_compensation, 0.0, 1.52))
 
     if CS.out.vEgo < 2.8:
       apply_brake = float(np.clip(apply_brake, 0.0, 1.0))
     return apply_brake
+
+  def _send_reengage_button(self, CS, can_sends):
+    stock_set_speed_kph = float(CS.stock_acc_set_speed)
+    current_speed_kph = float(CS.out.vEgoCluster) * 3.6
+    # Large stock set-speed deltas can fail to latch on RES_PLUS, use SET_MINUS to re-engage first.
+    if (stock_set_speed_kph - current_speed_kph) > REENGAGE_SET_MINUS_DELTA_KPH:
+      can_sends.append(dnga_buttons(self.packer, 1, 0, 0))
+    else:
+      can_sends.append(dnga_buttons(self.packer, 0, 1, 0))
 
   def _update_stock_acc_state(self, enabled, CS, can_sends):
     if enabled and CS.out.vEgo > 10.0:
       if CS.stock_acc_engaged:
         self.using_stock_acc = True
       else:
-        can_sends.append(dnga_buttons(self.packer, 0, 1, 0))
+        self._send_reengage_button(CS, can_sends)
     elif enabled:
-      can_sends.append(dnga_buttons(self.packer, 0, 1, 0))
+      self._send_reengage_button(CS, can_sends)
 
     if CS.out.vEgo < 8.3:
       self.using_stock_acc = False
@@ -159,6 +169,7 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos):
     del now_nanos
+    self.stock_longitudinal_contributing = False
     can_sends = []
     ts = self.frame * DT_CTRL
 

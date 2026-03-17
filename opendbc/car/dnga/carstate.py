@@ -189,6 +189,7 @@ class CarState(CarStateBase):
       self.stock_acc_engaged = self.stock_acc_cmd > 0
       self.stock_acc_set_speed = cp_cam.vl["ACC_CMD_HUD"]["SET_SPEED"]
       self.stock_brake_mag = -cp_cam.vl["ACC_BRAKE"]["MAGNITUDE"]
+    ret.stockAccelCmd = float(self.stock_acc_cmd)
 
     self._handle_lkas_button_latch(cp)
 
