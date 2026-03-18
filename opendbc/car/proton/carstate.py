@@ -178,7 +178,10 @@ class CarState(CarStateBase):
     self.prev_angle = ret.steeringAngleDeg
     ret.steeringTorque = cp.vl["STEERING_TORQUE"]["MAIN_TORQUE"] * steer_dir
     ret.steeringTorqueEps = cp.vl["STEERING_MODULE"]["STEER_RATE"] * steer_dir
-    ret.steeringPressed = bool(abs(ret.steeringTorque) > 65)
+    if self.CP.carFingerprint == CAR.PROTON_X50:
+      ret.steeringPressed = abs(ret.steeringTorque) > 124
+    else:
+      ret.steeringPressed = abs(ret.steeringTorque) > 65
 
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
 
