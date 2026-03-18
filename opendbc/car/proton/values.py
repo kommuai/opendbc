@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
 from opendbc.car.docs_definitions import CarDocs, SupportType
 
-HUD_MULTIPLIER = 1.04
-
 
 @dataclass
 class ProtonPlatformConfig(PlatformConfig):
