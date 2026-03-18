@@ -231,15 +231,16 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can_parser(CP):
+    # Some Proton signals may be missing for more than 3 seconds after startup, so math.nan avoids false timeout errors.
     signals = [
-      ("WHEEL_SPEED", math.nan),
+      ("WHEEL_SPEED", 50),
       ("ACC_BUTTONS", math.nan),
-      ("PARKING_BRAKE", math.nan),
-      ("TRANSMISSION", math.nan),
-      ("GAS_PEDAL", math.nan),
-      ("BRAKE", math.nan),
+      ("PARKING_BRAKE", 50),
+      ("TRANSMISSION", 50),
+      ("GAS_PEDAL", 100),
+      ("BRAKE", 50),
       ("STEERING_TORQUE", math.nan),
-      ("STEERING_MODULE", math.nan),
+      ("STEERING_MODULE", 100),
       ("LEFT_STALK", math.nan),
       ("BSM_ADAS", math.nan),
       ("SEATBELTS", math.nan),
@@ -251,10 +252,12 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_cam_can_parser(CP):
+    # FCW is event-driven on Proton and should not be treated as a periodic alive signal.
+    # Some Proton signals may be missing after startup, so math.nan avoids false timeout errors.
     signals = [
       ("ADAS_LEAD_DETECT", math.nan),
-      ("ACC_CMD", math.nan),
-      ("ADAS_LKAS", math.nan),
+      ("ACC_CMD", 50),
+      ("ADAS_LKAS", 50),
       ("LKAS", math.nan),
       ("FCW", math.nan),
       ("PCM_BUTTONS", math.nan),
