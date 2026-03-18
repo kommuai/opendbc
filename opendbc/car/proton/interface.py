@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFactor = 0.7933
 
     ret.openpilotLongitudinalControl = True
-    ret.wheelSpeedFactor = 1.02
+    ret.wheelSpeedFactor = 1.0455
 
     if candidate == CAR.PROTON_X50:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [545]]

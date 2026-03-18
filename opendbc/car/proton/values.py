@@ -4,8 +4,6 @@ from enum import Enum
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
 from opendbc.car.docs_definitions import CarDocs, CarParts, CUSTOM_CAR_PARTS, CarFootnote, Column
 
-HUD_MULTIPLIER = 1.04
-
 
 @dataclass
 class ProtonPlatformConfig(PlatformConfig):
