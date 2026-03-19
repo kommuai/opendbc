@@ -19,10 +19,6 @@ def _clip(value, lo, hi):
   return float(np.clip(value, lo, hi))
 
 
-def _interp(x, xp, fp):
-  return float(np.interp(x, xp, fp))
-
-
 def apply_proton_steer_torque_limits(apply_torque, apply_torque_last, driver_torque, LIMITS):
   # Proton-specific driver torque envelope.
   driver_offset = driver_torque * 30
@@ -188,12 +184,6 @@ class CarController(CarControllerBase):
         accel_cmd = accel_cmd * 15 if accel_cmd >= 0 else accel_cmd * 18
         if CS.out.gasPressed:
           accel_cmd = 0.0
-
-        mult = _interp(CS.out.vEgo, [0, 28.3], [1.0, 0.6])
-        if CS.out.vEgo < 2.5:
-          accel_cmd = (CS.stock_acc_cmd * mult + accel_cmd) / 2
-        else:
-          accel_cmd = min(CS.stock_acc_cmd * mult, accel_cmd)
 
         can_sends.append(
           create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume, CS.out.brakePressed)
