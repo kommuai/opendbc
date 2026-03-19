@@ -2,9 +2,8 @@
 
 #include "opendbc/safety/declarations.h"
 
-static bool proton_using_stock_acc = false;
 static uint8_t proton_crc8_lut_8h2f[256];
-static uint8_t proton_resume_window_frames = 0U;
+static uint8_t proton_acc_tx_block_frames = 0U;
 
 #define PROTON_ACC_CMD         0x1A1U  // 417
 #define PROTON_ADAS_LKAS       0x1B0U  // 432
@@ -14,17 +13,7 @@ static uint8_t proton_resume_window_frames = 0U;
 #define PROTON_PARKING_BRAKE   0x125U  // 293
 #define PROTON_WHEEL_SPEED     0x122U  // 290
 
-#define PROTON_RESUME_WINDOW_MAX 60U
-
-static void proton_start_resume_window(void) {
-  proton_resume_window_frames = PROTON_RESUME_WINDOW_MAX;
-}
-
-static void proton_tick_resume_window(void) {
-  if (proton_resume_window_frames > 0U) {
-    proton_resume_window_frames--;
-  }
-}
+#define PROTON_ACC_TX_BLOCK_MAX 1U
 
 static uint8_t proton_get_counter(const CANPacket_t *msg) {
   uint8_t counter = 0U;
@@ -72,11 +61,9 @@ static void proton_rx_hook(const CANPacket_t *msg) {
 
     if (res_btn || set_btn) {
       controls_allowed = true;
-      proton_start_resume_window();
     }
     if (cancel_btn) {
       controls_allowed = false;
-      proton_resume_window_frames = 0U;
     }
   }
 
@@ -86,9 +73,6 @@ static void proton_rx_hook(const CANPacket_t *msg) {
     bool standstill_req = GET_BIT(msg, 38U);  // STANDSTILL_REQ
     pcm_cruise_check(acc_req || standstill_req);
 
-    if (acc_req) {
-      proton_resume_window_frames = 0U;
-    }
   }
 }
 
@@ -121,10 +105,6 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
   }
 
   if (addr == (int)PROTON_ACC_CMD) {
-    if (proton_using_stock_acc) {
-      violation = true;
-    }
-
     bool acc_req = GET_BIT(msg, 36U);         // ACC_REQ
     bool cruise_disabled = GET_BIT(msg, 12U); // CRUISE_DISABLED
     bool set_me_1 = GET_BIT(msg, 33U);        // SET_ME_1
@@ -136,18 +116,8 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
       violation = true;
     }
 
-    proton_tick_resume_window();
-  }
-
-  if (addr == (int)PROTON_ACC_BUTTONS) {
-    bool res_btn = GET_BIT(msg, 3U);          // RES_BUTTON
-    bool set_btn = GET_BIT(msg, 4U);          // SET_BUTTON
-    bool set_me_pressed = GET_BIT(msg, 43U);  // SET_ME_BUTTON_PRESSED
-
-    // Keep button tx permissive to avoid blocking neutral button frames.
-    if (res_btn || set_btn || set_me_pressed) {
-      proton_start_resume_window();
-    }
+    // After device sends ACC_CMD, block camera ACC for one short step (stops both sources clashing).
+    proton_acc_tx_block_frames = PROTON_ACC_TX_BLOCK_MAX;
   }
 
   return !violation;
@@ -159,21 +129,25 @@ static bool proton_fwd_hook(int bus_num, int addr) {
   }
   if (bus_num == 2) {
     bool is_lkas_msg = (addr == (int)PROTON_ADAS_LKAS);
-    bool is_acc_msg = (addr == (int)PROTON_ACC_CMD) && !proton_using_stock_acc;
+    // Block camera ACC only for the brief window after device ACC_CMD transmit; then allow stock again.
+    bool is_acc_msg = (addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U);
+    if ((addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U)) {
+      proton_acc_tx_block_frames--;
+    }
     return is_lkas_msg || is_acc_msg;
   }
   return false;
 }
 
 static safety_config proton_init(uint16_t param) {
+  (void)param;
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
-  proton_using_stock_acc = (param == 2U);
-  proton_resume_window_frames = 0U;
+  proton_acc_tx_block_frames = 0U;
   controls_allowed = false;
 
   static const CanMsg PROTON_TX_MSGS[] = {
     {PROTON_ADAS_LKAS, 0, 8, .check_relay = true},
-    {PROTON_ACC_CMD, 0, 8, .check_relay = true},
+    {PROTON_ACC_CMD, 0, 8, .check_relay = true, .disable_static_blocking = true},
     {PROTON_ACC_BUTTONS, 2, 8, .check_relay = false},
   };
 

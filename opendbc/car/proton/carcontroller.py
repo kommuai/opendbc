@@ -181,7 +181,7 @@ class CarController(CarControllerBase):
       )
 
       if self.openpilot_long:
-        accel_cmd = accel_cmd * 15 if accel_cmd >= 0 else accel_cmd * 18
+        accel_cmd = accel_cmd * 17 if accel_cmd >= 0 else accel_cmd * 18
         if CS.out.gasPressed:
           accel_cmd = 0.0
 
