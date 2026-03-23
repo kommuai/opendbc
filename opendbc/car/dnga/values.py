@@ -69,10 +69,6 @@ class CAR(Platforms):
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
-  QC = DNGAPlatformConfig(
-    [DNGACarDocs("Quality Check 2020-24", "All")],
-    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
-  )
 
 
 BRAKE_SCALE = defaultdict(
@@ -82,7 +78,6 @@ BRAKE_SCALE = defaultdict(
     CAR.PERODUA_ATIVA: 0.8,
     CAR.PERODUA_MYVI: 0.8,
     CAR.TOYOTA_VIOS: 0.68,
-    CAR.QC: 0.8,
   },
 )
 
@@ -96,9 +91,14 @@ class CarControllerParams:
   ACCEL_MAX = 1.6  # not advisable to go higher because brake may fail
   LONG_CRUISE_ACCEL_DEADZONE = 0.08
   LONG_CRUISE_DEADZONE_MIN_V_EGO = 2.5
+  STEER_DRIVER_ALLOWANCE = 0
+  STEER_DRIVER_FACTOR = 1
+  STEER_DRIVER_MULTIPLIER_DEFAULT = 1.5
+  STEER_DRIVER_MULTIPLIER_BLINKER = 10.0
 
   def __init__(self, CP):
     self.STEER_MAX = CP.lateralParams.torqueV[0]
     assert len(CP.lateralParams.torqueV) == 1
     self.STEER_DELTA_UP = 10
     self.STEER_DELTA_DOWN = 30
+    self.STEER_DRIVER_MULTIPLIER = self.STEER_DRIVER_MULTIPLIER_DEFAULT

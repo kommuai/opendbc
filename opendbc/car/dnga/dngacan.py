@@ -1,13 +1,10 @@
+import numpy as np
+
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.dnga.values import CANBUS
 
-# Match bukapilot release_ka2:
-# LKAS/ACC/HUD are transmitted on bus 0 while parsing camera messages from bus 2.
-MAIN_BUS = CANBUS.main_bus
-
-
-def _clamp(value: float, minimum: float, maximum: float) -> float:
-  return max(minimum, min(maximum, value))
+BRAKE_DECEL_CMD_MAX = 1.56
+BRAKE_PUMP_MAX = 1.0
 
 
 def create_can_steer_command(packer, steer, steer_req, cnt):
@@ -18,13 +15,13 @@ def create_can_steer_command(packer, steer, steer_req, cnt):
     "SET_ME_1": 1,
     "SET_ME_1_2": 1,
   }
-  return packer.make_can_msg("STEERING_LKAS", MAIN_BUS, values)
+  return packer.make_can_msg("STEERING_LKAS", CANBUS.main_bus, values)
 
 
 def create_brake_command(packer, enabled, decel_req, pump, decel_cmd, aeb):
   # Keep command values in observed stock-safe ranges.
-  decel_cmd = _clamp(float(decel_cmd), 0.0, 1.56)
-  pump = _clamp(float(pump), 0.0, 1.0)
+  decel_cmd = float(np.clip(float(decel_cmd), 0.0, BRAKE_DECEL_CMD_MAX))
+  pump = float(np.clip(float(pump), 0.0, BRAKE_PUMP_MAX))
   braking_active = bool(enabled and decel_req)
 
   values = {
@@ -38,7 +35,7 @@ def create_brake_command(packer, enabled, decel_req, pump, decel_cmd, aeb):
     "AEB_REQ3": 1 if aeb else 0,
     "AEB_1019": aeb,
   }
-  return packer.make_can_msg("ACC_BRAKE", MAIN_BUS, values)
+  return packer.make_can_msg("ACC_BRAKE", CANBUS.main_bus, values)
 
 
 def create_accel_command(packer, set_speed, acc_rdy, enabled, is_lead, des_speed, brake_amt, brake_pump, distance_val):
@@ -56,7 +53,7 @@ def create_accel_command(packer, set_speed, acc_rdy, enabled, is_lead, des_speed
     "SET_1_WHEN_ENGAGE": enabled,
     "ACC_CMD": des_speed * CV.MS_TO_KPH if enabled else 0,
   }
-  return packer.make_can_msg("ACC_CMD_HUD", MAIN_BUS, values)
+  return packer.make_can_msg("ACC_CMD_HUD", CANBUS.main_bus, values)
 
 
 def create_hud(packer, lkas_rdy, enabled, llane_visible, rlane_visible, ldw, fcw, aeb, front_depart, ldp_off, fcw_off):
@@ -73,7 +70,7 @@ def create_hud(packer, lkas_rdy, enabled, llane_visible, rlane_visible, ldw, fcw
     "FRONT_DEPART": front_depart,
     "FCW_DISABLE": fcw_off,
   }
-  return packer.make_can_msg("LKAS_HUD", MAIN_BUS, values)
+  return packer.make_can_msg("LKAS_HUD", CANBUS.main_bus, values)
 
 
 def dnga_buttons(packer, set_button, res_button, cancel_button):
@@ -86,4 +83,4 @@ def dnga_buttons(packer, set_button, res_button, cancel_button):
     "NEW_SIGNAL_2": 1,
     "CANCEL": cancel_button,
   }
-  return packer.make_can_msg("PCM_BUTTONS", MAIN_BUS, values)
+  return packer.make_can_msg("PCM_BUTTONS", CANBUS.main_bus, values)

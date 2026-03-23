@@ -17,6 +17,10 @@ from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import AngleSteeringLimits, apply_std_steer_angle_limits
 
 STEER_LOWPASS_HZ = 2
+STEER_DT = 0.02
+MAX_STEER_ANGLE_OFFSET_DEG = 10
+LKA_COOLDOWN_MIN_FRAMES = 30
+BUTTON_KEEPALIVE_FRAMES = 100
 SPOOF_DURATION_FRAMES = 50
 SPOOF_CYCLE_FRAMES = 150
 
@@ -24,7 +28,7 @@ SPOOF_CYCLE_FRAMES = 150
 def lowpass_1pole(x, y_prev):
   if y_prev is None:
     return x
-  alpha = math.exp(-2.0 * math.pi * STEER_LOWPASS_HZ * 0.02)
+  alpha = math.exp(-2.0 * math.pi * STEER_LOWPASS_HZ * STEER_DT)
   return alpha * y_prev + (1.0 - alpha) * x
 
 
@@ -82,7 +86,9 @@ class CarController(CarControllerBase):
       lat_active,
       CarControllerParams.ANGLE_LIMITS,
     )
-    apply_angle = float(np.clip(apply_angle, CS.out.steeringAngleDeg - 10, CS.out.steeringAngleDeg + 10))
+    apply_angle = float(np.clip(apply_angle,
+                                CS.out.steeringAngleDeg - MAX_STEER_ANGLE_OFFSET_DEG,
+                                CS.out.steeringAngleDeg + MAX_STEER_ANGLE_OFFSET_DEG))
     self.last_apply_angle = apply_angle
     return apply_angle
 
@@ -96,7 +102,7 @@ class CarController(CarControllerBase):
 
     self._update_lka_latch_state(CS)
 
-    lat_active = (self.lka_cooldown > 30) and enabled and self.lka_active and not CS.out.standstill
+    lat_active = (self.lka_cooldown > LKA_COOLDOWN_MIN_FRAMES) and enabled and self.lka_active and not CS.out.standstill
 
     apply_angle = CS.out.steeringAngleDeg
     if (self.frame % 2) == 0:
@@ -134,7 +140,7 @@ class CarController(CarControllerBase):
         brake_hold = CS.out.standstill and actuators.accel < 0
         can_sends.append(create_accel_command(self.packer, actuators.accel, long_active, self.accel_mult, brake_hold))
       else:
-        if CS.out.genericToggle or (CS.out.standstill and CC.enabled and (self.frame % 100 == 0)):
+        if CS.out.genericToggle or (CS.out.standstill and CC.enabled and (self.frame % BUTTON_KEEPALIVE_FRAMES == 0)):
           can_sends.append(send_buttons(self.packer, 1, 0, self.button_send_bus))
 
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL):

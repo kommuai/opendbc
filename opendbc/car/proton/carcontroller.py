@@ -7,6 +7,20 @@ from opendbc.car.lateral import apply_dist_to_meas_limits
 from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, send_buttons
 from opendbc.car.proton.values import DBC, CAR, CarControllerParams
 
+PROTON_DRIVER_TORQUE_FACTOR = 30
+STEER_DISABLE_BLEND_DELAY_S = 0.55
+STEER_DISABLE_BLEND_DURATION_S = 0.5
+SNG_INITIAL_PRESS_DELAY_FRAMES = 310
+SNG_REPEAT_PRESS_DELAY_FRAMES = 110
+SNG_MAX_RESUME_PRESSES = 2
+CANCEL_SPAM_INTERVAL_FRAMES = 15
+CANCEL_SPAM_PRESS_COUNT = 2
+ACCEL_POSITIVE_SCALE = 15
+ACCEL_NEGATIVE_SCALE = 18
+ACCEL_BLEND_VEGO_BP = [0.0, 28.3]
+ACCEL_BLEND_MULT_V = [1.0, 0.6]
+ACCEL_BLEND_MIN_SPEED_MS = 2.5
+
 try:
   from openpilot.common.features import Features
 except (ImportError, ModuleNotFoundError):
@@ -15,20 +29,12 @@ except (ImportError, ModuleNotFoundError):
       return False
 
 
-def _clip(value, lo, hi):
-  return float(np.clip(value, lo, hi))
-
-
-def _interp(x, xp, fp):
-  return float(np.interp(x, xp, fp))
-
-
 def apply_proton_steer_torque_limits(apply_torque, apply_torque_last, driver_torque, LIMITS):
   # Proton-specific driver torque envelope.
-  driver_offset = driver_torque * 30
-  max_steer_allowed = _clip(LIMITS.STEER_MAX + driver_offset, 0, LIMITS.STEER_MAX)
-  min_steer_allowed = _clip(-LIMITS.STEER_MAX + driver_offset, -LIMITS.STEER_MAX, 0)
-  apply_torque = _clip(apply_torque, min_steer_allowed, max_steer_allowed)
+  driver_offset = driver_torque * PROTON_DRIVER_TORQUE_FACTOR
+  max_steer_allowed = float(np.clip(LIMITS.STEER_MAX + driver_offset, 0, LIMITS.STEER_MAX))
+  min_steer_allowed = float(np.clip(-LIMITS.STEER_MAX + driver_offset, -LIMITS.STEER_MAX, 0))
+  apply_torque = float(np.clip(apply_torque, min_steer_allowed, max_steer_allowed))
 
   # Delegate common ramp limiting to shared helper while keeping Proton-specific driver bounds.
   apply_torque = apply_dist_to_meas_limits(
@@ -83,7 +89,7 @@ class CarController(CarControllerBase):
       and not ((CS.out.rightBlinker and CS.stock_ldp_right) or (CS.out.leftBlinker and CS.stock_ldp_left))
     ):
       # Prevents sudden pull from LDP/ICC/LKA Centering after steer disable.
-      blend = _clip((monotonic() - self.last_steer_disable - 0.55) / 0.5, 0.0, 1.0)
+      blend = float(np.clip((monotonic() - self.last_steer_disable - STEER_DISABLE_BLEND_DELAY_S) / STEER_DISABLE_BLEND_DURATION_S, 0.0, 1.0))
       apply_steer = round(CS.stock_ldp_cmd * (-1 if CS.stock_steer_dir else 1) * blend) & ~1 # Ensure cmd LSB 0 for 11-bit cmd
       lat_active = True
 
@@ -98,12 +104,12 @@ class CarController(CarControllerBase):
     self.resume = CS.out.gasPressed or CS.res_btn_pressed
     if not self.is_sng_check:
       self.is_sng_check = True
-      self.sng_next_press_frame = self.frame + 310
+      self.sng_next_press_frame = self.frame + SNG_INITIAL_PRESS_DELAY_FRAMES
       self.resume_counter = 0
       return
 
-    if self.resume or self.resume_counter >= 2:
-      self.sng_next_press_frame = max(self.sng_next_press_frame, self.frame + 110)
+    if self.resume or self.resume_counter >= SNG_MAX_RESUME_PRESSES:
+      self.sng_next_press_frame = max(self.sng_next_press_frame, self.frame + SNG_REPEAT_PRESS_DELAY_FRAMES)
       self.resume_counter = 0
       return
 
@@ -119,10 +125,10 @@ class CarController(CarControllerBase):
       self.last_cancel_press = 0
       return
 
-    if self.frame > self.last_cancel_press + 15 and not (CS.out.brakePressed and not CS.cruise_standstill):
+    if self.frame > self.last_cancel_press + CANCEL_SPAM_INTERVAL_FRAMES and not (CS.out.brakePressed and not CS.cruise_standstill):
       can_sends.append(send_buttons(self.packer, True))
       self.cancel_press_cnt += 1
-      if self.cancel_press_cnt == 2:
+      if self.cancel_press_cnt == CANCEL_SPAM_PRESS_COUNT:
         self.cancel_press_cnt = 0
         self.last_cancel_press = self.frame
 
@@ -171,12 +177,12 @@ class CarController(CarControllerBase):
       )
 
       if self.openpilot_long:
-        accel_cmd = accel_cmd * 15 if accel_cmd >= 0 else accel_cmd * 18
+        accel_cmd = accel_cmd * ACCEL_POSITIVE_SCALE if accel_cmd >= 0 else accel_cmd * ACCEL_NEGATIVE_SCALE
         if CS.out.gasPressed:
           accel_cmd = 0.0
 
-        mult = _interp(CS.out.vEgo, [0, 28.3], [1.0, 0.6])
-        if CS.out.vEgo < 2.5:
+        mult = float(np.interp(CS.out.vEgo, ACCEL_BLEND_VEGO_BP, ACCEL_BLEND_MULT_V))
+        if CS.out.vEgo < ACCEL_BLEND_MIN_SPEED_MS:
           accel_cmd = (CS.stock_acc_cmd * mult + accel_cmd) / 2
         else:
           accel_cmd = min(CS.stock_acc_cmd * mult, accel_cmd)
@@ -189,7 +195,7 @@ class CarController(CarControllerBase):
 
     self.last_steer = apply_steer
     new_actuators = actuators.as_builder()
-    new_actuators.accel = accel_cmd / 15 if accel_cmd >= 0 else accel_cmd / 18
+    new_actuators.accel = accel_cmd / ACCEL_POSITIVE_SCALE if accel_cmd >= 0 else accel_cmd / ACCEL_NEGATIVE_SCALE
     new_actuators.torque = apply_steer / self.params.STEER_MAX
     new_actuators.torqueOutputCan = apply_steer
 

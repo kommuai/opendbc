@@ -2,6 +2,13 @@
 
 #include "opendbc/safety/declarations.h"
 
+// ACC_BRAKE encoding bounds for create_brake_command() clip logic:
+//   decel_cmd in [0.0, 1.56] -> MAGNITUDE raw in [44, 200] using (raw * 0.01 - 2)
+//   pump in [0.0, 1.0] -> PUMP_REACTION1 raw in [0, 10] using (raw * 0.1)
+static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MIN = 44U;
+static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MAX = 200U;
+static const uint8_t DNGA_ACC_BRAKE_PUMP_RAW_MAX = 10U;
+
 static const CanMsg DNGA_TX_MSGS[] = {
   {464, 0, 8, .check_relay = true},  // STEERING_LKAS
   {464, 2, 8, .check_relay = true},  // STEERING_LKAS (alt bus)
@@ -98,6 +105,23 @@ static bool dnga_tx_hook(const CANPacket_t *msg) {
       if (brake_req) {
         tx = false;
       }
+    }
+
+    // Enforce command clipping envelope for ACC_BRAKE payload.
+    uint8_t magnitude_raw = msg->data[5];
+    if ((magnitude_raw < DNGA_ACC_BRAKE_MAGNITUDE_RAW_MIN) || (magnitude_raw > DNGA_ACC_BRAKE_MAGNITUDE_RAW_MAX)) {
+      tx = false;
+    }
+
+    uint8_t pump_raw = msg->data[4];
+    if (pump_raw > DNGA_ACC_BRAKE_PUMP_RAW_MAX) {
+      tx = false;
+    }
+
+    // PUMP_REACTION2 should be the signed inverse of PUMP_REACTION1 (0, -1, ..., -10 in raw form).
+    uint8_t pump_inverse_raw = (uint8_t)(0U - pump_raw);
+    if (msg->data[3] != pump_inverse_raw) {
+      tx = false;
     }
   }
 

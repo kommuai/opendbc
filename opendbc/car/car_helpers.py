@@ -30,7 +30,7 @@ unsupported_platforms = {
   "HONDA_E", "HONDA_FIT", "HONDA_FREED", "HONDA_INSIGHT", "HONDA_NBOX",
   "HONDA_ODYSSEY", "HONDA_PASSPORT", "HONDA_PILOT", "HONDA_RIDGELINE", "LEXUS_CTH",
   "LEXUS_GS", "LEXUS_IS", "LEXUS_LC", "LEXUS_LS", "LEXUS_RC",
-  "QC", "TOYOTA_AVALON", "TOYOTA_CHR", "TOYOTA_HIGHLANDER", "TOYOTA_MIRAI",
+  "TOYOTA_AVALON", "TOYOTA_CHR", "TOYOTA_HIGHLANDER", "TOYOTA_MIRAI",
   "TOYOTA_PRIUS", "TOYOTA_RAV4", "TOYOTA_SIENNA", "TOYOTA_YARIS"
 }
 
@@ -125,11 +125,16 @@ def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, di
 
       frame += 1
 
-  # Multiple candidates can remain (e.g. PERODUA_MYVI and QC both match). Pick the one with smallest matching fingerprint.
+  # Multiple candidates can remain. Pick the one with the smallest matching fingerprint.
   if car_fingerprint is None and frame > 200:
+    # VIN query/response traffic can dominate sparse captures and is not unique to a platform.
+    # Excluding these addresses avoids false best-match picks when they are the only observed messages.
+    vin_query_addrs = (0x7df, 0x7e0, 0x7e8)
     for b in candidate_cars:
       if candidate_cars[b]:
-        observed = finger.get(b, {})
+        observed = {adr: ln for adr, ln in finger.get(b, {}).items() if adr not in vin_query_addrs}
+        if not observed:
+          continue
         car_fingerprint = best_match_from_candidates(candidate_cars[b], observed)
         break
 

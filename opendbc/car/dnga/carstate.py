@@ -255,7 +255,6 @@ class CarState(CarStateBase):
       ("GAS_PEDAL", 60),
       ("BRAKE", 100),
       ("RIGHT_STALK", 33),
-      # Realdata-measured (rounded) message rates to avoid long alive timeouts.
       ("METER_CLUSTER", 12.52814),
       ("BSM", 12.51876),
       ("STEERING_MODULE", 100),

@@ -50,7 +50,6 @@ non_tested_cars = [
   DNGA.PERODUA_ATIVA,
   DNGA.PERODUA_MYVI,
   DNGA.TOYOTA_VIOS,
-  DNGA.QC,
 ]
 
 

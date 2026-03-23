@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from cereal import car
 from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
@@ -52,10 +51,6 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.TOYOTA_VIOS:
       lateral_kf = 0.00018
       wheel_speed_factor = 1.43
-    elif candidate == CAR.QC:
-      lateral_kf = 0.00018
-      wheel_speed_factor = 1.43
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput)]
     else:
       ret.dashcamOnly = True
 

@@ -7,13 +7,14 @@ from opendbc.can.packer import CANPacker
 from opendbc.car import DT_CTRL, make_can_msg, rate_limit, structs
 from opendbc.car.dnga.dnga_longitudinal_pid import DNGAAccelPID
 from opendbc.car.dnga.dngacan import (
+  BRAKE_DECEL_CMD_MAX,
   create_accel_command,
   create_brake_command,
   create_can_steer_command,
   create_hud,
   dnga_buttons,
 )
-from opendbc.car.lateral import apply_dist_to_meas_limits
+from opendbc.car.lateral import apply_driver_steer_torque_limits
 from opendbc.car.dnga.values import BRAKE_SCALE, CAR, DBC, SNG_CAR, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 
@@ -25,6 +26,12 @@ PUMP_RESET_DURATION = 0.1
 BRAKE_MAG_COMP_BP = [0.0, 0.3, 0.5, 1.25]
 BRAKE_MAG_COMP_V = [1.0, 1.0, 1.25, 1.5]
 REENGAGE_SET_MINUS_DELTA_KPH = 25.0
+STOCK_ACC_ENABLE_MIN_SPEED_MS = 10.0
+STOCK_ACC_DISABLE_SPEED_MS = 8.3
+STOCK_ACC_ADJUST_DELTA_MS = 0.3
+STANDSTILL_BRAKE_ADD = 0.2
+LOW_SPEED_BRAKE_CLIP_SPEED_MS = 2.8
+LOW_SPEED_BRAKE_MAX = 1.0
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 
@@ -33,28 +40,6 @@ class BrakingStatus(IntEnum):
   STANDSTILL_INIT = 0
   BRAKE_HOLD = 1
   PUMP_RESET = 2
-
-
-def apply_steer_torque_limits(apply_torque, apply_torque_last, driver_torque, blinker_on, limits):
-  # Limits from driver override and lane-change context.
-  reduced_torque_mult = 10.0 if blinker_on else 1.5
-  driver_max_torque = 255 + driver_torque * reduced_torque_mult
-  driver_min_torque = -255 - driver_torque * reduced_torque_mult
-  max_steer_allowed = max(min(255, driver_max_torque), 0)
-  min_steer_allowed = min(max(-255, driver_min_torque), 0)
-  apply_torque = float(np.clip(apply_torque, min_steer_allowed, max_steer_allowed))
-
-  # Delegate common ramp limiting to shared lateral helper while preserving DNGA-specific driver bounds.
-  apply_torque = apply_dist_to_meas_limits(
-    apply_torque,
-    apply_torque_last,
-    0.0,
-    limits.STEER_DELTA_UP,
-    limits.STEER_DELTA_DOWN,
-    limits.STEER_MAX,
-    limits.STEER_MAX,
-  )
-  return int(round(apply_torque))
 
 
 def standstill_brake(min_accel, ts_last, ts_now, prev_status):
@@ -122,10 +107,10 @@ class CarController(CarControllerBase):
     else:
       base_brake = abs(acceleration * self.brake_scale)
       magnitude_compensation = float(np.interp(base_brake, BRAKE_MAG_COMP_BP, BRAKE_MAG_COMP_V))
-      apply_brake = float(np.clip(base_brake * magnitude_compensation, 0.0, 1.52))
+      apply_brake = float(np.clip(base_brake * magnitude_compensation, 0.0, BRAKE_DECEL_CMD_MAX))
 
-    if CS.out.vEgo < 2.8:
-      apply_brake = float(np.clip(apply_brake, 0.0, 1.0))
+    if CS.out.vEgo < LOW_SPEED_BRAKE_CLIP_SPEED_MS:
+      apply_brake = float(np.clip(apply_brake, 0.0, LOW_SPEED_BRAKE_MAX))
     return apply_brake
 
   def _send_reengage_button(self, CS, can_sends):
@@ -138,7 +123,7 @@ class CarController(CarControllerBase):
       can_sends.append(dnga_buttons(self.packer, 0, 1, 0))
 
   def _update_stock_acc_state(self, enabled, CS, can_sends):
-    if enabled and CS.out.vEgo > 10.0:
+    if enabled and CS.out.vEgo > STOCK_ACC_ENABLE_MIN_SPEED_MS:
       if CS.stock_acc_engaged:
         self.using_stock_acc = True
       else:
@@ -146,20 +131,20 @@ class CarController(CarControllerBase):
     elif enabled:
       self._send_reengage_button(CS, can_sends)
 
-    if CS.out.vEgo < 8.3:
+    if CS.out.vEgo < STOCK_ACC_DISABLE_SPEED_MS:
       self.using_stock_acc = False
 
     if enabled and self.using_stock_acc:
       stock_set_speed_ms = CS.stock_acc_set_speed // 3.6
-      if CS.out.cruiseState.speedCluster - stock_set_speed_ms > 0.3:
+      if CS.out.cruiseState.speedCluster - stock_set_speed_ms > STOCK_ACC_ADJUST_DELTA_MS:
         can_sends.append(dnga_buttons(self.packer, 0, 1, 0))
-      if stock_set_speed_ms - CS.out.cruiseState.speedCluster > 0.3:
+      if stock_set_speed_ms - CS.out.cruiseState.speedCluster > STOCK_ACC_ADJUST_DELTA_MS:
         can_sends.append(dnga_buttons(self.packer, 1, 0, 0))
 
   def _update_standstill_state(self, enabled, CS, apply_brake, ts):
     if enabled and apply_brake > 0.0 and CS.out.standstill and CS.CP.carFingerprint not in SNG_CAR:
       if self.standstill_status == BrakingStatus.STANDSTILL_INIT:
-        self.min_standstill_accel = apply_brake + 0.2
+        self.min_standstill_accel = apply_brake + STANDSTILL_BRAKE_ADD
       return standstill_brake(self.min_standstill_accel, self.prev_ts, ts, self.standstill_status)
 
     self.standstill_status = BrakingStatus.STANDSTILL_INIT
@@ -179,8 +164,12 @@ class CarController(CarControllerBase):
     hud_control = CC.hudControl
 
     new_steer = int(round(actuators.torque * self.params.STEER_MAX))
-    apply_steer = apply_steer_torque_limits(
-      new_steer, self.last_steer, CS.out.steeringTorqueEps, is_blinker_on, self.params
+    self.params.STEER_DRIVER_MULTIPLIER = (
+      self.params.STEER_DRIVER_MULTIPLIER_BLINKER
+      if is_blinker_on else self.params.STEER_DRIVER_MULTIPLIER_DEFAULT
+    )
+    apply_steer = apply_driver_steer_torque_limits(
+      new_steer, self.last_steer, CS.out.steeringTorqueEps, self.params
     )
 
     a_target = float(actuators.accel)
