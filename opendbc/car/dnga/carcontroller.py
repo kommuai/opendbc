@@ -5,7 +5,7 @@ import numpy as np
 
 from opendbc.can.packer import CANPacker
 from opendbc.car import DT_CTRL, make_can_msg, rate_limit, structs
-from opendbc.car.dnga.dnga_longitudinal_pid import DNGAAccelPID
+from opendbc.car.dnga.long_pid import DNGAAccelPID
 from opendbc.car.dnga.dngacan import (
   BRAKE_DECEL_CMD_MAX,
   create_accel_command,
@@ -150,14 +150,9 @@ class CarController(CarControllerBase):
     enabled = CC.enabled
     lat_active = CC.latActive
     actuators = CC.actuators
-    is_blinker_on = CS.out.leftBlinker != CS.out.rightBlinker
     hud_control = CC.hudControl
 
     new_steer = int(round(actuators.torque * self.params.STEER_MAX))
-    self.params.STEER_DRIVER_MULTIPLIER = (
-      self.params.STEER_DRIVER_MULTIPLIER_BLINKER
-      if is_blinker_on else self.params.STEER_DRIVER_MULTIPLIER_DEFAULT
-    )
     apply_steer = apply_driver_steer_torque_limits(
       new_steer, self.last_steer, CS.out.steeringTorqueEps, self.params
     )

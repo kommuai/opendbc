@@ -93,12 +93,10 @@ class CarControllerParams:
   LONG_CRUISE_DEADZONE_MIN_V_EGO = 2.5
   STEER_DRIVER_ALLOWANCE = 0
   STEER_DRIVER_FACTOR = 1
-  STEER_DRIVER_MULTIPLIER_DEFAULT = 1.5
-  STEER_DRIVER_MULTIPLIER_BLINKER = 10.0
+  STEER_DRIVER_MULTIPLIER = 1.5
 
   def __init__(self, CP):
     self.STEER_MAX = CP.lateralParams.torqueV[0]
     assert len(CP.lateralParams.torqueV) == 1
     self.STEER_DELTA_UP = 10
     self.STEER_DELTA_DOWN = 30
-    self.STEER_DRIVER_MULTIPLIER = self.STEER_DRIVER_MULTIPLIER_DEFAULT
