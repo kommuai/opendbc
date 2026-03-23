@@ -5,7 +5,9 @@ import numpy as np
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car import DT_CTRL, Bus, create_button_events
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.dnga.values import DBC, HUD_MULTIPLIER, CANBUS, HYBRID_CAR
+from opendbc.car.dnga.values import DBC, CANBUS, HYBRID_CAR
+
+HUD_MULTIPLIER = 1.04
 
 ButtonType = car.CarState.ButtonEvent.Type
 SEC_HOLD_TO_STEP_SPEED = 0.6

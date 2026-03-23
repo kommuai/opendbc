@@ -1,18 +1,17 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import IntFlag
+from enum import Enum, IntFlag
 
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
-from opendbc.car.docs_definitions import CarDocs
-
-HUD_MULTIPLIER = 1.04
+from opendbc.car.docs_definitions import CarDocs, CarParts, CUSTOM_CAR_PARTS, CarFootnote, Column
 
 @dataclass
 class DNGAPlatformConfig(PlatformConfig):
   dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("dnga_general_pt", None))
 
+@dataclass
 class DNGACarDocs(CarDocs):
-  pass
+  car_parts: CarParts = field(default_factory=CUSTOM_CAR_PARTS)
 
 class CANBUS:
   main_bus = 0
@@ -22,29 +21,51 @@ class DNGAFlags(IntFlag):
   HYBRID = 1
   SNG = 2
 
+
+class Footnote(Enum):
+  NO_RADAR_REDUNDANCY = CarFootnote(
+    "Vehicle without radar will use both bukapilot and stock braking as redundancy.",
+    Column.LONGITUDINAL,
+  )
+  BRAKE_PUMP_NOTE = CarFootnote(
+    "Braking at 0km/h will produce a brake pump sound which is completely normal. Vehicle without radar will use both bukapilot and stock braking as redundancy.",
+    Column.LONGITUDINAL,
+  )
+
+
+def dnca_car(name: str, footnote: Footnote | None = None, kommu_supported: bool | None = None):
+  # Small helper to keep CarDocs declarations compact.
+  return DNGACarDocs(
+    name,
+    "All",
+    footnotes=[footnote] if footnote is not None else [],
+    kommu_supported=kommu_supported,
+  )
+
+
 class CAR(Platforms):
   PERODUA_ALZA = DNGAPlatformConfig(
     [
-      DNGACarDocs("Perodua Alza 2022-26", "All"),
-      DNGACarDocs("Toyota Veloz 2022-26", "All"),
+      dnca_car("Perodua Alza 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
+      dnca_car("Toyota Veloz 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
     ],
     CarSpecs(mass=1170.0, wheelbase=2.750, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
   PERODUA_ATIVA = DNGAPlatformConfig(
     [
-      DNGACarDocs("Perodua Ativa 2021-26", "All"),
-      DNGACarDocs("Perodua Ativa Hybrid 2022", "All"),
-      DNGACarDocs("Toyota Raize 2021-26", "All"),
+      dnca_car("Perodua Ativa 2021-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
+      dnca_car("Perodua Ativa Hybrid 2022", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
+      dnca_car("Toyota Raize 2021-26"),
     ],
     CarSpecs(mass=1035.0, wheelbase=2.525, steerRatio=17.0),
   )
   PERODUA_MYVI = DNGAPlatformConfig(
-    [DNGACarDocs("Perodua Myvi 2022-26", "All")],
+    [dnca_car("Perodua Myvi 2022-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=18.2),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
-    [DNGACarDocs("Toyota Vios 2023-26", "All")],
+    [dnca_car("Toyota Vios 2023-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True)],
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
