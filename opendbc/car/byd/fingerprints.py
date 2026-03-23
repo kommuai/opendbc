@@ -1,13 +1,5 @@
 # ruff: noqa: E501
-"""BYD CAN fingerprints.
-
-Mappings are kept explicit for deterministic fingerprint matching.
-"""
-
-from cereal import car
 from opendbc.car.byd.values import CAR
-
-Ecu = car.CarParams.Ecu
 
 FINGERPRINTS = {
   CAR.BYD_ATTO3: [{

@@ -82,8 +82,22 @@ def create_accel_command(packer, accel, enabled, accel_mult, brake_hold):
   return packer.make_can_msg("ACC_CMD", 0, values)
 
 
-def create_lkas_hud(packer, lat_active, lss_state, lss_alert, tsr, ahb, passthrough,
-                    hma, pt2, pt3, pt4, pt5, lka_on):
+def pack_lkas_hud_status_passthrough(ahb, tsr_status):
+  # SET_ME_XFF (8 bits) + TSR_STATUS (3 bits) are continuous in LKAS_HUD_ADAS.
+  return ((int(ahb) & 0xFF) << 3) | (int(tsr_status) & 0x7)
+
+
+def unpack_lkas_hud_status_passthrough(chunk):
+  chunk = int(chunk)
+  ahb = (chunk >> 3) & 0xFF
+  tsr_status = chunk & 0x7
+  return ahb, tsr_status
+
+
+def create_lkas_hud(packer, lat_active, lss_state, lss_alert, tsr,
+                    hma, pt2, pt3, pt4, pt5, hud_status_passthrough, lka_on,
+                    hand_on_wheel_warning):
+  ahb_from_chunk, passthrough_from_chunk = unpack_lkas_hud_status_passthrough(hud_status_passthrough)
   values = {
     "STEER_ACTIVE_ACTIVE_LOW": lka_on,
     "LEFT_LANE_VISIBLE": lat_active,
@@ -92,10 +106,9 @@ def create_lkas_hud(packer, lat_active, lss_state, lss_alert, tsr, ahb, passthro
     "LSS_STATE": lss_state,
     "SET_ME_1_2": 1,
     "SETTINGS": lss_alert,
-    "TSR_STATUS": passthrough,
-    "SET_ME_XFF": ahb,
-    # TODO integrate warning signs when steer limited
-    "HAND_ON_WHEEL_WARNING": 0,
+    "TSR_STATUS": passthrough_from_chunk,
+    "SET_ME_XFF": ahb_from_chunk,
+    "HAND_ON_WHEEL_WARNING": bool(hand_on_wheel_warning),
     "TSR": tsr,
     "HMA": hma,
     "PT2": pt2,

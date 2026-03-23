@@ -175,6 +175,7 @@ BO_ 665 IKEY: 3 XXX
  SG_ IKEY_ENABLE : 22|1@1+ (1,0) [0|1] "" XXX
 
 BO_ 790 LKAS_HUD_ADAS: 8 XXX
+CM_ BO_ 790 "Openpilot code packs continuous SET_ME_XFF + TSR_STATUS into one lkas_hud_status_passthrough chunk in BYD carstate/controller.";
  SG_ HMA : 4|5@0+ (1,0) [0|7] "" XXX
  SG_ LEFT_LANE_VISIBLE : 5|1@0+ (1,0) [0|1] "" XXX
  SG_ LSS_STATE : 7|2@0+ (1,0) [0|1] "" XXX

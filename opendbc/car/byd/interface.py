@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from cereal import car
 from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
@@ -30,10 +29,6 @@ class CarInterface(CarInterfaceBase):
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [530]]
     ret.lateralTuning.pid.kpBP = [0.0, 5.0, 20.0]
     ret.lateralTuning.pid.kiBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kpBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kiBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kpV = [0.8, 0.7, 0.6]
-    ret.longitudinalTuning.kiV = [0.5, 0.4, 0.3]
     ret.lateralTuning.pid.kf = 0.00015
     ret.wheelSpeedFactor = 0.66
 
@@ -41,8 +36,6 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
     elif candidate == CAR.BYD_M6:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-
-      ret.longitudinalTuning.kpV = [1.2, 1.0, 0.8]
       ret.safetyConfigs[0].safetyParam = 3
     elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7):
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]

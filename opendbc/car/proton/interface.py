@@ -32,11 +32,6 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kiV = [0.05, 0.10, 0.20, 0.40]
     ret.lateralTuning.pid.kf = 0.00007
 
-    ret.longitudinalTuning.kpBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kpV = [0.7, 0.5, 0.4]
-    ret.longitudinalTuning.kiBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kiV = [0.2, 0.15, 0.1]
-
     ret.centerToFront = ret.wheelbase * 0.44
     ret.tireStiffnessFactor = 0.7933
 

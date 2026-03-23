@@ -3,6 +3,7 @@ import math
 from opendbc.can import CANDefine, CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
+from opendbc.car.byd.bydcan import pack_lkas_hud_status_passthrough
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.byd.values import DBC, CANBUS, HUD_MULTIPLIER, CAR
 
@@ -33,6 +34,7 @@ class CarState(CarStateBase):
     self.pt3 = 0
     self.pt4 = 0
     self.pt5 = 0
+    self.lkas_hud_status_passthrough = 0
     self.lkas_rdy_btn = False
     self.op_long = True
     self.distance_val = 1
@@ -62,6 +64,7 @@ class CarState(CarStateBase):
     self.pt3 = cp_cam.vl["LKAS_HUD_ADAS"]["PT3"]
     self.pt4 = cp_cam.vl["LKAS_HUD_ADAS"]["PT4"]
     self.pt5 = cp_cam.vl["LKAS_HUD_ADAS"]["PT5"]
+    self.lkas_hud_status_passthrough = pack_lkas_hud_status_passthrough(self.abh, self.passthrough)
     self.lkas_healthy = cp_cam.vl["STEERING_MODULE_ADAS"]["EPS_OK"]
     ret.lkaDisabled = not self.lka_on
 

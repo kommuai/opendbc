@@ -18,6 +18,8 @@ from opendbc.car.lateral import apply_std_steer_angle_limits
 STEER_LOWPASS_HZ = 2
 STEER_DT = 0.02
 MAX_STEER_ANGLE_OFFSET_DEG = 10
+# Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
+STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
 LKA_COOLDOWN_MIN_FRAMES = 30
 BUTTON_KEEPALIVE_FRAMES = 100
 SPOOF_DURATION_FRAMES = 50
@@ -72,24 +74,30 @@ class CarController(CarControllerBase):
         self.lka_cooldown = 0
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
-    apply_angle = CS.out.steeringAngleDeg
+    meas_deg = CS.out.steeringAngleDeg
     if not lat_active:
-      return apply_angle
+      return meas_deg, False
 
-    apply_angle = lowpass_1pole(actuators.steeringAngleDeg, self.last_apply_angle)
-    apply_angle = apply_std_steer_angle_limits(
-      apply_angle,
+    limits = CarControllerParams.ANGLE_LIMITS
+    after_lowpass = lowpass_1pole(actuators.steeringAngleDeg, self.last_apply_angle)
+    after_std = apply_std_steer_angle_limits(
+      after_lowpass,
       self.last_apply_angle,
       CS.out.vEgo,
-      CS.out.steeringAngleDeg,
+      meas_deg,
       lat_active,
-      CarControllerParams.ANGLE_LIMITS,
+      limits,
     )
-    apply_angle = float(np.clip(apply_angle,
-                                CS.out.steeringAngleDeg - MAX_STEER_ANGLE_OFFSET_DEG,
-                                CS.out.steeringAngleDeg + MAX_STEER_ANGLE_OFFSET_DEG))
+    lo = meas_deg - MAX_STEER_ANGLE_OFFSET_DEG
+    hi = meas_deg + MAX_STEER_ANGLE_OFFSET_DEG
+    apply_angle = float(np.clip(after_std, lo, hi))
     self.last_apply_angle = apply_angle
-    return apply_angle
+
+    eps = STEER_ANGLE_LIMIT_WARN_EPS_DEG
+    meas_clip_limited = abs(after_std - apply_angle) > eps
+    angle_max_limited = abs(apply_angle) >= limits.STEER_ANGLE_MAX - eps
+    steer_angle_limited = meas_clip_limited or angle_max_limited
+    return apply_angle, steer_angle_limited
 
   def update(self, CC, CS, now_nanos):
     del now_nanos
@@ -104,8 +112,10 @@ class CarController(CarControllerBase):
     lat_active = (self.lka_cooldown > LKA_COOLDOWN_MIN_FRAMES) and enabled and self.lka_active and not CS.out.standstill
 
     apply_angle = CS.out.steeringAngleDeg
+    hand_on_wheel_warning = False
     if (self.frame % 2) == 0:
-      apply_angle = self._compute_apply_angle(CS, actuators, lat_active)
+      apply_angle, steer_angle_limited = self._compute_apply_angle(CS, actuators, lat_active)
+      hand_on_wheel_warning = bool(lat_active and steer_angle_limited)
       can_sends.append(
         create_can_steer_command(
           self.packer,
@@ -123,14 +133,14 @@ class CarController(CarControllerBase):
           CS.lss_state,
           CS.lss_alert,
           CS.tsr,
-          CS.abh,
-          CS.passthrough,
           CS.HMA,
           CS.pt2,
           CS.pt3,
           CS.pt4,
           CS.pt5,
+          CS.lkas_hud_status_passthrough,
           CS.lka_on,
+          hand_on_wheel_warning,
         )
       )
 

@@ -7,8 +7,6 @@ from opendbc.car.byd.angle_rate_limit import AngleRateLimit
 from opendbc.car.lateral import AngleSteeringLimits
 from opendbc.car.docs_definitions import CarDocs, CarParts, CUSTOM_CAR_PARTS, CarFootnote, Column
 
-HUD_MULTIPLIER = 1.07
-
 
 @dataclass
 class BYDPlatformConfig(PlatformConfig):
@@ -108,9 +106,10 @@ ACCEL_MULT = defaultdict(
     CAR.BYD_SEALION7: 1,
   },
 )
+HUD_MULTIPLIER = 1.07
 
 class CarControllerParams:
-  STEER_ANGLE_MAX = 94.0  # deg
+  STEER_ANGLE_MAX = 120.0  # deg
   ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[6., 3., 1.])
   ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[8., 7., 4.])
   ANGLE_LIMITS = AngleSteeringLimits(STEER_ANGLE_MAX, ANGLE_RATE_LIMIT_UP, ANGLE_RATE_LIMIT_DOWN)
