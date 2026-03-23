@@ -23,15 +23,11 @@ BRAKE_MAG = [BRAKE_THRESHOLD, 0.32, 0.46, 0.61, 0.76, 0.90, 1.06, 1.21, 1.35, 1.
 PUMP_VALS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 PUMP_RESET_INTERVAL = 1.5
 PUMP_RESET_DURATION = 0.1
-BRAKE_MAG_COMP_BP = [0.0, 0.3, 0.5, 1.25]
-BRAKE_MAG_COMP_V = [1.0, 1.0, 1.25, 1.5]
 REENGAGE_SET_MINUS_DELTA_KPH = 25.0
 STOCK_ACC_ENABLE_MIN_SPEED_MS = 10.0
 STOCK_ACC_DISABLE_SPEED_MS = 8.3
 STOCK_ACC_ADJUST_DELTA_MS = 0.3
 STANDSTILL_BRAKE_ADD = 0.2
-LOW_SPEED_BRAKE_CLIP_SPEED_MS = 2.8
-LOW_SPEED_BRAKE_MAX = 1.0
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 
@@ -74,10 +70,8 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
 
     self.last_steer = 0
-    self.steer_rate_limited = False
     self.last_pump = 0.0
     self.brake_scale = BRAKE_SCALE[CP.carFingerprint]
-    self.fingerprint = CP.carFingerprint
 
     self.prev_ts = 0.0
     self.standstill_status = BrakingStatus.STANDSTILL_INIT
@@ -106,11 +100,7 @@ class CarController(CarControllerBase):
       apply_brake = 0.0
     else:
       base_brake = abs(acceleration * self.brake_scale)
-      magnitude_compensation = float(np.interp(base_brake, BRAKE_MAG_COMP_BP, BRAKE_MAG_COMP_V))
-      apply_brake = float(np.clip(base_brake * magnitude_compensation, 0.0, BRAKE_DECEL_CMD_MAX))
-
-    if CS.out.vEgo < LOW_SPEED_BRAKE_CLIP_SPEED_MS:
-      apply_brake = float(np.clip(apply_brake, 0.0, LOW_SPEED_BRAKE_MAX))
+      apply_brake = float(np.clip(base_brake, 0.0, BRAKE_DECEL_CMD_MAX))
     return apply_brake
 
   def _send_reengage_button(self, CS, can_sends):
