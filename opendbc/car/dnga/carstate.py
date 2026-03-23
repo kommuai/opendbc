@@ -253,12 +253,13 @@ class CarState(CarStateBase):
       ("GAS_PEDAL", 60),
       ("BRAKE", 100),
       ("RIGHT_STALK", 33),
-      ("METER_CLUSTER", math.nan),
-      ("BSM", math.nan),
+      # Realdata-measured (rounded) message rates to avoid long alive timeouts.
+      ("METER_CLUSTER", 12.52814),
+      ("BSM", 12.51876),
       ("STEERING_MODULE", 100),
       ("EPS_SHAFT_TORQUE", 40),
       ("PCM_BUTTONS", 30),
-      ("GAS_PEDAL_2", math.nan),
+      ("GAS_PEDAL_2", 61.04481),
       ("BUTTONS", 50),
     ]
 

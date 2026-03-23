@@ -2,7 +2,8 @@
 from cereal import car
 from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
-from opendbc.car.dnga.carcontroller import CarController, CarControllerParams
+from opendbc.car.dnga.carcontroller import CarController
+from opendbc.car.dnga.values import CarControllerParams
 from opendbc.car.dnga.carstate import CarState
 from opendbc.car.dnga.values import CAR
 
@@ -34,12 +35,6 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFactor = 0.7933
 
     ret.openpilotLongitudinalControl = True
-    ret.longitudinalTuning.kpBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kpV = [1.2, 1.2, 1.0]
-    # Perodua control is speed-command based; avoid longitudinal integrator windup.
-    ret.longitudinalTuning.kiBP = [0.0, 5.0, 20.0]
-    ret.longitudinalTuning.kiV = [0.211, 0.210, 0.206]
-    #ret.longitudinalTuning.kiV = [0.0, 0.0, 0.0]
 
     wheel_speed_factor = 1.0
     lateral_kf = 0.00015
@@ -67,9 +62,7 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kf = lateral_kf
     ret.wheelSpeedFactor = wheel_speed_factor
     ret.minEnableSpeed = -1
-    ret.stopAccel = -1.0
     ret.enableBsm = True
-    ret.stoppingDecelRate = 0.10
 
     return ret
 

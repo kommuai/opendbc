@@ -4,7 +4,8 @@ from enum import IntEnum
 import numpy as np
 
 from opendbc.can.packer import CANPacker
-from opendbc.car import DT_CTRL, make_can_msg, rate_limit
+from opendbc.car import DT_CTRL, make_can_msg, rate_limit, structs
+from opendbc.car.dnga.dnga_longitudinal_pid import DNGAAccelPID
 from opendbc.car.dnga.dngacan import (
   create_accel_command,
   create_brake_command,
@@ -13,7 +14,7 @@ from opendbc.car.dnga.dngacan import (
   dnga_buttons,
 )
 from opendbc.car.lateral import apply_dist_to_meas_limits
-from opendbc.car.dnga.values import BRAKE_SCALE, CAR, DBC, SNG_CAR
+from opendbc.car.dnga.values import BRAKE_SCALE, CAR, DBC, SNG_CAR, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 
 BRAKE_THRESHOLD = 0.01
@@ -24,6 +25,8 @@ PUMP_RESET_DURATION = 0.1
 BRAKE_MAG_COMP_BP = [0.0, 0.3, 0.5, 1.25]
 BRAKE_MAG_COMP_V = [1.0, 1.0, 1.25, 1.5]
 REENGAGE_SET_MINUS_DELTA_KPH = 25.0
+
+LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 
 class BrakingStatus(IntEnum):
@@ -79,18 +82,6 @@ def psd_brake(apply_brake, last_pump):
   return pump, brake_req, pump
 
 
-class CarControllerParams:
-  STEER_STEP = 1
-  ACCEL_MIN = -3.5
-  ACCEL_MAX = 1.6 # not advisable to go higher because brake may fail
-
-  def __init__(self, CP):
-    self.STEER_MAX = CP.lateralParams.torqueV[0]
-    assert len(CP.lateralParams.torqueV) == 1
-    self.STEER_DELTA_UP = 10
-    self.STEER_DELTA_DOWN = 30
-
-
 class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):
     super().__init__(dbc_names, CP)
@@ -110,6 +101,14 @@ class CarController(CarControllerBase):
     self.stock_ldw = False
     self.using_stock_acc = False
     self.frame = 0
+    self.long_accel = 0.0
+    self.long_pid = DNGAAccelPID(
+      pos_limit=self.params.ACCEL_MAX,
+      neg_limit=self.params.ACCEL_MIN,
+      cruise_deadzone=self.params.LONG_CRUISE_ACCEL_DEADZONE,
+      min_v_ego=self.params.LONG_CRUISE_DEADZONE_MIN_V_EGO,
+    )
+    self.prev_a_target = 0.0
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration #acceleration - CS.stock_brake_mag if CS.out.vEgo > 0.25 else acceleration
@@ -184,7 +183,23 @@ class CarController(CarControllerBase):
       new_steer, self.last_steer, CS.out.steeringTorqueEps, is_blinker_on, self.params
     )
 
-    acceleration, desired_speed = self._get_desired_speed(CS, actuators.accel)
+    a_target = float(actuators.accel)
+
+    if (self.frame % 5) == 0:
+      freeze_integrator = actuators.longControlState != LongCtrlState.pid
+      self.long_accel, reset_prev = self.long_pid.update_long_accel(
+        long_active=CC.longActive,
+        a_target=a_target,
+        a_ego=CS.out.aEgo,
+        v_ego=CS.out.vEgo,
+        prev_a_target=self.prev_a_target,
+        freeze_integrator=freeze_integrator,
+      )
+      if reset_prev:
+        self.prev_a_target = 0.0
+    self.prev_a_target = float(a_target)
+
+    acceleration, desired_speed = self._get_desired_speed(CS, self.long_accel)
     apply_brake = self._get_apply_brake(CS, acceleration)
 
     if self.frame <= 1000:
@@ -244,7 +259,7 @@ class CarController(CarControllerBase):
     new_actuators = actuators.as_builder()
     new_actuators.torque = apply_steer / self.params.STEER_MAX
     new_actuators.torqueOutputCan = apply_steer
-    new_actuators.accel = actuators.accel - apply_brake if actuators.accel > 0 else acceleration
+    new_actuators.accel = a_target
 
     self.frame += 1
     return new_actuators, can_sends

@@ -12,6 +12,7 @@ from opendbc.car.byd.bydcan import (
   send_buttons,
 )
 from opendbc.car.byd.values import DBC, CAR, ACCEL_MULT, CANBUS
+from opendbc.car.byd.values import CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import AngleSteeringLimits, apply_std_steer_angle_limits
 
@@ -25,16 +26,6 @@ def lowpass_1pole(x, y_prev):
     return x
   alpha = math.exp(-2.0 * math.pi * STEER_LOWPASS_HZ * 0.02)
   return alpha * y_prev + (1.0 - alpha) * x
-
-
-class CarControllerParams:
-  STEER_ANGLE_MAX = 94.0  # deg
-  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[6., 3., 1.])
-  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[8., 7., 4.])
-  ANGLE_LIMITS = AngleSteeringLimits(STEER_ANGLE_MAX, ANGLE_RATE_LIMIT_UP, ANGLE_RATE_LIMIT_DOWN)
-
-  def __init__(self, CP):
-    pass
 
 
 class CarController(CarControllerBase):

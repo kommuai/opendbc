@@ -197,9 +197,6 @@ bool safety_rx_hook(const CANPacket_t *msg) {
 
   // Handles gas, brake, and regen paddle
   generic_rx_checks();
-  if (current_safety_mode == SAFETY_DNGA) {
-    controls_allowed = true;  // Perodua: spoof so controls allowed no matter what until working
-  }
 
   // the relay malfunction hook runs on all incoming rx messages.
   // check all applicable tx msgs for liveness on sending bus.

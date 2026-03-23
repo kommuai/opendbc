@@ -5,7 +5,7 @@ from opendbc.can.packer import CANPacker
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_dist_to_meas_limits
 from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, send_buttons
-from opendbc.car.proton.values import DBC, CAR
+from opendbc.car.proton.values import DBC, CAR, CarControllerParams
 
 try:
   from openpilot.common.features import Features
@@ -43,20 +43,6 @@ def apply_proton_steer_torque_limits(apply_torque, apply_torque_last, driver_tor
 
   return round(apply_torque)
 
-
-class CarControllerParams:
-  STEER_STEP = 1
-
-  def __init__(self, CP):
-    self.STEER_MAX = CP.lateralParams.torqueV[0]
-    assert len(CP.lateralParams.torqueV) == 1
-
-    if CP.carFingerprint == CAR.PROTON_X90:
-      self.STEER_DELTA_UP = 4
-      self.STEER_DELTA_DOWN = 8
-    else:
-      self.STEER_DELTA_UP = 15
-      self.STEER_DELTA_DOWN = 35
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):

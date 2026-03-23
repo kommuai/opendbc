@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
-from opendbc.car.docs_definitions import CarDocs, SupportType
+from opendbc.car.docs_definitions import CarDocs
 
 HUD_MULTIPLIER = 1.04
 
@@ -24,31 +24,37 @@ class CANBUS:
 class CAR(Platforms):
   PROTON_S70 = ProtonPlatformConfig(
     [
-      ProtonCarDocs("Proton S70 2023-26", "All", support_type=SupportType.CUSTOM),
-      ProtonCarDocs("Proton X50 FL 2025-26", "All", support_type=SupportType.CUSTOM),
+      ProtonCarDocs("Proton S70 2023-26", "All"),
+      ProtonCarDocs("Proton X50 FL 2025-26", "All"),
     ],
     CarSpecs(mass=1300.0, wheelbase=2.627, steerRatio=15.0),
   )
   PROTON_X50 = ProtonPlatformConfig(
-    [ProtonCarDocs("Proton X50 2020-24", "All", support_type=SupportType.CUSTOM)],
+    [ProtonCarDocs("Proton X50 2020-24", "All")],
     CarSpecs(mass=1370.0, wheelbase=2.6, steerRatio=15.0),
   )
   PROTON_X70 = ProtonPlatformConfig(
-    [ProtonCarDocs("Proton X70 FL 2024-26", "All", support_type=SupportType.CUSTOM)],
+    [ProtonCarDocs("Proton X70 FL 2024-26", "All")],
     CarSpecs(mass=1610.0, wheelbase=2.67, steerRatio=15.0),
   )
   PROTON_X90 = ProtonPlatformConfig(
-    [ProtonCarDocs("Proton X90 2023-25", "All", support_type=SupportType.CUSTOM)],
+    [ProtonCarDocs("Proton X90 2023-25", "All")],
     CarSpecs(mass=1705.0, wheelbase=2.805, steerRatio=15.0),
   )
 
 
 DBC = CAR.create_dbc_map()
 
+class CarControllerParams:
+  STEER_STEP = 1
 
-def __getattr__(name):
-  if name == "CarControllerParams":
-    from opendbc.car.proton.carcontroller import CarControllerParams
+  def __init__(self, CP):
+    self.STEER_MAX = CP.lateralParams.torqueV[0]
+    assert len(CP.lateralParams.torqueV) == 1
 
-    return CarControllerParams
-  raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if CP.carFingerprint == CAR.PROTON_X90:
+      self.STEER_DELTA_UP = 4
+      self.STEER_DELTA_DOWN = 8
+    else:
+      self.STEER_DELTA_UP = 15
+      self.STEER_DELTA_DOWN = 35
