@@ -11,13 +11,13 @@ static const uint8_t DNGA_ACC_BRAKE_PUMP_RAW_MAX = 10U;
 
 static const CanMsg DNGA_TX_MSGS[] = {
   {464, 0, 8, .check_relay = true},  // STEERING_LKAS
-  {464, 2, 8, .check_relay = true},  // STEERING_LKAS (alt bus)
+  {464, 2, 8, .check_relay = false},  // STEERING_LKAS (alt bus)
   {628, 0, 8, .check_relay = true},  // LKAS_HUD
-  {628, 2, 8, .check_relay = true},  // LKAS_HUD (alt bus)
+  {628, 2, 8, .check_relay = false},  // LKAS_HUD (alt bus)
   {625, 0, 8, .check_relay = true},  // ACC_BRAKE
-  {625, 2, 8, .check_relay = true},  // ACC_BRAKE (alt bus)
+  {625, 2, 8, .check_relay = false},  // ACC_BRAKE (alt bus)
   {627, 0, 8, .check_relay = true},  // ACC_CMD_HUD
-  {627, 2, 8, .check_relay = true},  // ACC_CMD_HUD (alt bus)
+  {627, 2, 8, .check_relay = false},  // ACC_CMD_HUD (alt bus)
   {519, 0, 6, .check_relay = false},  // PCM_BUTTONS_HYBRID
   {520, 0, 6, .check_relay = false},  // PCM_BUTTONS
   {2015, 0, 8, .check_relay = false},  // DTC clear
@@ -69,7 +69,11 @@ static void dnga_rx_hook(const CANPacket_t *msg) {
 
   bool cruise_engaged = false;
   if (msg->addr == 627U) {
-    cruise_engaged = GET_BIT(msg, 13U) || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
+    // Perodua Myvi can assert SET_ME_1_2 (bit 9) without setting the more
+    // specific IS_ACCEL/IS_DECEL and SET_1_WHEN_ENGAGE bits (13/37/38).
+    // Using SET_ME_1_2 here keeps `controls_allowed` consistent with the
+    // PCM cruise state.
+    cruise_engaged = GET_BIT(msg, 9U) || GET_BIT(msg, 13U) || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
   } else if (msg->addr == 625U) {
     cruise_engaged = GET_BIT(msg, 8U);
   }
@@ -86,8 +90,10 @@ static bool dnga_tx_hook(const CANPacket_t *msg) {
 
   // ACC_CMD_HUD: if engagement isn’t requested, ACC_CMD should be 0.
   if (msg->addr == 627U) {
+    bool set_me_1_2 = GET_BIT(msg, 9U);
     bool set_1_when_engage = GET_BIT(msg, 13U);
-    if (!set_1_when_engage) {
+    bool engage_requested = set_me_1_2 || set_1_when_engage;
+    if (!engage_requested) {
       uint32_t acc_cmd_raw = ((msg->data[2] >> 7U) & 0x1U) |
                                ((uint32_t)msg->data[3] << 1U) |
                                ((uint32_t)(msg->data[4] & 0x7FU) << 9U);
