@@ -64,6 +64,7 @@ class CarState(CarStateBase):
     self.res_btn_pressed = False
 
     self.stock_acc_cmd = 0
+    self.stock_acc_cmd_values = {}
     self.cruise_standstill = False
 
     self.is_alc_enabled = _params_get_bool_default_false()
@@ -103,7 +104,9 @@ class CarState(CarStateBase):
 
     self.hand_on_wheel_warning = bool(cp_cam.vl["ADAS_LKAS"]["HAND_ON_WHEEL_WARNING"])
     self.hand_on_wheel_warning_2 = bool(cp_cam.vl["ADAS_LKAS"]["WHEEL_WARNING_CHIME"]) # The second warning before ICC disengage
-    self.stock_acc_cmd = cp_cam.vl["ACC_CMD"]["CMD"]
+    acc_cmd = cp_cam.vl["ACC_CMD"]
+    self.stock_acc_cmd = acc_cmd["CMD"]
+    self.stock_acc_cmd_values = dict(acc_cmd)
 
   def _apply_blinker_minimum_time(self, ret):
     left_blinker = ret.leftBlinker

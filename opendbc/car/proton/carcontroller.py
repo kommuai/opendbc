@@ -4,8 +4,9 @@ from time import monotonic
 from opendbc.can.packer import CANPacker
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_dist_to_meas_limits
-from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, send_buttons
+from opendbc.car.proton.protoncan import create_acc_cmd, create_acc_cmd_stock, create_can_steer_command, send_buttons
 from opendbc.car.proton.values import DBC, CAR
+from pprint import pprint
 
 try:
   from openpilot.common.features import Features
@@ -105,7 +106,7 @@ class CarController(CarControllerBase):
       self.resume = False
       return
 
-    self.resume = CS.out.gasPressed or CS.res_btn_pressed
+    self.resume = CS.res_btn_pressed
     if not self.is_sng_check:
       self.is_sng_check = True
       self.sng_next_press_frame = self.frame + 310
@@ -182,12 +183,16 @@ class CarController(CarControllerBase):
 
       if self.openpilot_long:
         accel_cmd = accel_cmd * 17 if accel_cmd >= 0 else accel_cmd * 18
-        if CS.out.gasPressed:
-          accel_cmd = 0.0
-
-        can_sends.append(
-          create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume, CS.out.brakePressed)
-        )
+        if False: # if CS.out.gasPressed and CS.stock_acc_cmd_values:
+          print("Sending stock ACC values:")
+          pprint(CS.stock_acc_cmd_values)
+          print("enabled", CS.out.cruiseState.enabled)
+          print("longActive", CC.longActive)
+          can_sends.append(create_acc_cmd_stock(self.packer, CS.stock_acc_cmd_values))
+        else:
+          can_sends.append(
+            create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed and CS.out.cruiseState.enabled, CS.cruise_standstill, self.resume, CS.out.brakePressed, standstill_request)
+          )
 
     self._update_cancel_spam(CS, pcm_cancel_cmd, can_sends)
 
