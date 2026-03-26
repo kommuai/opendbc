@@ -92,6 +92,3 @@ def send_buttons(packer, send_cruise=True):
     }
 
   return packer.make_can_msg("ACC_BUTTONS", 2, values)
-
-def create_acc_cmd_stock(packer, stock_values):
-  return packer.make_can_msg("ACC_CMD", 0, stock_values)
