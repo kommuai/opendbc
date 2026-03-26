@@ -60,6 +60,7 @@ class CarControllerParams:
 
 class CarController(CarControllerBase):
   _shared_proton_acc_log_prefix = None
+  _shared_proton_accel_log_header_written = False
 
   def __init__(self, dbc_names, CP):
     super().__init__(dbc_names, CP)
@@ -110,6 +111,115 @@ class CarController(CarControllerBase):
 
     # Ensure we don't let log line buffers grow forever if events never finish.
     self._proton_acc_log_max_pending = 50000
+
+    # Proton ACC accel logger (per-frame stock vs actuators):
+    # - only when CC.longActive == True and CS.out.standstill == False
+    # - flush at most once per second
+    # - do not exceed 100MB total file size; then stop logging
+    # - queued lines live only in memory; sudden stop => queued lines dropped silently
+    self._proton_accel_log_path = f"{self._proton_acc_log_prefix}_accel.txt"
+    self._proton_accel_log_pending_lines: list[str] = []
+    self._proton_accel_log_last_flush_t = 0.0
+    self._proton_accel_log_max_bytes = 100 * 1024 * 1024
+    self._proton_accel_log_disabled = False
+
+  def _proton_accel_log_maybe_write(self):
+    if self._proton_accel_log_disabled:
+      return
+    if not self._proton_accel_log_pending_lines:
+      return
+
+    now_t = monotonic()
+    if (now_t - self._proton_accel_log_last_flush_t) < 1.0:
+      return
+
+    # If file already too large, stop writing.
+    try:
+      if os.path.exists(self._proton_accel_log_path) and os.path.getsize(self._proton_accel_log_path) >= self._proton_accel_log_max_bytes:
+        self._proton_accel_log_disabled = True
+        self._proton_accel_log_pending_lines.clear()
+        return
+    except OSError:
+      self._proton_accel_log_disabled = True
+      self._proton_accel_log_pending_lines.clear()
+      return
+
+    pending_bytes = sum(len(line) + 1 for line in self._proton_accel_log_pending_lines)
+    try:
+      existing_size = os.path.getsize(self._proton_accel_log_path) if os.path.exists(self._proton_accel_log_path) else 0
+      if existing_size + pending_bytes > self._proton_accel_log_max_bytes:
+        self._proton_accel_log_disabled = True
+        self._proton_accel_log_pending_lines.clear()
+        return
+    except OSError:
+      self._proton_accel_log_disabled = True
+      self._proton_accel_log_pending_lines.clear()
+      return
+
+    write_header = not CarController._shared_proton_accel_log_header_written
+    try:
+      if os.path.exists(self._proton_accel_log_path) and os.path.getsize(self._proton_accel_log_path) > 0:
+        write_header = False
+        CarController._shared_proton_accel_log_header_written = True
+    except OSError:
+      pass
+
+    try:
+      mode = "w" if write_header else "a"
+      with open(self._proton_accel_log_path, mode, encoding="utf-8") as f:
+        if write_header:
+          f.write("Proton ACC accel debug log (stock vs actuators)\n")
+          f.write("fields: frame enabled brakePressed gasPressed resPressed outStandstill resume stockCMD actuatorsAccel actuatorsOutAccelScaled accelMultApplied accelCmdFromAccelMultScaled\n")
+          CarController._shared_proton_accel_log_header_written = True
+        for line in self._proton_accel_log_pending_lines:
+          f.write(line + "\n")
+    except OSError:
+      # Stop logging on persistent failure.
+      self._proton_accel_log_disabled = True
+      self._proton_accel_log_pending_lines.clear()
+      return
+
+    self._proton_accel_log_pending_lines.clear()
+    self._proton_accel_log_last_flush_t = now_t
+
+  def _proton_accel_log_update(self, CC, CS, actuators_accel: float):
+    if self._proton_accel_log_disabled:
+      return
+    if not CC.longActive:
+      return
+    if bool(CS.out.standstill):
+      return
+
+    enabled = bool(CS.out.cruiseState.enabled)
+    brake_pressed = bool(CS.out.brakePressed)
+    gas_pressed = bool(CS.out.gasPressed)
+    res_pressed = bool(CS.res_btn_pressed)
+    out_standstill = bool(CS.out.standstill)  # should be False due to gating
+    resume_state = bool(self.resume)
+
+    stock_cmd = None
+    if CS.stock_acc_cmd_values:
+      stock_cmd = CS.stock_acc_cmd_values.get("CMD", CS.stock_acc_cmd)
+    else:
+      stock_cmd = CS.stock_acc_cmd
+
+    ac = float(actuators_accel)
+    accel_mult_applied = 18.86 if ac >= 0.0 else 13.31
+    accel_cmd_from_acc_mult = _clip(ac * accel_mult_applied, -95.0, 95.0)
+
+    # This matches `new_actuators.accel = accel_cmd/15 if >=0 else /18` below.
+    actuators_out_accel_scaled = (ac / 15.0) if ac >= 0.0 else (ac / 18.0)
+
+    line = (
+      f"frame={self.frame} enabled={int(enabled)} brakePressed={int(brake_pressed)} "
+      f"gasPressed={int(gas_pressed)} resPressed={int(res_pressed)} outStandstill={int(out_standstill)} "
+      f"resume={int(resume_state)} stockCMD={stock_cmd} actuatorsAccel={ac} "
+      f"actuatorsOutAccelScaled={actuators_out_accel_scaled} accelMultApplied={accel_mult_applied} "
+      f"accelCmdFromAccelMultScaled={accel_cmd_from_acc_mult}"
+    )
+
+    self._proton_accel_log_pending_lines.append(line)
+    self._proton_accel_log_maybe_write()
 
   def _proton_acc_log_snapshot(self, CC, CS, accel_cmd_scaled, standstill_request):
     # Use same "enabled" source as control code.
@@ -501,6 +611,9 @@ class CarController(CarControllerBase):
     else:
       accel_cmd_scaled_for_log = accel_cmd_raw
     self._proton_acc_log_update(CC, CS, accel_cmd_scaled_for_log, standstill_request)
+
+    # Per-frame accel logging (stock vs actuators) for debugging/supprlt analysis.
+    self._proton_accel_log_update(CC, CS, accel_cmd)
 
     self.last_steer = apply_steer
     new_actuators = actuators.as_builder()
