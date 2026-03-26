@@ -272,6 +272,34 @@ class CarController(CarControllerBase):
         "logged_frames": set(),
       })
 
+    # Event 4: enabled cruise standstill clears (no RES requirement).
+    # This records the generic transition from cruise standstill to non-standstill while enabled.
+    if (
+      self._proton_acc_log_prev_enabled
+      and self._proton_acc_log_prev_standstill
+      and enabled
+      and (not standstill)
+    ):
+      start100 = max(0, self.frame - 100)
+      new_events.append({
+        "plot_tag": "enabled_standstill_to_nonstandstill_100",
+        "reason": "standstill_clear_while_enabled(enabled+standstill->non_standstill)_100frames",
+        "start_frame": start100,
+        "end_frame": self.frame + 100,
+        "trigger_frame": self.frame,
+        "logged_frames": set(),
+      })
+
+      start300 = max(0, self.frame - 300)
+      new_events.append({
+        "plot_tag": "enabled_standstill_to_nonstandstill_300",
+        "reason": "standstill_clear_while_enabled(enabled+standstill->non_standstill)_300frames",
+        "start_frame": start300,
+        "end_frame": self.frame + 300,
+        "trigger_frame": self.frame,
+        "logged_frames": set(),
+      })
+
     # Event 3: enabled cruise standstill rising (not standstill -> standstill)
     # This captures the moment the car transitions into standstill while cruise remains enabled.
     if (
