@@ -42,8 +42,7 @@ def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, whee
   return packer.make_can_msg("ADAS_LKAS", 0, values)
 
 
-def create_acc_cmd(packer, accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill):
-
+def _acc_cmd_values(accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill):
   standstill = cruise_standstill and not gas_override
   cmd = 35 if gas_override else 0 if not enabled else (-31 if standstill else accel_cmd)
   standstill_req = 0 if gas_override or not enabled else (1 if standstill else 0)
@@ -56,21 +55,20 @@ def create_acc_cmd(packer, accel_cmd, enabled, gas_override, cruise_standstill, 
   unknown1 = stationary
   motion = 3 if gas_override else 4 if not enabled else 9 if resume else 5 if cruise_standstill else 4 if accel_cmd < 0 else 6 if accel_cmd > 0 else 1
 
-
   x6a = (
     0xFA if gas_override else 0x6A if not enabled else (
       0xFA if resume else (0x6A if (standstill and accel_cmd <= 0) else 0xFA)
     )
   )
 
-  values = {
+  return {
     "ACC_REQ": acc_req,
     "CRUISE_DISABLED": cruise_disabled,
     "CMD": cmd,
     "CMD_OFFSET1": cmd,
     "CMD_OFFSET2": cmd,
     "SET_ME_1": 1,
-    "NOT_GAS_OVERRIDE": 1, # Need to hardcode to 1
+    "NOT_GAS_OVERRIDE": 1,
     "STANDSTILL_REQ": standstill_req,
     "STATIONARY": stationary,
     "UNKNOWN1": unknown1,
@@ -80,6 +78,9 @@ def create_acc_cmd(packer, accel_cmd, enabled, gas_override, cruise_standstill, 
     "SET_ME_X6A": x6a,
   }
 
+
+def create_acc_cmd(packer, accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill):
+  values = _acc_cmd_values(accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill)
   return packer.make_can_msg("ACC_CMD", 0, values)
 
 
