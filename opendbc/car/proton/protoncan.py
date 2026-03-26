@@ -46,14 +46,14 @@ def _acc_cmd_values(accel_cmd, enabled, gas_override, cruise_standstill, resume,
   standstill = cruise_standstill and not gas_override
   cmd = 35 if gas_override else 0 if not enabled else (-31 if standstill else accel_cmd)
   standstill_req = 0 if gas_override or not enabled else (1 if standstill else 0)
-  acc_req = 1 if gas_override or enabled else 0
+  acc_req = 0 if resume else 1 if gas_override or enabled else 0
   cruise_disabled = 0 if gas_override or enabled else 1
-  brake_out = 1 if gas_override or brake_pressed or accel_cmd < 0 else 0
+  brake_out = 1 if not enabled or gas_override or brake_pressed or (accel_cmd < 0 and not standstill) else 0
   rising = 1 if gas_override or (enabled and resume) else 0
   full_cruise_stand = standstill and car_standstill
   stationary = 1 if (enabled and (not resume) and standstill) else 0
   unknown1 = stationary
-  motion = 3 if gas_override else 4 if not enabled else 9 if resume else 5 if cruise_standstill else 4 if accel_cmd < 0 else 6 if accel_cmd > 0 else 1
+  motion = 3 if gas_override else 4 if not enabled else 9 if resume or (cruise_standstill and accel_cmd > 0) else 5 if cruise_standstill else 4 if accel_cmd < 0 else 6 if accel_cmd > 0 else 1
   x6a = 0xFA if gas_override else (0x6A if not enabled else 0xFA)
 
   return {
