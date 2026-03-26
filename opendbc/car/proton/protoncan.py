@@ -42,40 +42,31 @@ def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, whee
   return packer.make_can_msg("ADAS_LKAS", 0, values)
 
 
-def _acc_cmd_values(accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill):
-  standstill = cruise_standstill and not gas_override
-  cmd = 35 if gas_override else 0 if not enabled else (-31 if standstill else accel_cmd)
-  standstill_req = 0 if gas_override or not enabled else (1 if standstill else 0)
-  acc_req = 0 if resume else 1 if gas_override or enabled else 0
-  cruise_disabled = 0 if gas_override or enabled else 1
-  brake_out = 1 if not enabled or gas_override or brake_pressed or (accel_cmd < 0 and not standstill) else 0
-  rising = 1 if gas_override or (enabled and resume) else 0
-  full_cruise_stand = standstill and car_standstill
-  stationary = 1 if (enabled and standstill) else 0
-  unknown1 = stationary
-  motion = 3 if gas_override else 4 if not enabled else 9 if resume or (cruise_standstill and accel_cmd > 0) else 5 if cruise_standstill else 4 if accel_cmd < 0 else 6 if accel_cmd > 0 else 1
-  x6a = 0xFA if gas_override else (0x6A if not enabled else 0xFA)
+def create_acc_cmd(packer, accel_cmd, long_active, gas_override, stock_values, car_standstill):
+  active = gas_override or long_active
+  car_standstill = car_standstill and long_active and not gas_override
+  cmd = 35 if gas_override else stock_values["CMD"] if car_standstill else 0 if not long_active else accel_cmd
 
-  return {
-    "ACC_REQ": acc_req,
-    "CRUISE_DISABLED": cruise_disabled,
+  values = {
+    "ACC_REQ": stock_values["ACC_REQ"] if car_standstill else active,
+    "CRUISE_DISABLED": not active,
     "CMD": cmd,
     "CMD_OFFSET1": cmd,
     "CMD_OFFSET2": cmd,
     "SET_ME_1": 1,
-    "NOT_GAS_OVERRIDE": 1,
-    "STANDSTILL_REQ": standstill_req,
-    "STATIONARY": stationary,
-    "UNKNOWN1": unknown1,
-    "BRAKE_ENGAGED": brake_out,
-    "RISING_ENGAGE": rising,
-    "MOTION_CONTROL": motion,
-    "SET_ME_X6A": x6a,
+    "SET_ME_X6A": stock_values["SET_ME_X6A"] if car_standstill else 0xFA if active else 0x6A,
+    "STANDSTILL_REQ": car_standstill and stock_values["STANDSTILL_REQ"],
+    "STATIONARY": car_standstill and stock_values["STATIONARY"],
+    "UNKNOWN1": car_standstill and stock_values["UNKNOWN1"],
+    "MOTION_CONTROL": (
+      3 if gas_override else stock_values["MOTION_CONTROL"] if car_standstill else
+      4 if (not long_active or cmd < 0) else 6 if cmd > 0 else 1
+    ),
+    "NOT_GAS_OVERRIDE": gas_override or stock_values["NOT_GAS_OVERRIDE"],
+    "BRAKE_ENGAGED": gas_override or stock_values["BRAKE_ENGAGED"],
+    "RISING_ENGAGE": gas_override or stock_values["RISING_ENGAGE"],
   }
 
-
-def create_acc_cmd(packer, accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill):
-  values = _acc_cmd_values(accel_cmd, enabled, gas_override, cruise_standstill, resume, brake_pressed, car_standstill)
   return packer.make_can_msg("ACC_CMD", 0, values)
 
 
