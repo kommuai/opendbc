@@ -204,7 +204,9 @@ class CarController(CarControllerBase):
       stock_cmd = CS.stock_acc_cmd
 
     ac = float(actuators_accel)
-    accel_mult_applied = 18.86 if ac >= 0.0 else 13.31
+    # Tuned from /data/*_accel.txt logs (stock CMD vs actuators accel),
+    # using separate multipliers for accel vs decel.
+    accel_mult_applied = 19 if ac >= 0.0 else 21
     accel_cmd_from_acc_mult = _clip(ac * accel_mult_applied, -95.0, 95.0)
 
     # This matches `new_actuators.accel = accel_cmd/15 if >=0 else /18` below.
