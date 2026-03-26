@@ -31,30 +31,6 @@ PROTON_DISTANCE_TO_PERSONALITY = {
 }
 BLINKER_MIN = 2.25 # Minimum turn signal length in seconds
 
-_PROTON_ACC_LOG_MAP = (
-  ("ACC_REQ", "accReq", int),
-  ("CRUISE_DISABLED", "cruiseDisabled", int),
-  ("CMD", "cmd", float),
-  ("STANDSTILL_REQ", "standstillReq", int),
-  ("STATIONARY", "stationary", int),
-  ("UNKNOWN1", "unknown1", int),
-  ("BRAKE_ENGAGED", "brakeEngaged", int),
-  ("RISING_ENGAGE", "risingEngage", int),
-  ("MOTION_CONTROL", "motionControl", int),
-  ("SET_ME_X6A", "setMeX6a", int),
-  ("NOT_GAS_OVERRIDE", "notGasOverride", int),
-  ("SET_ME_1", "setMe1", int),
-)
-
-
-def _proton_fill_acc_cmd_log(dst, src):
-  if not src:
-    return
-  for key, attr, conv in _PROTON_ACC_LOG_MAP:
-    if key in src:
-      setattr(dst, attr, conv(src[key]))
-
-
 class Dir(Enum):
   LEFT = auto()
   RIGHT = auto()
@@ -96,7 +72,6 @@ class CarState(CarStateBase):
     self.blinker_on_alc_speed = False
     self.blinker_start_time = 0
     self.distance_val = 1
-    self._proton_sim_acc = {}
 
   def set_cur_blinker(self, alc_below_min_speed, right_blinker):
     self.blinker_start_time = monotonic()
@@ -247,18 +222,6 @@ class CarState(CarStateBase):
       ret.rightBlindspot = bool(cp.vl["BSM_ADAS"]["RIGHT_APPROACH"]) or bool(cp.vl["BSM_ADAS"]["RIGHT_APPROACH_WARNING"])
 
     self._apply_blinker_minimum_time(ret)
-
-    pl = ret.protonLongLog
-    pl.resButtonPressed = self.res_btn_pressed
-    pl.cruiseStateEnabled = ret.cruiseState.enabled
-    pl.brakePressed = ret.brakePressed
-    pbc = cp.vl["PARKING_BRAKE"]
-    pl.parkingBrake.brakePressed = bool(pbc["BRAKE_PRESSED"])
-    pl.parkingBrake.carOnHold = bool(pbc["CAR_ON_HOLD"])
-    pl.parkingBrake.escOn = bool(pbc["ESC_ON"])
-    pl.parkingBrake.engagingTillRelease = bool(pbc["ENGAGING_TILL_RELEASE"])
-    _proton_fill_acc_cmd_log(pl.stockAccCmd, self.stock_acc_cmd_values)
-    _proton_fill_acc_cmd_log(pl.simAccCmd, self._proton_sim_acc)
 
     return ret
 

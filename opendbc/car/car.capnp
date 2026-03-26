@@ -218,41 +218,6 @@ struct CarState {
   buttonEnable @57 :Bool;  # user is requesting enable, usually one frame. set if pcmCruise=False
   personality @62 :Int8 = -1;  # optional carstate-provided longitudinal personality override
   stockAccelCmd @63 :Float32;  # optional stock ACC accel command observed from CAN
-
-  # Proton: optional longitudinal debug (stock camera ACC_CMD vs OP-sim TX, parking brake, cruise)
-  struct ProtonAccCmdValues {
-    accReq @0 :Int16;
-    cruiseDisabled @1 :Int16;
-    cmd @2 :Float32;
-    standstillReq @3 :Int16;
-    stationary @4 :Int16;
-    unknown1 @5 :Int16;
-    brakeEngaged @6 :Int16;
-    risingEngage @7 :Int16;
-    motionControl @8 :Int16;
-    setMeX6a @9 :UInt16;
-    notGasOverride @10 :Int16;
-    setMe1 @11 :Int16;
-  }
-
-  struct ProtonParkingBrakeLog {
-    brakePressed @0 :Bool;
-    carOnHold @1 :Bool;
-    escOn @2 :Bool;
-    engagingTillRelease @3 :Bool;
-  }
-
-  struct ProtonLongLog {
-    resButtonPressed @0 :Bool;
-    cruiseStateEnabled @1 :Bool;
-    parkingBrake @2 :ProtonParkingBrakeLog;
-    stockAccCmd @3 :ProtonAccCmdValues;
-    simAccCmd @4 :ProtonAccCmdValues;
-    brakePressed @5 :Bool;  # same as CarState.brakePressed (PARKING_BRAKE.BRAKE_PRESSED); logged here for segments
-  }
-
-  protonLongLog @64 :ProtonLongLog;
-
   leftBlinker @20 :Bool;
   rightBlinker @21 :Bool;
   genericToggle @23 :Bool;

@@ -4,7 +4,7 @@ from time import monotonic
 from opendbc.can.packer import CANPacker
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_dist_to_meas_limits
-from opendbc.car.proton.protoncan import _acc_cmd_values, create_acc_cmd, create_acc_cmd_stock, create_can_steer_command, send_buttons
+from opendbc.car.proton.protoncan import create_acc_cmd, create_acc_cmd_stock, create_can_steer_command, send_buttons
 from opendbc.car.proton.values import DBC, CAR
 from pprint import pprint
 
@@ -184,9 +184,6 @@ class CarController(CarControllerBase):
       if self.openpilot_long:
         accel_cmd = accel_cmd * 17 if accel_cmd >= 0 else accel_cmd * 18
         gas_ov = CS.out.gasPressed and CS.out.cruiseState.enabled
-        CS._proton_sim_acc = _acc_cmd_values(
-          accel_cmd, CC.longActive, gas_ov, CS.cruise_standstill, self.resume, CS.out.brakePressed, standstill_request,
-        )
         if False:  # Set True to TX stock ACC_CMD (e.g. gas + stock); tweak condition as needed
           print("Sending stock ACC values:")
           pprint(CS.stock_acc_cmd_values)
@@ -197,8 +194,6 @@ class CarController(CarControllerBase):
           can_sends.append(
             create_acc_cmd(self.packer, accel_cmd, CC.longActive, gas_ov, CS.cruise_standstill, self.resume, CS.out.brakePressed, standstill_request),
           )
-      else:
-        CS._proton_sim_acc = {}
 
     self._update_cancel_spam(CS, pcm_cancel_cmd, can_sends)
 
