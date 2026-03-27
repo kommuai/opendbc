@@ -67,7 +67,6 @@ class CarController(CarControllerBase):
     self.sng_next_press_frame = 0 # The frame where the next resume press is allowed
     self.resume_counter = 0       # Counter for tracking the progress of a resume press
     self.is_sng_check = False
-    self.resume = False
 
     self.cancel_press_cnt = 0
     self.last_cancel_press = 0
@@ -98,24 +97,21 @@ class CarController(CarControllerBase):
   def _update_sng(self, CC, CS, can_sends):
     if not (CS.cruise_standstill and CC.longActive):
       self.is_sng_check = False
-      self.resume = False
       return
 
-    self.resume = CS.out.gasPressed or CS.res_btn_pressed
     if not self.is_sng_check:
       self.is_sng_check = True
       self.sng_next_press_frame = self.frame + SNG_INITIAL_PRESS_DELAY_FRAMES
       self.resume_counter = 0
       return
 
-    if self.resume or self.resume_counter >= SNG_MAX_RESUME_PRESSES:
+    if CS.out.gasPressed or CS.res_btn_pressed or self.resume_counter >= SNG_MAX_RESUME_PRESSES:
       self.sng_next_press_frame = max(self.sng_next_press_frame, self.frame + SNG_REPEAT_PRESS_DELAY_FRAMES)
       self.resume_counter = 0
       return
 
     # Brake check added for resume because S70 can still increase speed when standstill if brake pressed.
     if CC.actuators.accel > 0 and self.frame > self.sng_next_press_frame and not CS.out.brakePressed:
-      self.resume = True
       can_sends.append(send_buttons(self.packer, False))
       self.resume_counter += 1
 
@@ -150,7 +146,6 @@ class CarController(CarControllerBase):
       else:
         lks_audio, lks_tactile = CS.lks_audio, CS.lks_tactile
 
-      standstill_request = CS.out.standstill and CC.longActive
       self._update_sng(CC, CS, can_sends)
 
       is_x90 = self.CP.carFingerprint == CAR.PROTON_X90
@@ -188,7 +183,14 @@ class CarController(CarControllerBase):
           accel_cmd = min(CS.stock_acc_cmd * mult, accel_cmd)
 
         can_sends.append(
-          create_acc_cmd(self.packer, accel_cmd, CC.longActive, CS.out.gasPressed, standstill_request, self.resume, CS.out.brakePressed)
+          create_acc_cmd(
+            self.packer,
+            accel_cmd,
+            CC.longActive,
+            CS.out.gasPressed and CS.out.cruiseState.enabled,
+            CS.out.standstill,
+            CS.stock_acc_cmd_values,
+          )
         )
 
     self._update_cancel_spam(CS, pcm_cancel_cmd, can_sends)

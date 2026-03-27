@@ -29,7 +29,7 @@ def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, whee
     "LDW_READY": 1,
     "LDW_STEERING": ldw_steering,
     "SET_ME_1": 1,
-    "SET_ME_1_2": new_lka, # Currently only for X90, pre FL X50 needs to be False or LKS cannot be changed
+    "SET_ME_1_2": new_lka, # Currently only for X90, pre-FL X50 needs to be False or LKS cannot be changed
     "LKS_STATUS": 1,
     "STOCK_LKS_AUX": lks_aux,
     "LKS_WARNING_AUDIO_TYPE": lks_audio,
@@ -42,30 +42,38 @@ def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, whee
   return packer.make_can_msg("ADAS_LKAS", 0, values)
 
 
-def create_acc_cmd(packer, accel_cmd, enabled, gas_override, standstill, resume, brake_pressed):
+def create_acc_cmd(packer, accel_cmd, long_active, gas_override, car_standstill, stock_values):
+
+  active = gas_override or long_active # long_active is False when gas override, so gas override needs to be checked first.
+  car_standstill = car_standstill and long_active and not gas_override # Pass stock values to make resume work.
+  cmd = 35 if gas_override else stock_values["CMD"] if car_standstill else 0 if not long_active else accel_cmd
 
   values = {
-    "CMD": accel_cmd,
-    "CMD_OFFSET1": accel_cmd,
-    "CMD_OFFSET2": accel_cmd,
-    "ACC_REQ": enabled and not resume, # Resume check required for SNG to work but frequent switching can make X50 rpm drop.
-    "CRUISE_DISABLED": not enabled,
+    "ACC_REQ": stock_values["ACC_REQ"] if car_standstill else active,
+    "CRUISE_DISABLED": not active,
+    "CMD": cmd,
+    "CMD_OFFSET1": cmd,
+    "CMD_OFFSET2": cmd,
     "SET_ME_1": 1,
-    "NOT_GAS_OVERRIDE": enabled and not gas_override,
-    "RISING_ENGAGE": resume,
-    "BRAKE_ENGAGED": brake_pressed,
-    "UNKNOWN1": 0, # Needs to be 0, if 1 when braking, braking is too hard on S70. This signal might mean hard braking needed.
 
-    # The distance, if value too low, car cannot move when SNG resume.
-    "SET_ME_X6A": 0x6A if not enabled else 0xFA if resume else 0x6A if (standstill and accel_cmd <= 0) else 0xFA,
+    # Affects X50 engine rpm when standstill; if value too low, S70 ACC does not allow car to move.
+    # The value is a lot different on X50 and S70, so the stock value should be passed.
+    "SET_ME_X6A": stock_values["SET_ME_X6A"],
 
-    # 5 = Standstill, 6 = Accelerate, 4 = Brake, 1 = Maintain speed
-    "MOTION_CONTROL": 4 if not enabled else 9 if resume else 5 if standstill else 4 if accel_cmd < 0 else 6 if accel_cmd > 0 else 1,
+    # Not sure
+    "STANDSTILL_REQ": car_standstill and stock_values["STANDSTILL_REQ"],
+    "STATIONARY": car_standstill and stock_values["STATIONARY"],
+    "UNKNOWN1": car_standstill and stock_values["UNKNOWN1"],
 
-    # Hardcoded the 2 signals to 0 because when SNG resumes EPB is pulled by the car.
-    # Hardcoding to 0 makes X50 and X50 FL engine run higher rpm when stopped.
-    "STATIONARY": 0,
-    "STANDSTILL_REQ": 0,
+    # Affects resume, not sure about if it affects acceleration.
+    "MOTION_CONTROL": (
+      3 if gas_override else stock_values["MOTION_CONTROL"] if car_standstill else
+      4 if (not long_active or cmd < 0) else 6 if cmd > 0 else 1
+    ),
+
+    "NOT_MOVE_BLOCK": gas_override or stock_values["NOT_MOVE_BLOCK"], # If forced to 0, the car stays at standstill and the set speed changes.
+    "BRAKE_ENGAGED": gas_override or stock_values["BRAKE_ENGAGED"], # Not sure, so pass stock value.
+    "RISING_ENGAGE": gas_override or stock_values["RISING_ENGAGE"], # Becomes True then False after resume button presses.
   }
 
   return packer.make_can_msg("ACC_CMD", 0, values)
