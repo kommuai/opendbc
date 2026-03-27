@@ -15,7 +15,7 @@ from opendbc.car.dnga.dngacan import (
   dnga_buttons,
 )
 from opendbc.car.lateral import apply_driver_steer_torque_limits
-from opendbc.car.dnga.values import BRAKE_SCALE, CAR, DBC, SNG_CAR, CarControllerParams
+from opendbc.car.dnga.values import BRAKE_SCALE, DBC, SNG_CAR, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 
 BRAKE_THRESHOLD = 0.01
@@ -90,7 +90,7 @@ class CarController(CarControllerBase):
     self.prev_a_target = 0.0
 
   def _get_desired_speed(self, CS, acceleration):
-    accel_cmd = acceleration #acceleration - CS.stock_brake_mag if CS.out.vEgo > 0.25 else acceleration
+    accel_cmd = acceleration
     speed_gain = 0.457 + 0.065 * CS.out.vEgo
     desired_speed = CS.out.vEgo + accel_cmd * speed_gain
     return accel_cmd, desired_speed
@@ -157,10 +157,13 @@ class CarController(CarControllerBase):
       new_steer, self.last_steer, CS.out.steeringTorqueEps, self.params
     )
 
-    a_target = float(actuators.accel)
+    stock_brake_mag = float(getattr(CS, "stock_brake_mag", 0.0)) * 0.4
+    stock_brake_contributing = (CS.out.vEgo > 0.25) and (stock_brake_mag < -1e-6)
+    self.stock_longitudinal_contributing = stock_brake_contributing
+    a_target = float(actuators.accel - stock_brake_mag) if CS.out.vEgo > 0.25 else float(actuators.accel)
 
     if (self.frame % 5) == 0:
-      freeze_integrator = actuators.longControlState != LongCtrlState.pid
+      freeze_integrator = (actuators.longControlState != LongCtrlState.pid)
       self.long_accel, reset_prev = self.long_pid.update_long_accel(
         long_active=CC.longActive,
         a_target=a_target,

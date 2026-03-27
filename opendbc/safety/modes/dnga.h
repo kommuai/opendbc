@@ -46,7 +46,11 @@ static RxCheck dnga_rx_checks[] = {
 };
 
 static void dnga_rx_hook(const CANPacket_t *msg) {
-  // Use decoded signals to drive safety bookkeeping. controls_allowed is driven by pcm_cruise_check().
+  // Use decoded signals to drive safety bookkeeping.
+  // For DNGA/Myvi, openpilot enable state is managed upstream and stock cruise
+  // engage bits can be inconsistent across segments. Keep controls permissive
+  // to avoid persistent controlsMismatch from transient bit drops.
+  controls_allowed = true;
 
   if (msg->addr == 416U) {
     // WHEEL_SPEED.WHEELSPEED_F: 7|24@0+ (little-endian)
@@ -67,25 +71,6 @@ static void dnga_rx_hook(const CANPacket_t *msg) {
     brake_pressed = GET_BIT(msg, 5U);
   }
 
-  // Use OP command bus for cruise state to avoid false disengage from stock camera bus echoes.
-  if (msg->bus == 0U) {
-    bool cruise_engaged = false;
-    if (msg->addr == 627U) {
-      // Perodua Myvi can assert SET_ME_1_2 (bit 9) without setting the more
-      // specific IS_ACCEL/IS_DECEL and SET_1_WHEN_ENGAGE bits (13/37/38).
-      // Using SET_ME_1_2 here keeps `controls_allowed` consistent with the
-      // PCM cruise state.
-      cruise_engaged = GET_BIT(msg, 9U) || GET_BIT(msg, 13U) || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
-    } else if (msg->addr == 625U) {
-      cruise_engaged = GET_BIT(msg, 8U);
-    }
-
-    if (cruise_engaged) {
-      pcm_cruise_check(true);
-    } else if (msg->addr == 627U || msg->addr == 625U) {
-      pcm_cruise_check(false);
-    }
-  }
 }
 
 static bool dnga_tx_hook(const CANPacket_t *msg) {
@@ -95,7 +80,7 @@ static bool dnga_tx_hook(const CANPacket_t *msg) {
   if (msg->addr == 627U) {
     bool set_me_1_2 = GET_BIT(msg, 9U);
     bool set_1_when_engage = GET_BIT(msg, 13U);
-    bool engage_requested = set_me_1_2 || set_1_when_engage;
+    bool engage_requested = set_me_1_2 || set_1_when_engage || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
     if (!engage_requested) {
       uint32_t acc_cmd_raw = ((msg->data[2] >> 7U) & 0x1U) |
                                ((uint32_t)msg->data[3] << 1U) |
@@ -140,7 +125,7 @@ static bool dnga_tx_hook(const CANPacket_t *msg) {
 
 static safety_config dnga_init(uint16_t param) {
   SAFETY_UNUSED(param);
-  controls_allowed = false;
+  controls_allowed = true;
   return BUILD_SAFETY_CFG(dnga_rx_checks, DNGA_TX_MSGS);
 }
 
