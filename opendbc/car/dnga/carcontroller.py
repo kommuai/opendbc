@@ -91,7 +91,7 @@ class CarController(CarControllerBase):
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration #acceleration - CS.stock_brake_mag if CS.out.vEgo > 0.25 else acceleration
-    speed_gain = (0.567 if CS.CP.carFingerprint == CAR.PERODUA_ATIVA else 0.407) + 0.06 * CS.out.vEgo
+    speed_gain = 0.457 + 0.065 * CS.out.vEgo
     desired_speed = CS.out.vEgo + accel_cmd * speed_gain
     return accel_cmd, desired_speed
 

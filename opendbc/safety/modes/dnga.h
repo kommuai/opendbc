@@ -67,21 +67,24 @@ static void dnga_rx_hook(const CANPacket_t *msg) {
     brake_pressed = GET_BIT(msg, 5U);
   }
 
-  bool cruise_engaged = false;
-  if (msg->addr == 627U) {
-    // Perodua Myvi can assert SET_ME_1_2 (bit 9) without setting the more
-    // specific IS_ACCEL/IS_DECEL and SET_1_WHEN_ENGAGE bits (13/37/38).
-    // Using SET_ME_1_2 here keeps `controls_allowed` consistent with the
-    // PCM cruise state.
-    cruise_engaged = GET_BIT(msg, 9U) || GET_BIT(msg, 13U) || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
-  } else if (msg->addr == 625U) {
-    cruise_engaged = GET_BIT(msg, 8U);
-  }
+  // Use OP command bus for cruise state to avoid false disengage from stock camera bus echoes.
+  if (msg->bus == 0U) {
+    bool cruise_engaged = false;
+    if (msg->addr == 627U) {
+      // Perodua Myvi can assert SET_ME_1_2 (bit 9) without setting the more
+      // specific IS_ACCEL/IS_DECEL and SET_1_WHEN_ENGAGE bits (13/37/38).
+      // Using SET_ME_1_2 here keeps `controls_allowed` consistent with the
+      // PCM cruise state.
+      cruise_engaged = GET_BIT(msg, 9U) || GET_BIT(msg, 13U) || GET_BIT(msg, 37U) || GET_BIT(msg, 38U);
+    } else if (msg->addr == 625U) {
+      cruise_engaged = GET_BIT(msg, 8U);
+    }
 
-  if (cruise_engaged) {
-    pcm_cruise_check(true);
-  } else if (msg->addr == 627U || msg->addr == 625U) {
-    pcm_cruise_check(false);
+    if (cruise_engaged) {
+      pcm_cruise_check(true);
+    } else if (msg->addr == 627U || msg->addr == 625U) {
+      pcm_cruise_check(false);
+    }
   }
 }
 
