@@ -33,8 +33,7 @@ class Footnote(Enum):
   )
 
 
-def dnca_car(name: str, footnote: Footnote | None = None, kommu_supported: bool | None = None):
-  # Small helper to keep CarDocs declarations compact.
+def dnga_car(name: str, footnote: Footnote | None = None, kommu_supported: bool | None = None):
   return DNGACarDocs(
     name,
     "All",
@@ -46,26 +45,26 @@ def dnca_car(name: str, footnote: Footnote | None = None, kommu_supported: bool 
 class CAR(Platforms):
   PERODUA_ALZA = DNGAPlatformConfig(
     [
-      dnca_car("Perodua Alza 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
-      dnca_car("Toyota Veloz 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
+      dnga_car("Perodua Alza 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
+      dnga_car("Toyota Veloz 2022-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True),
     ],
     CarSpecs(mass=1170.0, wheelbase=2.750, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )
   PERODUA_ATIVA = DNGAPlatformConfig(
     [
-      dnca_car("Perodua Ativa 2021-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
-      dnca_car("Perodua Ativa Hybrid 2022", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
-      dnca_car("Toyota Raize 2021-26"),
+      dnga_car("Perodua Ativa 2021-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
+      dnga_car("Perodua Ativa Hybrid 2022", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True),
+      dnga_car("Toyota Raize 2021-26"),
     ],
     CarSpecs(mass=1035.0, wheelbase=2.525, steerRatio=17.0),
   )
   PERODUA_MYVI = DNGAPlatformConfig(
-    [dnca_car("Perodua Myvi 2022-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True)],
+    [dnga_car("Perodua Myvi 2022-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True)],
     CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=18.2),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
-    [dnca_car("Toyota Vios 2023-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True)],
+    [dnga_car("Toyota Vios 2023-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True)],
     CarSpecs(mass=1035.0, wheelbase=2.620, steerRatio=17.0),
     flags=DNGAFlags.SNG,
   )

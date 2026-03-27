@@ -11,13 +11,9 @@ static const uint8_t DNGA_ACC_BRAKE_PUMP_RAW_MAX = 10U;
 
 static const CanMsg DNGA_TX_MSGS[] = {
   {464, 0, 8, .check_relay = true},  // STEERING_LKAS
-  {464, 2, 8, .check_relay = false},  // STEERING_LKAS (alt bus)
   {628, 0, 8, .check_relay = true},  // LKAS_HUD
-  {628, 2, 8, .check_relay = false},  // LKAS_HUD (alt bus)
   {625, 0, 8, .check_relay = true},  // ACC_BRAKE
-  {625, 2, 8, .check_relay = false},  // ACC_BRAKE (alt bus)
   {627, 0, 8, .check_relay = true},  // ACC_CMD_HUD
-  {627, 2, 8, .check_relay = false},  // ACC_CMD_HUD (alt bus)
   {519, 0, 6, .check_relay = false},  // PCM_BUTTONS_HYBRID
   {520, 0, 6, .check_relay = false},  // PCM_BUTTONS
   {2015, 0, 8, .check_relay = false},  // DTC clear
@@ -25,31 +21,17 @@ static const CanMsg DNGA_TX_MSGS[] = {
 
 static RxCheck dnga_rx_checks[] = {
   // Wheel speed (used for vehicle_moving and for lag bookkeeping).
-  {.msg = {{416, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {416, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {0}}},
+  {.msg = {{416, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},{0},{0}}},
   // Gas pressed signal (carstate.py: gasPressed = not bool(GAS_PEDAL_2.GAS_PEDAL_STEP)).
-  {.msg = {{399, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {399, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {0}}},
+  {.msg = {{399, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},{0},{0}}},
   // Brake pressed.
-  {.msg = {{161, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {161, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {0}}},
+  {.msg = {{161, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},{0},{0}}},
   // Cruise engagement.
-  {.msg = {{627, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {627, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {0}}},
-  {.msg = {{625, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {625, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},
-           {0}}},
+  {.msg = {{627, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},{0},{0}}},
+  {.msg = {{625, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true},{0},{0}}},
 };
 
 static void dnga_rx_hook(const CANPacket_t *msg) {
-  // Use decoded signals to drive safety bookkeeping.
-  // For DNGA/Myvi, openpilot enable state is managed upstream and stock cruise
-  // engage bits can be inconsistent across segments. Keep controls permissive
-  // to avoid persistent controlsMismatch from transient bit drops.
   controls_allowed = true;
 
   if (msg->addr == 416U) {

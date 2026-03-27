@@ -255,12 +255,12 @@ class CarState(CarStateBase):
       ("GAS_PEDAL", 60),
       ("BRAKE", 100),
       ("RIGHT_STALK", 33),
-      ("METER_CLUSTER", 12.52814),
-      ("BSM", 12.51876),
+      ("METER_CLUSTER", 15),
+      ("BSM", 15),
       ("STEERING_MODULE", 100),
       ("EPS_SHAFT_TORQUE", 40),
       ("PCM_BUTTONS", 30),
-      ("GAS_PEDAL_2", 61.04481),
+      ("GAS_PEDAL_2", 60),
       ("BUTTONS", 50),
     ]
 
