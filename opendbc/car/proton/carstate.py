@@ -4,7 +4,7 @@ from opendbc.can import CANDefine, CANParser
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car import Bus, create_button_events
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.proton.values import DBC, CANBUS, CAR
+from opendbc.car.proton.values import DBC, HUD_MULTIPLIER, CANBUS, CAR
 from time import monotonic
 from enum import Enum, auto
 
@@ -183,7 +183,7 @@ class CarState(CarStateBase):
     else:
       ret.steeringPressed = abs(ret.steeringTorque) > 65
 
-    ret.vEgoCluster = ret.vEgo
+    ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
 
     ret.stockAeb = False
     ret.stockFcw = bool(cp_cam.vl["FCW"]["STOCK_FCW_TRIGGERED"])
@@ -201,7 +201,7 @@ class CarState(CarStateBase):
 
     self.cruise_speed = int(cp_cam.vl["PCM_BUTTONS"]["ACC_SET_SPEED"]) * CV.KPH_TO_MS
     ret.cruiseState.speedCluster = self.cruise_speed
-    ret.cruiseState.speed = ret.cruiseState.speedCluster
+    ret.cruiseState.speed = ret.cruiseState.speedCluster / HUD_MULTIPLIER
     self.cruise_standstill = bool(cp_cam.vl["ACC_CMD"]["STANDSTILL_REQ"]) and not ret.gasPressed
     ret.cruiseState.standstill = False
     ret.cruiseState.nonAdaptive = False
