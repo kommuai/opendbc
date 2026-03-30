@@ -17,9 +17,6 @@ CANCEL_SPAM_INTERVAL_FRAMES = 15
 CANCEL_SPAM_PRESS_COUNT = 2
 ACCEL_POSITIVE_SCALE = 19
 ACCEL_NEGATIVE_SCALE = 21
-ACCEL_BLEND_VEGO_BP = [0.0, 28.3]
-ACCEL_BLEND_MULT_V = [1.0, 0.6]
-ACCEL_BLEND_MIN_SPEED_MS = 2.5
 
 try:
   from openpilot.common.features import Features
@@ -173,14 +170,6 @@ class CarController(CarControllerBase):
 
       if self.openpilot_long:
         accel_cmd = accel_cmd * ACCEL_POSITIVE_SCALE if accel_cmd >= 0 else accel_cmd * ACCEL_NEGATIVE_SCALE
-        if CS.out.gasPressed:
-          accel_cmd = 0.0
-
-        mult = float(np.interp(CS.out.vEgo, ACCEL_BLEND_VEGO_BP, ACCEL_BLEND_MULT_V))
-        if CS.out.vEgo < ACCEL_BLEND_MIN_SPEED_MS:
-          accel_cmd = (CS.stock_acc_cmd * mult + accel_cmd) / 2
-        else:
-          accel_cmd = min(CS.stock_acc_cmd * mult, accel_cmd)
 
         can_sends.append(
           create_acc_cmd(
