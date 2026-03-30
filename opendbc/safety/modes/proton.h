@@ -4,6 +4,8 @@
 
 static uint8_t proton_crc8_lut_8h2f[256];
 static uint8_t proton_acc_tx_block_frames = 0U;
+static uint8_t proton_pcm_stock_off_count = 0U;
+static bool proton_pcm_saw_stock_engaged = false;
 
 #define PROTON_ACC_CMD         0x1A1U  // 417
 #define PROTON_ADAS_LKAS       0x1B0U  // 432
@@ -15,6 +17,8 @@ static uint8_t proton_acc_tx_block_frames = 0U;
 #define PROTON_MAX_STEER_SEEN  599U
 
 #define PROTON_ACC_TX_BLOCK_MAX 1U
+// ~100 ms at nominal 50 Hz ACC_CMD before treating stock cruise as disengaged (avoids brief bus glitches).
+#define PROTON_PCM_DISENGAGE_FRAMES 5U
 
 static uint8_t proton_get_counter(const CANPacket_t *msg) {
   uint8_t counter = 0U;
@@ -66,12 +70,21 @@ static void proton_rx_hook(const CANPacket_t *msg) {
     }
   }
 
-  // Engagement source mirrors carState behavior.
+  // Stock cruise from ACC_REQ / STANDSTILL_REQ; debounce disengage after we have seen stock engaged
+  // so brief drops do not clear controls_allowed.
   if ((bus == 2) && (addr == (int)PROTON_ACC_CMD)) {
-    bool acc_req = GET_BIT(msg, 36U);         // ACC_REQ
-    bool standstill_req = GET_BIT(msg, 38U);  // STANDSTILL_REQ
-    pcm_cruise_check(acc_req || standstill_req);
+    bool stock_engaged = GET_BIT(msg, 36U) || GET_BIT(msg, 38U);  // ACC_REQ || STANDSTILL_REQ
+    if (stock_engaged) {
+      proton_pcm_saw_stock_engaged = true;
+      proton_pcm_stock_off_count = 0U;
+    } else if (proton_pcm_saw_stock_engaged && (proton_pcm_stock_off_count < 255U)) {
+      proton_pcm_stock_off_count++;
+    }
 
+    bool pcm_engaged =
+      stock_engaged ||
+      (proton_pcm_saw_stock_engaged && (proton_pcm_stock_off_count < PROTON_PCM_DISENGAGE_FRAMES));
+    pcm_cruise_check(pcm_engaged);
   }
 }
 
@@ -87,8 +100,8 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
     }
 
     // When steer request is inactive, command must be zero.
-    int steer_cmd = (GET_BYTES(msg, 4, 2) >> 5) & 0x7FFU;  // STEER_CMD
-    if (!steer_req && (steer_cmd != 0)) {
+    uint32_t steer_cmd = (GET_BYTES(msg, 4, 2) >> 5) & 0x7FFU;  // STEER_CMD
+    if (!steer_req && (steer_cmd != 0U)) {
       violation = true;
     }
 
@@ -132,6 +145,8 @@ static safety_config proton_init(uint16_t param) {
   (void)param;
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
   proton_acc_tx_block_frames = 0U;
+  proton_pcm_stock_off_count = 0U;
+  proton_pcm_saw_stock_engaged = false;
   controls_allowed = false;
 
   static const CanMsg PROTON_TX_MSGS[] = {
@@ -145,9 +160,9 @@ static safety_config proton_init(uint16_t param) {
     {.msg = {{PROTON_ACC_CMD, 2, 8, 50U, .max_counter = 15U, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{PROTON_ADAS_LKAS, 2, 8, 50U, .max_counter = 15U, .ignore_quality_flag = true}, {0}, {0}}},
 
-    // Engagement sources.
-    {.msg = {{PROTON_ACC_BUTTONS, 0, 8, 10U, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{PROTON_PCM_BUTTONS, 2, 8, 20U, .max_counter = 15U, .ignore_quality_flag = true}, {0}, {0}}},
+    // Irregular on PT/cam; low nominal Hz => larger lag window (max of 10/freq and 1 s).
+    {.msg = {{PROTON_ACC_BUTTONS, 0, 8, 4U, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    {.msg = {{PROTON_PCM_BUTTONS, 2, 8, 4U, .max_counter = 15U, .ignore_quality_flag = true}, {0}, {0}}},
 
     // Additional liveness anchors used by control state.
     {.msg = {{PROTON_GAS_PEDAL, 0, 8, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
