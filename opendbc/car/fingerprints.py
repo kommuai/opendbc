@@ -53,6 +53,22 @@ def all_legacy_fingerprint_cars():
   return list(_FINGERPRINTS.keys())
 
 
+def best_match_from_candidates(candidates: list, observed: dict[int, int]) -> str | None:
+  """When multiple candidates match, return the one whose fingerprint is the smallest superset of observed (most specific)."""
+  if not candidates:
+    return None
+  if not observed:
+    return candidates[0]
+  best = None
+  best_size = float('inf')
+  for car_name in candidates:
+    for fp in _FINGERPRINTS[car_name]:
+      if all(adr in fp and fp[adr] == length for adr, length in observed.items()) and len(fp) < best_size:
+        best = car_name
+        best_size = len(fp)
+  return best
+
+
 # A dict that maps old platform strings to their latest representations
 MIGRATION = {
   "ACURA ILX 2016 ACURAWATCH PLUS": HONDA.ACURA_ILX,

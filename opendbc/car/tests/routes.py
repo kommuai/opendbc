@@ -16,6 +16,9 @@ from opendbc.car.values import Platform
 from opendbc.car.volkswagen.values import CAR as VOLKSWAGEN
 from opendbc.car.body.values import CAR as COMMA
 from opendbc.car.psa.values import CAR as PSA
+from opendbc.car.proton.values import CAR as PROTON
+from opendbc.car.byd.values import CAR as BYD
+from opendbc.car.dnga.values import CAR as DNGA
 
 # FIXME: add routes for these cars
 non_tested_cars = [
@@ -34,6 +37,19 @@ non_tested_cars = [
   TOYOTA.TOYOTA_COROLLA,
   TOYOTA.TOYOTA_RAV4H,
 
+  # Proton, BYD, DNGA (no test routes yet)
+  PROTON.PROTON_S70,
+  PROTON.PROTON_X50,
+  PROTON.PROTON_X70,
+  PROTON.PROTON_X90,
+  BYD.BYD_ATTO3,
+  BYD.BYD_M6,
+  BYD.BYD_SEAL,
+  BYD.BYD_SEALION7,
+  DNGA.PERODUA_ALZA,
+  DNGA.PERODUA_ATIVA,
+  DNGA.PERODUA_MYVI,
+  DNGA.TOYOTA_VIOS,
 ]
 
 

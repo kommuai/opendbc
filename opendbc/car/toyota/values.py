@@ -90,6 +90,28 @@ class Footnote(Enum):
     "openpilot operates above 28mph for Camry 4CYL L, 4CYL LE and 4CYL SE which don't have Full-Speed Range Dynamic Radar Cruise Control.",
     Column.FSR_LONGITUDINAL)
 
+  # Kommu/Bukapilot mapping (concise support + control capabilities).
+  ALPHARD_NOTE = CarFootnote(
+    "Support: Supports only Toyota vehicles that comes with Toyota Safety Sense 2.0. "
+    "LKC + ACC support available.",
+    Column.LONGITUDINAL,
+  )
+  CAMRY_NOTE = CarFootnote(
+    "Support: Supports only Toyota vehicles that comes with Toyota Safety Sense 2.0. "
+    "LKC + ACC support available.",
+    Column.LONGITUDINAL,
+  )
+  COROLLA_NOTE = CarFootnote(
+    "Support: Supports only Toyota vehicles that comes with Toyota Safety Sense 2.0. "
+    "LKC + ACC support available.",
+    Column.LONGITUDINAL,
+  )
+  COROLLA_CROSS_NOTE = CarFootnote(
+    "Support: Supports only Toyota vehicles that comes with Toyota Safety Sense 2.0. "
+    "LKC + ACC support available.",
+    Column.LONGITUDINAL,
+  )
+
 
 @dataclass
 class ToyotaCarDocs(CarDocs):
@@ -129,8 +151,14 @@ class CAR(Platforms):
   # Toyota
   TOYOTA_ALPHARD_TSS2 = ToyotaTSS2PlatformConfig(
     [
-      ToyotaCarDocs("Toyota Alphard 2019-20"),
-      ToyotaCarDocs("Toyota Alphard Hybrid 2021"),
+      ToyotaCarDocs("Toyota Alphard 2019-20", footnotes=[Footnote.ALPHARD_NOTE], variant="2.5V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="90°"),
+      ToyotaCarDocs("Toyota Alphard Hybrid 2021", footnotes=[Footnote.ALPHARD_NOTE], variant="2.5V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="90°"),
     ],
     CarSpecs(mass=4305. * CV.LB_TO_KG, wheelbase=3.0, steerRatio=14.2, tireStiffnessFactor=0.444),
   )
@@ -160,8 +188,11 @@ class CAR(Platforms):
   # TODO: determine if TSS-P NO_DSU cars can work with toyota_adas radar DBC and re-enable
   TOYOTA_CAMRY = PlatformConfig(
     [
-      ToyotaCarDocs("Toyota Camry 2018-20", video="https://www.youtube.com/watch?v=fkcjviZY9CM", footnotes=[Footnote.CAMRY]),
-      ToyotaCarDocs("Toyota Camry Hybrid 2018-20", video="https://www.youtube.com/watch?v=Q2DYY0AWKgk"),
+      ToyotaCarDocs("Toyota Camry 2018-20", video="https://www.youtube.com/watch?v=fkcjviZY9CM", footnotes=[Footnote.CAMRY], kommu_supported=True),
+      ToyotaCarDocs("Toyota Camry Hybrid 2018-20", video="https://www.youtube.com/watch?v=Q2DYY0AWKgk", footnotes=[Footnote.CAMRY_NOTE], variant="V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
     ],
     CarSpecs(mass=3400. * CV.LB_TO_KG, wheelbase=2.82448, steerRatio=13.7, tireStiffnessFactor=0.7933),
     {Bus.pt: 'toyota_nodsu_pt_generated'},
@@ -169,8 +200,14 @@ class CAR(Platforms):
   )
   TOYOTA_CAMRY_TSS2 = ToyotaTSS2PlatformConfig( # TSS 2.5
     [
-      ToyotaCarDocs("Toyota Camry 2021-24", footnotes=[Footnote.CAMRY]),
-      ToyotaCarDocs("Toyota Camry Hybrid 2021-24"),
+      ToyotaCarDocs("Toyota Camry 2021-24", footnotes=[Footnote.CAMRY, Footnote.CAMRY_NOTE], variant="V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
+      ToyotaCarDocs("Toyota Camry Hybrid 2021-24", footnotes=[Footnote.CAMRY_NOTE], variant="V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
     ],
     TOYOTA_CAMRY.specs,
   )
@@ -199,13 +236,28 @@ class CAR(Platforms):
   # LSS2 Lexus UX Hybrid is same as a TSS2 Corolla Hybrid
   TOYOTA_COROLLA_TSS2 = ToyotaTSS2PlatformConfig(
     [
-      ToyotaCarDocs("Toyota Corolla 2020-22", video="https://www.youtube.com/watch?v=_66pXk0CBYA"),
-      ToyotaCarDocs("Toyota Corolla Cross (Non-US only) 2020-23", min_enable_speed=7.5),
+      ToyotaCarDocs("Toyota Corolla 2020-22", video="https://www.youtube.com/watch?v=_66pXk0CBYA", footnotes=[Footnote.COROLLA_NOTE], variant="G, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
+      ToyotaCarDocs("Toyota Corolla Cross (Non-US only) 2020-23", min_enable_speed=7.5, footnotes=[Footnote.COROLLA_CROSS_NOTE], variant="V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
       ToyotaCarDocs("Toyota Corolla Hatchback 2019-22", video="https://www.youtube.com/watch?v=_66pXk0CBYA"),
       # Hybrid platforms
-      ToyotaCarDocs("Toyota Corolla Hybrid 2020-22"),
-      ToyotaCarDocs("Toyota Corolla Hybrid (South America only) 2020-23", min_enable_speed=7.5),
-      ToyotaCarDocs("Toyota Corolla Cross Hybrid (Non-US only) 2020-22", min_enable_speed=7.5),
+      ToyotaCarDocs("Toyota Corolla Hybrid 2020-22", footnotes=[Footnote.COROLLA_NOTE], variant="G, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
+      ToyotaCarDocs("Toyota Corolla Hybrid (South America only) 2020-23", min_enable_speed=7.5, footnotes=[Footnote.COROLLA_NOTE], variant="G, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
+      ToyotaCarDocs("Toyota Corolla Cross Hybrid (Non-US only) 2020-22", min_enable_speed=7.5, footnotes=[Footnote.COROLLA_CROSS_NOTE], variant="V, Hybrid",
+                    kommu_supported=True,
+                    acc_low_speed=True, acc_speed_range="0 - 140", acc_stop_and_go=True,
+                    lkc_torque="High", lkc_speed_range="0 - 140", max_steering_angle="60°"),
       ToyotaCarDocs("Lexus UX Hybrid 2019-24"),
     ],
     CarSpecs(mass=3060. * CV.LB_TO_KG, wheelbase=2.67, steerRatio=13.9, tireStiffnessFactor=0.444),

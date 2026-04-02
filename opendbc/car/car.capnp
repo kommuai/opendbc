@@ -195,6 +195,7 @@ struct CarState {
   steerFaultPermanent @36 :Bool;
 
   invalidLkasSetting @55 :Bool;    # stock LKAS is incorrectly configured (i.e. on or off)
+  lkaDisabled @61 :Bool;          # LKA/LKAS disabled by car or driver (DNGA, Proton, etc.); used by ALC/desire
   stockAeb @30 :Bool;
   stockLkas @59 :Bool;
   stockFcw @31 :Bool;
@@ -215,6 +216,8 @@ struct CarState {
   # button presses
   buttonEvents @11 :List(ButtonEvent);
   buttonEnable @57 :Bool;  # user is requesting enable, usually one frame. set if pcmCruise=False
+  personality @62 :Int8 = -1;  # optional carstate-provided longitudinal personality override
+  stockAccelCmd @63 :Float32;  # optional stock ACC accel command observed from CAN
   leftBlinker @20 :Bool;
   rightBlinker @21 :Bool;
   genericToggle @23 :Bool;
@@ -449,6 +452,7 @@ struct CarOutput {
   # the CarController are reflected in actuatorsOutput
   # and matches what is sent to the car
   actuatorsOutput @0 :CarControl.Actuators;
+  stockLongitudinalContributing @1 :Bool;
 }
 
 # ****** car param ******
@@ -635,6 +639,9 @@ struct CarParams {
     fcaGiorgio @32;
     rivian @33;
     volkswagenMeb @34;
+    proton @35;
+    byd @36;
+    dnga @37;
   }
 
   enum SteerControlType {

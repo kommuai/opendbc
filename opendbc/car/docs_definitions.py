@@ -15,6 +15,14 @@ class Column(Enum):
   MAKE = "Make"
   MODEL = "Model"
   PACKAGE = "Supported Package"
+  VARIANT = "Variant"
+  KOMMU_SUPPORTED = "Kommu Supported"
+  ACC_LOW_SPEED = "ACC Low Speed"
+  ACC_SPEED_RANGE = "ACC Speed Range"
+  ACC_STOP_AND_GO = "ACC Stop and Go"
+  LKC_TORQUE = "LKC Torque"
+  LKC_SPEED_RANGE = "LKC Speed Range"
+  MAX_STEERING_ANGLE = "Max Steering Angle"
   LONGITUDINAL = "ACC"
   FSR_LONGITUDINAL = "No ACC accel below"
   FSR_STEERING = "No ALC below"
@@ -180,6 +188,12 @@ class CarParts:
     return self.parts + parts
 
 
+# Default "custom harness" parts used by platforms that don't model a
+# specific harness connector yet but still need docs generation to have
+# a connector + mount + OBD-C cable for tests.
+CUSTOM_CAR_PARTS = CarParts.common([CarHarness.custom])
+
+
 CarFootnote = namedtuple("CarFootnote", ["text", "column", "docs_only", "setup_note"], defaults=(False, False))
 
 
@@ -230,6 +244,22 @@ class CarDocs:
 
   # the simplest description of the requirements for the US market
   package: str
+
+  # Bukapilot-style trim/variant descriptor (shown as a dedicated docs column).
+  variant: str | None = None
+
+  # Whether this car/model is listed as supported by kommu.ai.
+  # Leave unset/None for cars not known to be supported.
+  kommu_supported: bool | None = None
+
+  # Bukapilot-style support capability fields (shown as dedicated docs columns).
+  # When unset, docs output will keep them empty.
+  acc_low_speed: bool | None = None
+  acc_speed_range: str | None = None
+  acc_stop_and_go: bool | None = None
+  lkc_torque: str | None = None
+  lkc_speed_range: str | None = None
+  max_steering_angle: str | None = None
 
   video: str | None = None
   setup_video: str | None = None
@@ -300,6 +330,14 @@ class CarDocs:
       Column.MAKE: self.make,
       Column.MODEL: self.model,
       Column.PACKAGE: self.package,
+      Column.VARIANT: self.variant or "",
+      Column.KOMMU_SUPPORTED: "true" if self.kommu_supported else "",
+      Column.ACC_LOW_SPEED: "" if self.acc_low_speed is None else str(self.acc_low_speed).lower(),
+      Column.ACC_SPEED_RANGE: self.acc_speed_range or "",
+      Column.ACC_STOP_AND_GO: "" if self.acc_stop_and_go is None else str(self.acc_stop_and_go).lower(),
+      Column.LKC_TORQUE: self.lkc_torque or "",
+      Column.LKC_SPEED_RANGE: self.lkc_speed_range or "",
+      Column.MAX_STEERING_ANGLE: self.max_steering_angle or "",
       Column.LONGITUDINAL: op_long,
       Column.FSR_LONGITUDINAL: f"{max(self.min_enable_speed * CV.MS_TO_MPH, 0):.0f} mph",
       Column.FSR_STEERING: f"{max(self.min_steer_speed * CV.MS_TO_MPH, 0):.0f} mph",

@@ -92,6 +92,19 @@ class Bus(StrEnum):
   ap_party = auto()
 
 
+def dbc_dict(pt: str, radar: str | None) -> DbcDict:
+  """Build DbcDict from pt and optional radar dbc names (used by byd, dnga, proton)."""
+  out: DbcDict = {Bus.pt: pt}
+  if radar is not None:
+    out[Bus.radar] = radar
+  return out
+
+
+def make_can_msg(addr: int, dat: bytes, bus: int) -> CanData:
+  """Build a CanData for raw (addr, dat, bus) for use in apply() can_sends."""
+  return CanData(addr, dat, bus)
+
+
 def rate_limit(new_value, last_value, dw_step, up_step):
   return float(np.clip(new_value, last_value + dw_step, last_value + up_step))
 
