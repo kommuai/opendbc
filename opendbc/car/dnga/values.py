@@ -75,7 +75,7 @@ BRAKE_SCALE = defaultdict(
   {
     CAR.PERODUA_ALZA: 0.65,
     CAR.PERODUA_ATIVA: 0.75,
-    CAR.PERODUA_MYVI: 1.0,
+    CAR.PERODUA_MYVI: 0.85,
     CAR.TOYOTA_VIOS: 0.68,
   },
 )

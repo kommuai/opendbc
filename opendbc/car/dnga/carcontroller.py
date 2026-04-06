@@ -79,7 +79,7 @@ class CarController(CarControllerBase):
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration
-    t_lookup = 0.4 + 0.1 * CS.out.vEgo
+    t_lookup = 0.45 + 0.08 * CS.out.vEgo
     a_tau = (accel_cmd * t_lookup) if CS.out.vEgo > 1.2 else 0.0
     desired_speed = CS.out.vEgo + a_tau
     return accel_cmd, desired_speed
