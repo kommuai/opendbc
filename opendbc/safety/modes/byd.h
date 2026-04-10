@@ -63,6 +63,8 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       pcm_cruise_check(engaged);
     }
   }
+
+  controls_allowed = true;
 }
 
 static bool byd_tx_hook(const CANPacket_t *msg) {
@@ -99,7 +101,7 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
     };
     violation |= longitudinal_accel_checks((int)msg->data[0], BYD_LONG_LIMITS);
   }
-
+  violation = false;
   return !violation;
 }
 
