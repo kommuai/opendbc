@@ -51,7 +51,7 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1
     ret.enableBsm = True
     ret.stoppingDecelRate = 0.2
-    ret.longitudinalActuatorDelay = 0.3
+    ret.longitudinalActuatorDelay = 0.4
 
     return ret
 
