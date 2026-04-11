@@ -38,6 +38,8 @@ def is_steering_msg(mode, param, addr):
     ret = addr == 0x120
   elif mode == CarParams.SafetyModel.tesla:
     ret = addr == 0x488
+  elif mode == CarParams.SafetyModel.byd:
+    ret = addr == 0x1E2
   return ret
 
 
@@ -78,6 +80,10 @@ def get_steer_value(mode, param, msg):
     torque = ((msg.data[2] << 3) | (msg.data[3] >> 5)) - 1024
   elif mode == CarParams.SafetyModel.tesla:
     angle = (((msg.data[0] & 0x7F) << 8) | (msg.data[1])) - 16384  # ceil(1638.35/0.1)
+  elif mode == CarParams.SafetyModel.byd:
+    # Matches GET_BYTES(msg, 3, 2) in byd_tx_hook (STEER_ANGLE, little-endian)
+    angle = (msg.data[3] | (msg.data[4] << 8))
+    angle = to_signed(angle, 16)
   return torque, angle
 
 

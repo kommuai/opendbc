@@ -3,11 +3,13 @@ from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.byd.carcontroller import CarController
 from opendbc.car.byd.carstate import CarState
+from opendbc.car.byd.radar_interface import RadarInterface
 from opendbc.car.byd.values import CAR
 
 class CarInterface(CarInterfaceBase):
   CarState = CarState
   CarController = CarController
+  RadarInterface = RadarInterface
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, alpha_long, is_release, docs):
@@ -51,7 +53,7 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1
     ret.enableBsm = True
     ret.stoppingDecelRate = 0.2
-    ret.longitudinalActuatorDelay = 0.4
+    ret.longitudinalActuatorDelay = 0.3
 
     return ret
 

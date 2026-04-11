@@ -110,9 +110,9 @@ class CarState(CarStateBase):
 
     ret.stockAeb = False
     ret.stockFcw = False
-    ret.cruiseState.available = any(
-      [parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"], parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"]]
-    )
+    hud_acc_on1 = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"])
+    hud_acc_ctrl = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"])
+    ret.cruiseState.available = hud_acc_on1 or hud_acc_ctrl
 
     prev_distance_val = self.distance_val
     self.distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long else 1
@@ -136,8 +136,20 @@ class CarState(CarStateBase):
     ret.cruiseState.standstill = False
     ret.cruiseState.nonAdaptive = False
 
-    stock_acc_on = bool(parser_alt.vl["ACC_CMD"]["ACC_CONTROLLABLE_AND_ON"])
-    if not ret.cruiseState.available or ret.brakePressed or not stock_acc_on:
+    # Latch clear from ACC_CMD ACC_CONTROLLABLE_AND_ON: bit often goes low under gas or at standstill
+    # while cruise should stay latched; only honor it when moving and not on the accelerator.
+    acc_cmd_controllable = bool(parser_alt.vl["ACC_CMD"]["ACC_CONTROLLABLE_AND_ON"])
+    acc_cmd_clears_latch = (
+      not acc_cmd_controllable and not ret.gasPressed and not ret.standstill
+    )
+    # Latch clear from HUD ACC_ON1 / ACC_CONTROLLABLE_AND_ON: brief falling edges at standstill while
+    # latched; do not drop the latch on HUD loss alone in that case. Include a low-speed band so
+    # standstill→rollout does not clear before HUD catches up (standstill often drops first).
+    hud_low_speed_hold = ret.standstill or (ret.vEgoRaw < 0.15)
+    hud_clears_latch = (
+      not ret.cruiseState.available and not (hud_low_speed_hold and self.is_cruise_latch)
+    )
+    if hud_clears_latch or ret.brakePressed or acc_cmd_clears_latch:
       self.is_cruise_latch = False
 
     if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_M6):

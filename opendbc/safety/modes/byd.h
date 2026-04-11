@@ -63,8 +63,6 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       pcm_cruise_check(engaged);
     }
   }
-
-  controls_allowed = true;
 }
 
 static bool byd_tx_hook(const CANPacket_t *msg) {
@@ -76,14 +74,23 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
     bool lka_active = (msg->data[2] >> 5) & 1U;
     desired_angle = to_signed(desired_angle, 16);
 
+    /*
+     * Angle rate lookup Y values are **max delta in degrees per steering TX frame** (same numeric scale as
+     * opendbc/car/byd/values.py CarControllerParams ANGLE_RATE_LIMIT_* angle_v with apply_std_steer_angle_limits).
+     * lateral.h multiplies by angle_deg_to_can (+1); there is no extra Hz division in steer_angle_cmd_checks.
+     *
+     * If these Y match values.py (~6/3/1 up, ~8/6/4 down), a single violation can still burst-block TX:
+     * steer_angle_cmd_checks resets desired_angle_last to 0 while the next frame may carry a large absolute
+     * command (~20+ deg). Larger Y here tolerates that generic reset until last-angle handling is fixed.
+     */
     static const AngleSteeringLimits BYD_STEERING_LIMITS = {
-      .max_angle = 1000,
+      .max_angle = 450,
       .angle_deg_to_can = 10,
-      .angle_rate_up_lookup = {{0., 5., 15.}, {6., 4., 3.}},
-      .angle_rate_down_lookup = {{0., 5., 15.}, {8., 6., 4.}},
+      .angle_rate_up_lookup = {{0., 5., 15.}, {24., 22., 20.}},
+      .angle_rate_down_lookup = {{0., 5., 15.}, {28., 26., 22.}},
       .max_angle_error = 0,
       .angle_error_min_speed = 0.f,
-      .frequency = 100U,
+      .frequency = 50U,
       .angle_is_curvature = false,
       .enforce_angle_error = false,
       .inactive_angle_is_zero = true,
@@ -94,14 +101,14 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
   }
 
   if (addr == BYD_ACC_CMD) {
+    // ACCEL_CMD raw byte; DBC physical = raw - 100. Stock logs use down to ~-80 (raw 20).
     static const LongitudinalLimits BYD_LONG_LIMITS = {
-      .max_accel = 130,
-      .min_accel = 50,
+      .max_accel = 135,
+      .min_accel = 20,
       .inactive_accel = 100,
     };
     violation |= longitudinal_accel_checks((int)msg->data[0], BYD_LONG_LIMITS);
   }
-  violation = false;
   return !violation;
 }
 

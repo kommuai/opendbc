@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-from opendbc.can.parser import CANParser
-from cereal import car
+# BYD front radar: same framing pattern as toyota/honda/gm (single update(), CANParser, trigger frame).
+# Unlike those stacks, BYD DBC exposes VLEAD as absolute lead speed; radard expects RadarPoint.vRel
+# relative to ego, so we parse WHEEL_SPEED on the PT bus (same wheel scaling as CarState) for v_ego.
+from opendbc.can import CANParser
+from opendbc.car import Bus
+from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import RadarInterfaceBase
-from opendbc.car.byd.values import DBC
+from opendbc.car.structs import RadarData
+from opendbc.car.byd.values import CANBUS, DBC
 
 RADAR_START_ADDR = 0x280
 RADAR_MSG_COUNT = 10
@@ -30,13 +35,14 @@ VREL_ABS_MAX = 60.0
 AREL_ABS_MAX = 12.0
 
 
-def _create_radar_can_parser(car_fingerprint):
-  if DBC[car_fingerprint]["radar"] is None:
+def _create_radar_can_parser(CP):
+  dbc = DBC[CP.carFingerprint]
+  if Bus.radar not in dbc:
     return None
 
   messages = [(f"RADAR_TRACK_{addr:02d}", RADAR_FREQ_HZ)
               for addr in range(RADAR_MSG_COUNT)]
-  return CANParser(DBC[car_fingerprint]["radar"], messages, 1)
+  return CANParser(dbc[Bus.radar], messages, CANBUS.radar_bus)
 
 
 class RadarInterface(RadarInterfaceBase):
@@ -54,7 +60,12 @@ class RadarInterface(RadarInterfaceBase):
     self.valid_cnt = {i: 0 for i in range(RADAR_MSG_COUNT)}
     self.miss_cnt = {i: 0 for i in range(RADAR_MSG_COUNT)}
 
-    self.rcp = None if CP.radarUnavailable else _create_radar_can_parser(CP.carFingerprint)
+    self.rcp = None if CP.radarUnavailable else _create_radar_can_parser(CP)
+
+    # Ego speed on PT bus for vRel = v_lead_radar - v_ego (same wheel scaling as CarState)
+    self.speed_cp = None
+    if Bus.pt in DBC[CP.carFingerprint]:
+      self.speed_cp = CANParser(DBC[CP.carFingerprint][Bus.pt], [("WHEEL_SPEED", 50)], CANBUS.main_bus)
 
     # Track persistence: store last known position/velocity for disappeared tracks
     # This helps match reappearing tracks to their previous track IDs
@@ -62,12 +73,27 @@ class RadarInterface(RadarInterfaceBase):
     self.track_history: dict[int, tuple[float, float, float, int]] = {}
     self.MAX_HISTORY_FRAMES = 10  # Keep history for up to 10 frames after track disappears
 
-  def update(self, can_strings, v_ego, a_ego):
-    if self.rcp is None:
-      return super().update(None, v_ego, a_ego)
+  def _ego_speed_accel(self) -> tuple[float, float]:
+    if self.speed_cp is None:
+      return 0.0, 0.0
+    vl = self.speed_cp.vl["WHEEL_SPEED"]
+    fl = float(vl["WHEELSPEED_FL"])
+    fr = float(vl["WHEELSPEED_FR"])
+    rl = float(vl["WHEELSPEED_BL"])
+    rr = float(vl["WHEELSPEED_BR"])
+    v_ego = (fl + fr + rl + rr) / 4.0 * CV.KPH_TO_MS * self.CP.wheelSpeedFactor
+    return v_ego, 0.0
 
-    vls = self.rcp.update_strings(can_strings)
+  def update(self, can_strings):
+    if self.rcp is None:
+      return super().update(None)
+
+    vls = self.rcp.update(can_strings)
     self.updated_messages.update(vls)
+
+    if self.speed_cp is not None:
+      self.speed_cp.update(can_strings)
+    v_ego, a_ego = self._ego_speed_accel()
 
     if self.trigger_msg not in self.updated_messages:
       return None
@@ -152,12 +178,10 @@ class RadarInterface(RadarInterfaceBase):
     # Keep slot_track_id to allow matching when track reappears
     # Don't delete it here - let it persist for potential rematching
 
-  def _update(self, updated_messages, v_ego, a_ego):
-    ret = car.RadarData.new_message()
-
-    # propagate CAN validity
+  def _update(self, updated_messages, v_ego: float = 0.0, a_ego: float = 0.0):
+    ret = RadarData()
     if not self.rcp.can_valid:
-      ret.errors = ["canError"]
+      ret.errors.canError = True
 
     for slot in range(RADAR_MSG_COUNT):
       msg = self.rcp.vl[f"RADAR_TRACK_{slot:02d}"]
@@ -235,7 +259,7 @@ class RadarInterface(RadarInterfaceBase):
 
       if publish:
         if slot not in self.pts:
-          self.pts[slot] = car.RadarData.RadarPoint.new_message()
+          self.pts[slot] = RadarData.RadarPoint()
           # Try to match to previous track ID when allocating
           self.pts[slot].trackId = self._alloc_track_id(slot, dRel, yRel, vRel)
         else:

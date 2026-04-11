@@ -52,7 +52,7 @@ def create_can_steer_command(packer, steer_angle, steer_req, is_standstill, ecu_
 
 
 def create_accel_command(packer, accel, enabled, accel_mult, brake_hold):
-  accel = max(min(accel * accel_mult, 30.0), -50.0)
+  accel = max(min(accel * accel_mult, 30.0), -80.0)
   accel_factor = 12 if accel >= 2 else 5 if accel < 0 else 11
   enabled &= not brake_hold
 
