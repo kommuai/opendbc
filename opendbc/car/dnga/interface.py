@@ -24,9 +24,10 @@ class CarInterface(CarInterfaceBase):
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [255]]
     ret.lateralTuning.init("pid")
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.0, 20.0], [0.0, 20.0]]
-    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.08, 0.09], [0.10, 0.16]]
+    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.09, 0.09], [0.10, 0.14]]
 
     ret.steerLimitTimer = 0.01  # DNGA EPS torque authority is low.
+    ret.steerSaturationThreshold = 0.8  # warn before hitting full normalized torque (PID still clips at ±1)
 
     # params that are just estimates, but compensated by lat livetune
     ret.steerActuatorDelay = 0.12

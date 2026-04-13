@@ -219,6 +219,7 @@ class CarInterfaceBase(ABC):
     # TODO estimate car specific lag, use .15s for now
     ret.longitudinalActuatorDelay = 0.15
     ret.steerLimitTimer = 1.0
+    ret.steerSaturationThreshold = 1.0
     return ret
 
   @staticmethod
