@@ -46,7 +46,7 @@ def create_acc_cmd(packer, accel_cmd, long_active, gas_override, car_standstill,
 
   active = gas_override or long_active # long_active is False when gas override, so gas override needs to be checked first.
   car_standstill = car_standstill and long_active and not gas_override # Pass stock values to make resume work.
-  cmd = 35 if gas_override else stock_values["CMD"] if car_standstill else 0 if not long_active else accel_cmd
+  cmd = stock_values["CMD"] if gas_override or car_standstill else 0 if not long_active else accel_cmd
 
   values = {
     "ACC_REQ": stock_values["ACC_REQ"] if car_standstill else active,
@@ -61,19 +61,19 @@ def create_acc_cmd(packer, accel_cmd, long_active, gas_override, car_standstill,
     "SET_ME_X6A": stock_values["SET_ME_X6A"],
 
     # Not sure
-    "STANDSTILL_REQ": car_standstill and stock_values["STANDSTILL_REQ"],
+    "STANDSTILL_REQ": stock_values["STANDSTILL_REQ"],
     "STATIONARY": car_standstill and stock_values["STATIONARY"],
     "UNKNOWN1": car_standstill and stock_values["UNKNOWN1"],
 
     # Affects resume, not sure about if it affects acceleration.
     "MOTION_CONTROL": (
-      3 if gas_override else stock_values["MOTION_CONTROL"] if car_standstill else
+      stock_values["MOTION_CONTROL"] if gas_override or car_standstill else
       4 if (not long_active or cmd < 0) else 6 if cmd > 0 else 1
     ),
 
-    "NOT_MOVE_BLOCK": gas_override or stock_values["NOT_MOVE_BLOCK"], # If forced to 0, the car stays at standstill and the set speed changes.
-    "BRAKE_ENGAGED": gas_override or stock_values["BRAKE_ENGAGED"], # Not sure, so pass stock value.
-    "RISING_ENGAGE": gas_override or stock_values["RISING_ENGAGE"], # Becomes True then False after resume button presses.
+    "NOT_MOVE_BLOCK": stock_values["NOT_MOVE_BLOCK"], # If forced to 0, the car stays at standstill and the set speed changes.
+    "BRAKE_ENGAGED": stock_values["BRAKE_ENGAGED"], # Not sure, so pass stock value.
+    "RISING_ENGAGE": stock_values["RISING_ENGAGE"], # Becomes True then False after resume button presses.
   }
 
   return packer.make_can_msg("ACC_CMD", 0, values)
