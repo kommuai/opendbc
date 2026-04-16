@@ -18,6 +18,15 @@ from opendbc.car.dnga.values import BRAKE_SCALE, DBC, SNG_CAR, CarControllerPara
 from opendbc.car.interfaces import CarControllerBase
 
 BRAKE_THRESHOLD = 0.01
+DECEL_BRAKE_APPLY_TH = 0.20
+DECEL_BRAKE_RELEASE_TH = 0.10
+LOW_SPEED_BRAKE_EXTRA_RELEASE = 0.05
+LOW_SPEED_BRAKE_V = 3.0
+LOW_SPEED_DECEL_FORCE_ZERO = 0.25
+BRAKE_CMD_MIN = 0.06
+BRAKE_APPLY_RATE = 1.2
+BRAKE_RELEASE_RATE = 3.5
+BRAKE_CMD_CUTOFF = 0.02
 BRAKE_MAG = [BRAKE_THRESHOLD, 0.32, 0.46, 0.61, 0.76, 0.90, 1.06, 1.21, 1.35, 1.51, 4.0]
 PUMP_VALS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 PUMP_RESET_INTERVAL = 1.5
@@ -76,6 +85,8 @@ class CarController(CarControllerBase):
     self.stock_ldw = False
     self.using_stock_acc = False
     self.frame = 0
+    self._brake_hyst = False
+    self._brake_cmd_slew = 0.0
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration
@@ -84,13 +95,47 @@ class CarController(CarControllerBase):
     desired_speed = CS.out.vEgo + a_tau
     return accel_cmd, desired_speed
 
-  def _get_apply_brake(self, CS, acceleration):
-    if CS.out.gasPressed or acceleration >= 0.0:
-      apply_brake = 0.0
+  def _get_apply_brake(self, CS, acceleration, enabled):
+    if not enabled or CS.out.gasPressed or acceleration >= 0.0:
+      self._brake_hyst = False
+      self._brake_cmd_slew = 0.0
+      return 0.0
+
+    decel_req = max(0.0, -float(acceleration))
+    v_ego = float(CS.out.vEgo)
+    release_boost = LOW_SPEED_BRAKE_EXTRA_RELEASE if v_ego < LOW_SPEED_BRAKE_V else 0.0
+    release_th = DECEL_BRAKE_RELEASE_TH + release_boost
+    apply_th = DECEL_BRAKE_APPLY_TH + release_boost
+
+    if v_ego < LOW_SPEED_BRAKE_V and decel_req < LOW_SPEED_DECEL_FORCE_ZERO:
+      self._brake_hyst = False
+      return 0.0
+
+    if not self._brake_hyst:
+      if decel_req <= apply_th:
+        return 0.0
+      self._brake_hyst = True
+      threshold = apply_th
     else:
-      base_brake = abs(acceleration * self.brake_scale)
-      apply_brake = float(np.clip(base_brake, 0.0, BRAKE_DECEL_CMD_MAX))
-    return apply_brake
+      if decel_req <= release_th:
+        self._brake_hyst = False
+        return 0.0
+      threshold = release_th
+
+    x = max(0.0, decel_req - threshold)
+    target = BRAKE_CMD_MIN + self.brake_scale * x
+    return float(np.clip(target, 0.0, BRAKE_DECEL_CMD_MAX))
+
+  def _shape_brake_magnitude(self, apply_brake_target):
+    up_step = BRAKE_APPLY_RATE * DT_CTRL
+    down_step = -BRAKE_RELEASE_RATE * DT_CTRL
+    shaped = rate_limit(apply_brake_target, self._brake_cmd_slew, down_step, up_step)
+
+    if apply_brake_target <= 0.0 and shaped < BRAKE_CMD_CUTOFF:
+      shaped = 0.0
+
+    self._brake_cmd_slew = shaped
+    return float(shaped)
 
   def _send_reengage_button(self, CS, can_sends):
     stock_set_speed_kph = float(CS.stock_acc_set_speed)
@@ -153,7 +198,7 @@ class CarController(CarControllerBase):
     acceleration = float(actuators.accel) if CS.out.vEgo > 0.25 else float(actuators.accel)
 
     acceleration, desired_speed = self._get_desired_speed(CS, acceleration)
-    apply_brake = self._get_apply_brake(CS, acceleration)
+    apply_brake = self._get_apply_brake(CS, acceleration, enabled)
 
     if self.frame <= 1000:
       can_sends.append(make_can_msg(2015, b"\x01\x04\x00\x00\x00\x00\x00\x00", 0))
@@ -174,6 +219,7 @@ class CarController(CarControllerBase):
         can_sends.append(dnga_buttons(self.packer, 0, 0, 1))
 
       apply_brake, self.standstill_status, self.prev_ts = self._update_standstill_state(enabled, CS, apply_brake, ts)
+      apply_brake = self._shape_brake_magnitude(apply_brake)
       pump, brake_req, self.last_pump = psd_brake(apply_brake, self.last_pump)
 
       can_sends.append(
@@ -213,6 +259,7 @@ class CarController(CarControllerBase):
     new_actuators.torque = apply_steer / self.params.STEER_MAX
     new_actuators.torqueOutputCan = apply_steer
     new_actuators.accel = acceleration
+    new_actuators.brake = float(apply_brake)
 
     self.frame += 1
     return new_actuators, can_sends
