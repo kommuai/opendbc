@@ -4,6 +4,7 @@ from enum import IntEnum
 import numpy as np
 
 from opendbc.can.packer import CANPacker
+from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car import DT_CTRL, make_can_msg, rate_limit, structs
 from opendbc.car.dnga.dngacan import (
   BRAKE_DECEL_CMD_MAX,
@@ -79,7 +80,7 @@ class CarController(CarControllerBase):
 
   def _get_desired_speed(self, CS, acceleration):
     accel_cmd = acceleration
-    t_lookup = 0.5 + 0.08 * CS.out.vEgo
+    t_lookup = 0.45 + 0.08 * CS.out.vEgo
     a_tau = (accel_cmd * t_lookup) if CS.out.vEgo > 1.2 else 0.0
     desired_speed = CS.out.vEgo + a_tau
     return accel_cmd, desired_speed
@@ -88,7 +89,8 @@ class CarController(CarControllerBase):
     if CS.out.gasPressed or acceleration >= 0.0:
       apply_brake = 0.0
     else:
-      base_brake = abs(acceleration * self.brake_scale)
+      speed_scale = float(np.interp(CS.out.vEgo, [0.0, 140.0 * CV.KPH_TO_MS], [1.0, 1.0 / 3.0]))
+      base_brake = abs(acceleration * self.brake_scale * speed_scale)
       apply_brake = float(np.clip(base_brake, 0.0, BRAKE_DECEL_CMD_MAX))
     return apply_brake
 
