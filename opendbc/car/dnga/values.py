@@ -61,7 +61,7 @@ class CAR(Platforms):
   )
   PERODUA_MYVI = DNGAPlatformConfig(
     [dnga_car("Perodua Myvi 2022-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True)],
-    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=18.2),
+    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.0),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
     [dnga_car("Toyota Vios 2023-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True)],

@@ -24,10 +24,10 @@ class CarInterface(CarInterfaceBase):
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [255]]
     ret.lateralTuning.init("pid")
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.0, 20.0], [0.0, 20.0]]
-    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.09, 0.09], [0.10, 0.14]]
+    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.02, 0.04], [0.10, 0.14]]
 
     ret.steerLimitTimer = 0.01  # DNGA EPS torque authority is low.
-    ret.steerSaturationThreshold = 0.8  # warn before hitting full normalized torque (PID still clips at ±1)
+    ret.steerSaturationThreshold = 0.4  # warn before hitting full normalized torque (PID still clips at ±1)
 
     # params that are just estimates, but compensated by lat livetune
     ret.steerActuatorDelay = 0.12
@@ -38,26 +38,21 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = True
     ret.longitudinalTuning.kpV = [0.4]
 
+    ret.lateralTuning.pid.kf = 0.000188
     wheel_speed_factor = 1.0
-    lateral_kf = 0.00015
 
     if candidate == CAR.PERODUA_ALZA:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.12, 0.14], [0.18, 0.25]]
-      lateral_kf = 0.00015
       wheel_speed_factor = 1.425
     elif candidate == CAR.PERODUA_ATIVA:
-      lateral_kf = 0.000188
       wheel_speed_factor = 1.505
     elif candidate == CAR.PERODUA_MYVI:
-      lateral_kf = 0.00012
       wheel_speed_factor = 1.31
     elif candidate == CAR.TOYOTA_VIOS:
-      lateral_kf = 0.00018
       wheel_speed_factor = 1.43
     else:
       ret.dashcamOnly = True
 
-    ret.lateralTuning.pid.kf = lateral_kf
     ret.wheelSpeedFactor = wheel_speed_factor
     ret.minEnableSpeed = -1
     ret.enableBsm = True
