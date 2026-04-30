@@ -24,7 +24,7 @@ class CarInterface(CarInterfaceBase):
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0.0], [255]]
     ret.lateralTuning.init("pid")
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.0, 20.0], [0.0, 20.0]]
-    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.08, 0.12], [0.10, 0.14]]
+    ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.04, 0.08], [0.08, 0.10]]
 
     ret.steerLimitTimer = 0.01  # DNGA EPS torque authority is low.
     ret.steerSaturationThreshold = 0.25  # warn before hitting full normalized torque (PID still clips at ±1)
@@ -42,7 +42,6 @@ class CarInterface(CarInterfaceBase):
     wheel_speed_factor = 1.0
 
     if candidate == CAR.PERODUA_ALZA:
-      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.14, 0.18], [0.18, 0.22]]
       ret.lateralTuning.pid.kf = 0.00018
       wheel_speed_factor = 1.425
     elif candidate == CAR.PERODUA_ATIVA:
