@@ -129,7 +129,7 @@ static safety_config byd_init(uint16_t param) {
   static const CanMsg BYD_TX_MSGS[] = {
     {0x1E2, 0, 8, .check_relay = true},   // STEERING_MODULE_ADAS
     {0x316, 0, 8, .check_relay = true},   // LKAS_HUD_ADAS
-    {0x32E, 0, 8, .check_relay = true},   // ACC_CMD
+    {0x32E, 0, 8, .check_relay = false},   // ACC_CMD
     {0x3B0, 0, 8, .check_relay = false},  // PCM_BUTTONS
     {0x3B0, 2, 8, .check_relay = false},
     {0x1FC, 2, 8, .check_relay = false},  // STEERING_TORQUE
