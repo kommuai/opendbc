@@ -30,6 +30,7 @@
 #include "opendbc/safety/modes/byd.h"
 #include "opendbc/safety/modes/dnga.h"
 #include "opendbc/safety/modes/proton.h"
+#include "opendbc/safety/modes/cherry.h"
 
 uint32_t GET_BYTES(const CANPacket_t *msg, int start, int len) {
   uint32_t ret = 0U;
@@ -416,6 +417,7 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
     {SAFETY_BYD, &byd_hooks},
     {SAFETY_DNGA, &dnga_hooks},
     {SAFETY_PROTON, &proton_hooks},
+    {SAFETY_CHERRY, &cherry_hooks},
   };
 
   // reset state set by safety mode

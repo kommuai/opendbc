@@ -19,6 +19,7 @@ from opendbc.car.body.bodycan import body_checksum
 from opendbc.car.psa.psacan import psa_checksum
 from opendbc.car.proton.protoncan import proton_checksum
 from opendbc.car.byd.bydcan import byd_checksum
+from opendbc.car.cherry.cherrycan import cherry_checksum
 
 
 class SignalType:
@@ -38,6 +39,7 @@ class SignalType:
   VOLKSWAGEN_MLB_CHECKSUM = 13
   PROTON_CHECKSUM = 14
   BYD_CHECKSUM = 15
+  CHERRY_CHECKSUM = 16
 
 
 @dataclass
@@ -207,6 +209,8 @@ def get_checksum_state(dbc_name: str) -> ChecksumState | None:
     return ChecksumState(8, 4, 7, -1, False, SignalType.PROTON_CHECKSUM, proton_checksum)
   elif dbc_name.startswith("byd_"):
     return ChecksumState(8, 4, 7, -1, False, SignalType.BYD_CHECKSUM, byd_checksum)
+  elif dbc_name.startswith("cherry_"):
+    return ChecksumState(8, 4, 7, -1, False, SignalType.CHERRY_CHECKSUM, cherry_checksum)
   return None
 
 
