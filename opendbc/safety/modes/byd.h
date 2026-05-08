@@ -86,7 +86,7 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
     static const AngleSteeringLimits BYD_STEERING_LIMITS = {
       .max_angle = 450,
       .angle_deg_to_can = 10,
-      .angle_rate_up_lookup = {{0., 5., 15.}, {24., 22., 20.}},
+      .angle_rate_up_lookup = {{0., 5., 15.}, {28., 26., 22.}},
       .angle_rate_down_lookup = {{0., 5., 15.}, {28., 26., 22.}},
       .max_angle_error = 0,
       .angle_error_min_speed = 0.f,

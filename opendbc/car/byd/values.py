@@ -48,6 +48,7 @@ class Footnote(Enum):
   M6_NOTE = BYD_LKC_ACC_INTELLIGENT_NOTE
   SEAL_NOTE = BYD_LKC_ACC_STOCK_NOTE
   SEALION7_NOTE = BYD_LKC_ACC_STOCK_NOTE
+  SHARK_NOTE = BYD_LKC_ACC_STOCK_NOTE
 
 
 class CAR(Platforms):
@@ -105,6 +106,17 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
   )
+  BYD_SHARK = BYDPlatformConfig(
+    [BYDCarDocs(
+      "BYD Shark 2024-26",
+      "ALL",
+      footnotes=[Footnote.SHARK_NOTE],
+      variant="All",
+      kommu_supported=True,
+      **BYD_SUPPORT_COMMON_FIELDS,
+    )],
+    CarSpecs(mass=2710.0, wheelbase=3.26, steerRatio=16.0),
+  )
 
 DBC = CAR.create_dbc_map()
 ACCEL_MULT = defaultdict(
@@ -114,13 +126,14 @@ ACCEL_MULT = defaultdict(
     CAR.BYD_M6: 26,
     CAR.BYD_SEAL: 1,
     CAR.BYD_SEALION7: 1,
+    CAR.BYD_SHARK: 1,
   },
 )
 HUD_MULTIPLIER = 1.12
 
 class CarControllerParams:
   STEER_ANGLE_MAX = 120.0  # deg
-  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[6., 3., 1.])
+  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[6., 4., 3.])
   ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[8., 6., 4.])
   ANGLE_LIMITS = AngleSteeringLimits(STEER_ANGLE_MAX, ANGLE_RATE_LIMIT_UP, ANGLE_RATE_LIMIT_DOWN)
 

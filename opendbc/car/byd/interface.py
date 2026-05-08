@@ -39,7 +39,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.BYD_M6:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
       ret.safetyConfigs[0].safetyParam = 3
-    elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7):
+    elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
       ret.safetyConfigs[0].safetyParam = 2
       ret.openpilotLongitudinalControl = False
