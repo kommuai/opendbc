@@ -47,7 +47,7 @@ class CarController(CarControllerBase):
     self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6) else CANBUS.main_bus
 
   def _update_lka_latch_state(self, CS):
-    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEALION7):
+    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SHARK, CAR.BYD_SEALION7):
       rising_edge = CS.lkas_rdy_btn and not self.prev_press
       if rising_edge:
         if not self.lka_latched:
