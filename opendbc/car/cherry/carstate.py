@@ -1,9 +1,11 @@
+import math
+
 from cereal import car
 from opendbc.can import CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.cherry.values import CANBUS, DBC, HUD_MULTIPLIER
+from opendbc.car.cherry.values import CANBUS, DBC, HUD_MULTIPLIER, cherry_steering_deg_sign
 
 ButtonType = car.CarState.ButtonEvent.Type
 CHERRY_FOLLOW_RAW_TO_PERSONALITY = {
@@ -42,7 +44,7 @@ class CarState(CarStateBase):
     )
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
 
-    ret.steeringAngleDeg = cp.vl["EPS"]["STEERING_ANGLE"]
+    ret.steeringAngleDeg = cherry_steering_deg_sign(self.CP) * float(cp.vl["EPS"]["STEERING_ANGLE"])
     ret.steeringTorque = cp.vl["EPS"]["DRIVER_TORQUE"]
     steer_dir = 1 if (ret.steeringAngleDeg - self.prev_angle >= 0) else -1
     self.prev_angle = ret.steeringAngleDeg
@@ -63,7 +65,7 @@ class CarState(CarStateBase):
     ret.leftBlinker = left
     ret.rightBlinker = right
 
-    # HUD is on bus 2 (same DBC, different bus).
+    # HUD / cruise UI on CANBUS.cam_bus (bus 2); LKAS_INFO is parsed from PT (bus 0).
     cruise_state = int(cp_cam.vl["HUD"]["CRUISE_STATE"])
     set_speed_kph = float(cp_cam.vl["HUD"]["SET_SPEED"])
     gas_override = bool(cp_cam.vl["HUD"]["GAS_OVERRIDE"])
@@ -85,6 +87,11 @@ class CarState(CarStateBase):
     if self.distance_val in CHERRY_FOLLOW_RAW_TO_PERSONALITY:
       ret.personality = CHERRY_FOLLOW_RAW_TO_PERSONALITY[self.distance_val]
 
+    # FOLLOW_DISTANCE can be transient or unmapped while cycling the distance button.
+    # Keep mapped values in [0, 2]; leave -1 untouched (car.capnp: optional override / unknown).
+    if ret.personality != -1:
+      ret.personality = max(0, min(int(ret.personality), 2))
+
     # PCM buttons (minimal edge detection — expand when CAN semantics confirmed)
     icc = bool(cp.vl["PCM_BUTTONS"]["ICC_TOGGLE"])
     cruise_btn = bool(cp.vl["PCM_BUTTONS"]["CRUISE_BUTTON"])
@@ -98,14 +105,20 @@ class CarState(CarStateBase):
     ret.stockAeb = bool(cp_cam.vl["HUD"]["AEB"])
     ret.stockFcw = bool(cp_cam.vl["HUD"]["PCW"])
 
-    # TODO
-    ret.doorOpen = False
-    ret.seatbeltUnlatched = False
+    # 0x391: door ajar = PAYLOAD391_B3 LSB (0x08 latched vs 0x09 ajar). B1/B6 vary like counter.
+    st_vl = cp.vl["STALK"]
+    b3 = int(st_vl["PAYLOAD391_B3"])
+    ret.doorOpen = bool((b3 & 1) != 0)
+    ret.genericToggle = False
+    ret.seatbeltUnlatched = bool(
+      cp.vl["SEATBELT_287"]["DRIVER_UNBUCKLED"] != 0
+      or cp.vl["SEATBELT_430"]["DRIVER_UNBUCKLED"] != 0
+    )
     ret.espDisabled = False
 
-    # Bus 2: LANE_KEEP, LKAS_INFO, ACC_UNCERTAIN (see get_cam_can_parser).
+    # LANE_KEEP / ACC on CANBUS.cam_bus; LKAS_INFO is on PT (bus 0) for this harness.
     self.lkas_enable_lane = bool(cp_cam.vl["LANE_KEEP"]["LKAS_ENABLE"])
-    self.lkas_enable_info = bool(cp_cam.vl["LKAS_INFO"]["LKAS_ENABLE"])
+    self.lkas_enable_info = bool(cp.vl["LKAS_INFO"]["LKAS_ENABLE"])
 
     return ret
 
@@ -130,6 +143,11 @@ class CarState(CarStateBase):
       ("ADAS_RELATED", 100),
       ("SPEED_RELATED", 50),
       ("STEER_RELATED", 100),
+      ("SEATBELT_287", 50),
+      ("SEATBELT_430", 50),
+      ("BCM_STAT_412", math.nan),
+      ("BCM_STAT_465", math.nan),
+      ("LKAS_INFO", 50),
     ]
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.main_bus)
 
@@ -138,7 +156,6 @@ class CarState(CarStateBase):
     signals = [
       ("HUD", 20),
       ("LANE_KEEP", 50),
-      ("LKAS_INFO", 50),
       ("ACC_UNCERTAIN", 20),
     ]
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.cam_bus)

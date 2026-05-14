@@ -1,4 +1,11 @@
-"""Cherry ADAS TX helpers — cherry_general_pt.dbc."""
+"""Cherry ADAS TX helpers — cherry_general_pt.dbc.
+
+LANE_KEEP TX bus: the stock camera transmits 0x345 on the camera leg (panda bus 2);
+we inject ours on the vehicle/ECU leg (panda bus 0). Cherry safety blocks bus 2 -> bus 0
+forwarding of 0x345 (see opendbc/safety/modes/cherry.h::cherry_fwd_hook) so the ECU only
+sees openpilot's frame when the relay is open. TX-ing on bus 2 instead drops the frame
+because cherry's TX whitelist binds 0x345 to bus 0 only.
+"""
 
 from opendbc.car.crc import CRC8J1850
 from opendbc.car.cherry.values import CANBUS
@@ -23,15 +30,22 @@ def cherry_checksum(address: int, sig, d: bytearray) -> int:
   return crc ^ 0x0A
 
 
-def create_lane_keep_command(packer, steer_angle_deg: float, steer_req: bool, meas_angle_deg: float):
-  """LANE_KEEP (0x345) on ADAS bus — physical degrees on STEER_CMD_ANGLE (DBC scale 0.1, offset -773).
+def create_lane_keep_command(
+  packer,
+  steer_angle_deg: float,
+  steer_req: bool,
+  meas_angle_deg: float,
+  steering_deg_sign: float = 1.0,
+):
+  """LANE_KEEP (0x345) on ADAS bus — STEER_CMD_ANGLE (DBC scale 0.1, offset -780.1, same as EPS).
 
-  When steer_req is false, command tracks measured angle for a smoother handoff (LKAS_ENABLE=0).
+  steer_angle_deg / meas_angle_deg are openpilot convention (+ = left). steering_deg_sign maps to ECU CAN
+  (Jaecoo J7: +1.0 via cherry_steering_deg_sign). When steer_req is false, command tracks measured angle (LKAS_ENABLE=0).
   """
-  cmd_angle = steer_angle_deg if steer_req else meas_angle_deg
+  cmd_angle = steering_deg_sign * (steer_angle_deg if steer_req else meas_angle_deg)
   values = {
     "STEER_CMD_ANGLE": float(cmd_angle),
     "LKAS_ENABLE": 1 if steer_req else 0,
     **_LANE_KEEP_PADDING,
   }
-  return packer.make_can_msg("LANE_KEEP", CANBUS.cam_bus, values)
+  return packer.make_can_msg("LANE_KEEP", CANBUS.main_bus, values)

@@ -20,6 +20,7 @@ class CherryCarDocs(CarDocs):
 
 class CANBUS:
   main_bus = 0
+  # Jaecoo J7: HUD / LANE_KEEP / ACC_UNCERTAIN on panda bus 2; LKAS_INFO (0x394) on bus 0 (PT).
   cam_bus = 2
 
 
@@ -58,6 +59,27 @@ class CAR(Platforms):
 
 
 DBC = CAR.create_dbc_map()
+
+
+def cherry_steering_deg_sign(cp) -> float:
+  """Map EPS / LANE_KEEP DBC angles to openpilot (+deg = left / CCW wheel).
+
+  Jaecoo J7: use +1.0 so steering angle agrees with road-frame yaw in paramsd (steer vs
+  yaw correlation on route logs; inverted sign caused |angleOffset| > 10° and
+  angleOffsetValid=false / "Steering misalignment detected").
+
+  RX: steeringAngleDeg = s * EPS["STEERING_ANGLE"] (see carstate.py).
+  TX: STEER_CMD_ANGLE packed with s * (OP command or OP meas) so CAN matches EPS units
+      (see cherrycan.create_lane_keep_command).
+
+  On-car check if lateral is backwards: log EPS decode vs carState while turning left;
+  if steeringAngleDeg moves opposite expectation, flip s for this fingerprint.
+  """
+  if cp.carFingerprint == CAR.CHERRY_JAECOO_J7_PHEV:
+    return 1.0
+  return 1.0
+
+
 ACCEL_MULT = defaultdict(
   lambda: 1,
   {CAR.CHERRY_JAECOO_J7_PHEV: 1},

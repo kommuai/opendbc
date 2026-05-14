@@ -3,7 +3,7 @@ import numpy as np
 from opendbc.can.packer import CANPacker
 
 from opendbc.car.cherry.cherrycan import create_lane_keep_command
-from opendbc.car.cherry.values import CarControllerParams, DBC
+from opendbc.car.cherry.values import CarControllerParams, DBC, cherry_steering_deg_sign
 from opendbc.car.interfaces import CarControllerBase
 
 class CarController(CarControllerBase):
@@ -11,6 +11,7 @@ class CarController(CarControllerBase):
     super().__init__(dbc_names, CP)
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.last_apply_angle = None
+    self.steering_deg_sign = cherry_steering_deg_sign(CP)
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
     meas_deg = CS.out.steeringAngleDeg
@@ -34,8 +35,9 @@ class CarController(CarControllerBase):
     enabled = CC.latActive
     actuators = CC.actuators
 
-    stock_lka_ok = CS.lkas_enable_lane
-    lat_active = enabled and stock_lka_ok and not CS.out.standstill
+    # On observed J7 logs, stock LKAS enable bits can stay low even while openpilot is engaged.
+    # Gate only on openpilot lateral activation + vehicle motion so we don't force LKAS_ENABLE=0.
+    lat_active = enabled and not CS.out.standstill
 
     apply_angle = CS.out.steeringAngleDeg
     if (self.frame % 2) == 0:
@@ -46,6 +48,7 @@ class CarController(CarControllerBase):
           apply_angle,
           lat_active,
           CS.out.steeringAngleDeg,
+          self.steering_deg_sign,
         )
       )
 

@@ -3,14 +3,32 @@
 #include "opendbc/safety/declarations.h"
 #include "opendbc/safety/modes/defaults.h"
 
-// Cherry (Jaecoo J7 PHEV, etc.) — permissive bring-up: no RX checks, allow all TX.
-// Tighten with real limits and relay/forward rules before production use.
+// Cherry (Jaecoo J7 PHEV, etc.) — TX whitelist for LANE_KEEP; cruise engagement gates controls_allowed
+// via HUD on camera bus (matches cherry_general_pt.dbc + CarState cruise parsing).
 #define CHERRY_LANE_KEEP 0x345U
+#define CHERRY_HUD       0x387U
+
+static RxCheck cherry_rx_checks[] = {
+  {.msg = {{CHERRY_HUD, 2U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+};
+
+static const CanMsg CHERRY_TX_MSGS[] = {
+  {CHERRY_LANE_KEEP, 0, 8, .check_relay = true},  // bus 0 = vehicle/ECU side; stock cam TXes on bus 2.
+};
+
+static void cherry_rx_hook(const CANPacket_t *msg) {
+  // HUD CRUISE_STATE on camera leg (panda bus 2): DBC CM "3 is ENABLE" — same as CarState.cruiseState.enabled.
+  if ((msg->addr == CHERRY_HUD) && (msg->bus == 2U) && (GET_LEN(msg) >= 5U)) {
+    const uint8_t cruise_state = (uint8_t)((msg->data[4] >> 2) & 0x3U);
+    const bool cruise_engaged = (cruise_state == 3U);
+    pcm_cruise_check(cruise_engaged);
+  }
+}
 
 static safety_config cherry_init(uint16_t param) {
   SAFETY_UNUSED(param);
-  controls_allowed = true;
-  return (safety_config){NULL, 0, NULL, 0, false}; // NOLINT(readability/braces)
+  controls_allowed = false;
+  return BUILD_SAFETY_CFG(cherry_rx_checks, CHERRY_TX_MSGS);
 }
 
 static bool cherry_tx_hook(const CANPacket_t *msg) {
@@ -27,7 +45,7 @@ static bool cherry_fwd_hook(int bus_num, int addr) {
 
 const safety_hooks cherry_hooks = {
   .init = cherry_init,
-  .rx = default_rx_hook,
+  .rx = cherry_rx_hook,
   .tx = cherry_tx_hook,
   .fwd = cherry_fwd_hook,
 };

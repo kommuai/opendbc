@@ -48,7 +48,7 @@ BO_ 269 TRANSMISSION: 8 XXX
  SG_ GEAR : 43|4@0+ (1,0) [0|15] "" XXX
 
 BO_ 467 EPS: 8 XXX
- SG_ STEERING_ANGLE : 7|14@0+ (0.1,-773) [0|16383] "" XXX
+ SG_ STEERING_ANGLE : 7|14@0+ (0.1,-780.1) [0|16383] "" XXX
  SG_ DRIVER_TORQUE : 22|7@0+ (1,0) [0|127] "" XXX
  SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
  SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
@@ -63,8 +63,54 @@ BO_ 608 SPEED_RELATED: 8 XXX
  SG_ NON_CAL_SPEED2 : 17|9@0+ (1,0) [0|511] "" XXX
 
 BO_ 666 BRAKE_PEDAL: 8 XXX
- SG_ BRAKE_PRESSURE : 18|9@0+ (0.002,0) [0|511] "" XXX
+ SG_ BRAKE_PRESSURE : 18|9@0+ (0.002,-0.2) [0|511] "" XXX
  SG_ AUTO_HOLD : 40|1@0+ (1,0) [0|1] "" XXX
+
+BO_ 647 SEATBELT_287: 8 XXX
+ SG_ DRIVER_UNBUCKLED : 25|1@1+ (1,0) [0|1] "" XXX
+
+BO_ 1072 SEATBELT_430: 8 XXX
+ SG_ DRIVER_UNBUCKLED : 46|1@1+ (1,0) [0|1] "" XXX
+
+BO_ 295 DOOR_BCM_127: 8 XXX
+ SG_ B0 : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ B1 : 8|8@1+ (1,0) [0|255] "" XXX
+ SG_ DOOR_B2_STATUS : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ B3 : 24|8@1+ (1,0) [0|255] "" XXX
+ SG_ B4 : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ DOOR_B5_STATUS : 40|8@1+ (1,0) [0|255] "" XXX
+ SG_ B6 : 48|8@1+ (1,0) [0|255] "" XXX
+ SG_ B7 : 56|8@1+ (1,0) [0|255] "" XXX
+
+BO_ 914 BCM_STAT_392: 8 XXX
+ SG_ B0 : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ B1 : 8|8@1+ (1,0) [0|255] "" XXX
+ SG_ B2 : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ B3 : 24|8@1+ (1,0) [0|255] "" XXX
+ SG_ B4 : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ B5 : 40|8@1+ (1,0) [0|255] "" XXX
+ SG_ B6 : 48|8@1+ (1,0) [0|255] "" XXX
+ SG_ B7 : 56|8@1+ (1,0) [0|255] "" XXX
+
+BO_ 1042 BCM_STAT_412: 8 XXX
+ SG_ B0 : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ B1 : 8|8@1+ (1,0) [0|255] "" XXX
+ SG_ B2 : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ B3 : 24|8@1+ (1,0) [0|255] "" XXX
+ SG_ B4 : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ B5 : 40|8@1+ (1,0) [0|255] "" XXX
+ SG_ B6 : 48|8@1+ (1,0) [0|255] "" XXX
+ SG_ B7 : 56|8@1+ (1,0) [0|255] "" XXX
+
+BO_ 1125 BCM_STAT_465: 8 XXX
+ SG_ B0 : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ B1 : 8|8@1+ (1,0) [0|255] "" XXX
+ SG_ B2 : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ B3 : 24|8@1+ (1,0) [0|255] "" XXX
+ SG_ B4 : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ B5 : 40|8@1+ (1,0) [0|255] "" XXX
+ SG_ B6 : 48|8@1+ (1,0) [0|255] "" XXX
+ SG_ B7 : 56|8@1+ (1,0) [0|255] "" XXX
 
 BO_ 787 WHEELSPEED_2: 8 XXX
  SG_ WHEEL_FL : 7|16@0+ (0.01,0) [0|65535] "" XXX
@@ -78,7 +124,7 @@ BO_ 790 WHEELSPEED_1: 8 XXX
  SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
 
 BO_ 837 LANE_KEEP: 8 XXX
- SG_ STEER_CMD_ANGLE : 7|14@0+ (0.1,-773) [0|16383] "" XXX
+ SG_ STEER_CMD_ANGLE : 7|14@0+ (0.1,-780.1) [0|16383] "" XXX
  SG_ LKAS_ENABLE : 9|1@0+ (1,0) [0|1] "" XXX
  SG_ SET_ME_XFF : 23|8@0+ (1,0) [0|255] "" XXX
  SG_ SET_ME_XFC : 31|8@0+ (1,0) [0|255] "" XXX
@@ -111,6 +157,13 @@ BO_ 903 HUD: 8 XXX
 BO_ 913 STALK: 8 XXX
  SG_ RIGHT_BLINKER : 16|1@0+ (1,0) [0|1] "" XXX
  SG_ LEFT_BLINKER : 17|1@0+ (1,0) [0|1] "" XXX
+ SG_ PAYLOAD391_B0 : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B1 : 8|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B3 : 24|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B4 : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B5 : 40|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B6 : 48|8@1+ (1,0) [0|255] "" XXX
+ SG_ PAYLOAD391_B7 : 56|8@1+ (1,0) [0|255] "" XXX
 
 BO_ 916 LKAS_INFO: 8 XXX
  SG_ MAIN_TORQUE : 7|10@0+ (1,0) [0|1023] "" XXX
@@ -124,6 +177,16 @@ BO_ 990 ACC_UNCERTAIN: 8 XXX
 
 CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 666 AUTO_HOLD "Only gear D it will be active";
+CM_ SG_ 666 BRAKE_PRESSURE "Offset -0.2 removes ~0.2 idle bias (Jaecoo J7); scale 0.002 unchanged.";
 CM_ SG_ 903 FOLLOW_DISTANCE "1 is 3 BAR, 2 is 2 BAR, 3 is 1 BAR";
+CM_ BO_ 647 "Driver seatbelt: byte3 bit1 (Intel start bit 25) set when unbuckled (Jaecoo J7 log).";
+CM_ BO_ 1072 "Driver seatbelt: byte5 bit6 (Intel start bit 46) set when unbuckled (Jaecoo J7 log).";
+CM_ BO_ 295 "BCM 0x127 (optional): door-related bytes vary; not present on every latch event — do not use alone for doorOpen.";
+CM_ BO_ 913 "CAN 0x391 STALK+BCM. Door: PAYLOAD391_B3 (wire byte3) 0x08 latched vs 0x09 ajar — use LSB (byte3&1), not B1/B6 (counter).";
+CM_ BO_ 914 "BCM 0x392 (Jaecoo J7): raw BCM; door decode uses 0x391 PAYLOAD391_B3 as in CM_ BO_ 913.";
+CM_ BO_ 1042 "BCM frame 0x412; trailing bytes roll (counter) in capture.";
+CM_ BO_ 1125 "BCM frame 0x465; single sample in door-close capture — label for follow-up.";
 CM_ SG_ 903 CRUISE_STATE "3 is ENABLE, 2 is READY, 1 is IDLE";
+CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at straight-ahead vs -773.";
+CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";
 
