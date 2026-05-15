@@ -11,7 +11,7 @@ class TestCherrySafety(unittest.TestCase):
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
-    self.safety.set_safety_hooks(CarParams.SafetyModel.cherry, 0)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.cherry, 1)
     self.safety.init_tests()
     self.packer = CANPackerSafety("cherry_general_pt")
 
@@ -71,6 +71,23 @@ class TestCherrySafety(unittest.TestCase):
     self.assertTrue(self._tx(self._lane_keep(0.0, 0)))
     self.safety.set_controls_allowed(True)
     self.assertTrue(self._tx(self._lane_keep(1.0, 1)))
+
+  def _lkas_info(self, main_torque: float, lkas_enable: int):
+    return self.packer.make_can_msg_safety(
+      "LKAS_INFO",
+      0,
+      {
+        "MAIN_TORQUE": main_torque,
+        "LKAS_ENABLE": lkas_enable,
+        "STEER_RELATED": 0.0,
+      },
+    )
+
+  def test_lkas_info_tx_allowed_when_whitelisted(self):
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(self._lkas_info(50.0, 1)))
+    self.safety.set_controls_allowed(True)
+    self.assertTrue(self._tx(self._lkas_info(0.0, 0)))
 
 
 if __name__ == "__main__":

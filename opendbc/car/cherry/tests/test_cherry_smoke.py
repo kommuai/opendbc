@@ -21,7 +21,11 @@ from opendbc.car import Bus, structs
 from opendbc.car.can_definitions import CanData
 from opendbc.car.cherry.carcontroller import CarController
 from opendbc.car.cherry.carstate import CarState
-from opendbc.car.cherry.cherrycan import cherry_checksum, create_lane_keep_command
+from opendbc.car.cherry.cherrycan import (
+  cherry_checksum,
+  create_lane_keep_command,
+  create_lkas_info_torque_spoof,
+)
 from opendbc.car.cherry.fingerprints import FINGERPRINTS
 from opendbc.car.cherry.interface import CarInterface
 from opendbc.car.cherry.radar_interface import RadarInterface
@@ -54,6 +58,7 @@ class TestCherryParams:
     assert CP.openpilotLongitudinalControl is False
     assert CP.steerControlType == cereal_car.CarParams.SteerControlType.angle
     assert CP.safetyConfigs[0].safetyModel == cereal_car.CarParams.SafetyModel.cherry
+    assert CP.safetyConfigs[0].safetyParam == 0
     assert math.isclose(CP.wheelSpeedFactor, 0.832, rel_tol=0.0, abs_tol=1e-5)
     assert CP.dashcamOnly is False
 
@@ -124,6 +129,29 @@ class TestCherryChecksum:
     d = bytearray(dat)
     assert d[7] == cherry_checksum(addr, None, d)
     assert (d[6] & 0x0F) == 5
+
+  def test_lkas_info_tx_on_vehicle_bus(self):
+    packer = CANPacker(DBC_NAME)
+    msg = create_lkas_info_torque_spoof(packer, lat_active=True, main_torque=12.0, spoof_active=True)
+    assert msg[0] == 0x394
+    assert msg[2] == CANBUS.main_bus, "LKAS_INFO TX must be bus 0 (PT), not camera bus 2"
+
+  def test_lkas_info_checksum_matches_packer(self):
+    packer = CANPacker(DBC_NAME)
+    msg = create_lkas_info_torque_spoof(packer, lat_active=True, main_torque=12.0, spoof_active=True)
+    d = bytearray(msg[1])
+    assert msg[2] == CANBUS.main_bus
+    assert cherry_checksum(0x394, None, d) == d[7]
+
+  def test_lkas_info_counter_increments(self):
+    packer = CANPacker(DBC_NAME)
+    parser = CANParser(DBC_NAME, [("LKAS_INFO", 50)], CANBUS.main_bus)
+    counters = []
+    for _ in range(4):
+      msg = create_lkas_info_torque_spoof(packer, lat_active=False, main_torque=0.0, spoof_active=False)
+      parser.update([0, [msg]])
+      counters.append(int(parser.vl["LKAS_INFO"]["COUNTER"]))
+    assert counters == [0, 1, 2, 3]
 
   def test_lane_keep_roundtrip_checksum(self, subtests):
     parser = CANParser(DBC_NAME, [("LANE_KEEP", 2)], CANBUS.cam_bus)
@@ -353,6 +381,35 @@ class TestCherryCarController:
             act.steeringAngleDeg = steer_cmd
             out = CC._compute_apply_angle(CS, act, lat_active)
             assert math.isfinite(out)
+
+  def test_lane_keep_lkas_off_when_driver_steering(self):
+    """Driver torque must drop LKAS_ENABLE to avoid EPS fault (route 2026-05-14--07-49-04)."""
+    CP = _cp()
+    CC = CarController({Bus.pt: DBC_NAME, Bus.cam: DBC_NAME}, CP)
+    CS = CarState(CP)
+    CS.out = structs.CarState.new_message()
+    CS.out.steeringAngleDeg = 2.0
+    CS.out.steeringTorque = 25.0
+    CS.out.vEgo = 12.0
+    CS.out.standstill = False
+    CS.out.steeringPressed = True
+    CS.steer_related_intervention = False
+
+    ctl = structs.CarControl()
+    ctl.latActive = True
+    ctl.actuators.steeringAngleDeg = 9.0
+    ctl = ctl.as_reader()
+
+    can_sends: list = []
+    for _ in range(40):
+      _, sends = CC.update(ctl, CS, 0)
+      can_sends.extend(sends)
+
+    lane_keep = [x for x in can_sends if x[0] == 0x345]
+    assert len(lane_keep) >= 1
+    parser = CANParser(DBC_NAME, [("LANE_KEEP", 2)], CANBUS.main_bus)
+    parser.update([0, [lane_keep[-1]]])
+    assert parser.vl["LANE_KEEP"]["LKAS_ENABLE"] == 0
 
   def test_lat_control_not_blocked_by_stock_lka_bit(self):
     CP = _cp()

@@ -19,8 +19,9 @@ class CherryCarDocs(CarDocs):
 
 
 class CANBUS:
+  # Panda bus 0 = vehicle / EPS / ECU (PT). openpilot TX: LANE_KEEP + LKAS_INFO torque spoof.
   main_bus = 0
-  # Jaecoo J7: HUD / LANE_KEEP / ACC_UNCERTAIN on panda bus 2; LKAS_INFO (0x394) on bus 0 (PT).
+  # Panda bus 2 = stock ADAS camera leg. CarState RX: HUD, LANE_KEEP (read stock). Not LKAS_INFO TX.
   cam_bus = 2
 
 
@@ -85,6 +86,10 @@ ACCEL_MULT = defaultdict(
   {CAR.CHERRY_JAECOO_J7_PHEV: 1},
 )
 HUD_MULTIPLIER = 1.0
+
+# Jaecoo J7 route 2026-05-14--07-49-04: STEER_RELATED (0xC4) STEERING_ANGLE_NOT_CALIBRATED raw value
+# rises from ~327xx at rest to >=36000 when the driver applies meaningful torque while LKAS is active.
+STEER_RELATED_INTERVENTION_RAW_MIN = 36000
 
 
 class CarControllerParams:

@@ -188,5 +188,6 @@ CM_ BO_ 1042 "BCM frame 0x412; trailing bytes roll (counter) in capture.";
 CM_ BO_ 1125 "BCM frame 0x465; single sample in door-close capture — label for follow-up.";
 CM_ SG_ 903 CRUISE_STATE "3 is ENABLE, 2 is READY, 1 is IDLE";
 CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at straight-ahead vs -773.";
+CM_ SG_ 196 STEERING_ANGLE_NOT_CALIBRATED "Jaecoo J7: raw ~327xx at rest; >=36000 during driver torque / LKAS conflict (route 2026-05-14--07-49-04).";
 CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";
 

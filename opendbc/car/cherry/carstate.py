@@ -5,7 +5,13 @@ from opendbc.can import CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.cherry.values import CANBUS, DBC, HUD_MULTIPLIER, cherry_steering_deg_sign
+from opendbc.car.cherry.values import (
+  CANBUS,
+  DBC,
+  HUD_MULTIPLIER,
+  STEER_RELATED_INTERVENTION_RAW_MIN,
+  cherry_steering_deg_sign,
+)
 
 ButtonType = car.CarState.ButtonEvent.Type
 CHERRY_FOLLOW_RAW_TO_PERSONALITY = {
@@ -28,6 +34,8 @@ class CarState(CarStateBase):
     self.prev_cruise = False
     self.distance_val = 1
     self.prev_angle = 0.0
+    self.lkas_info_steer_related = 0.0
+    self.steer_related_intervention = False
 
   def update(self, can_parsers):
     cp = can_parsers[Bus.pt]
@@ -118,7 +126,13 @@ class CarState(CarStateBase):
 
     # LANE_KEEP / ACC on CANBUS.cam_bus; LKAS_INFO is on PT (bus 0) for this harness.
     self.lkas_enable_lane = bool(cp_cam.vl["LANE_KEEP"]["LKAS_ENABLE"])
-    self.lkas_enable_info = bool(cp.vl["LKAS_INFO"]["LKAS_ENABLE"])
+    lkas_vl = cp.vl["LKAS_INFO"]
+    self.lkas_enable_info = bool(lkas_vl["LKAS_ENABLE"])
+    self.lkas_info_steer_related = float(lkas_vl["STEER_RELATED"])
+
+    sr_raw = int(cp.vl["STEER_RELATED"]["STEERING_ANGLE_NOT_CALIBRATED"])
+    # EPS/cluster conflict indicator (route 2026-05-14--07-49-04); used to drop LKAS_ENABLE, not OP steerFault*.
+    self.steer_related_intervention = sr_raw >= STEER_RELATED_INTERVENTION_RAW_MIN
 
     return ret
 

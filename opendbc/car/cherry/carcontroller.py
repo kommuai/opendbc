@@ -2,9 +2,13 @@ import numpy as np
 
 from opendbc.can.packer import CANPacker
 
-from opendbc.car.cherry.cherrycan import create_lane_keep_command
+from opendbc.car.cherry.cherrycan import create_lane_keep_command, create_lkas_info_torque_spoof
 from opendbc.car.cherry.values import CarControllerParams, DBC, cherry_steering_deg_sign
 from opendbc.car.interfaces import CarControllerBase
+
+SPOOF_DURATION_FRAMES = 50
+SPOOF_CYCLE_FRAMES = 150
+
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):
@@ -39,16 +43,40 @@ class CarController(CarControllerBase):
     # Gate only on openpilot lateral activation + vehicle motion so we don't force LKAS_ENABLE=0.
     lat_active = enabled and not CS.out.standstill
 
+    # Release LKAS_ENABLE while the driver is on the wheel (route 2026-05-14--07-49-04: avoids EPS fault).
+    driver_overriding = (
+      CS.out.steeringPressed
+      or getattr(CS, "steer_related_intervention", False)
+    )
+    steer_req = lat_active and not driver_overriding
+
     apply_angle = CS.out.steeringAngleDeg
     if (self.frame % 2) == 0:
-      apply_angle = self._compute_apply_angle(CS, actuators, lat_active)
+      apply_angle = self._compute_apply_angle(CS, actuators, steer_req)
       can_sends.append(
         create_lane_keep_command(
           self.packer,
           apply_angle,
-          lat_active,
+          steer_req,
           CS.out.steeringAngleDeg,
           self.steering_deg_sign,
+        )
+      )
+
+    # LKAS_INFO MAIN_TORQUE spoof (BYD STEERING_TORQUE pattern) — 20 Hz, intermittent cycle.
+    if (self.frame % 5) == 0:
+      cycle_position = self.frame % SPOOF_CYCLE_FRAMES
+      spoof_active = cycle_position < SPOOF_DURATION_FRAMES
+      # MAIN_TORQUE mirrors EPS DRIVER_TORQUE; skip fake offset while driver is steering.
+      can_sends.append(
+        create_lkas_info_torque_spoof(
+          self.packer,
+          lat_active,
+          CS.out.steeringTorque,
+          spoof_active,
+          lkas_enable=steer_req,
+          steer_related=getattr(CS, "lkas_info_steer_related", 0.0),
+          apply_spoof_offset=not driver_overriding,
         )
       )
 
