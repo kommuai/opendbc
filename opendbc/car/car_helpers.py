@@ -57,6 +57,25 @@ def supported_cars() -> list[str]:
 def car_name_to_platform(car_name: str) -> str | None:
   return next((p for p, ns in CAR_MAPPING.items() if car_name in ns), None)
 
+def fingerprint_to_display_name(fp: str | None) -> str:
+  if not fp:
+    return ""
+  return " ".join(
+    "-".join(s.capitalize() for s in seg.split("-")) if "-" in seg else seg.capitalize()
+    for seg in fp.split("_") if seg
+  )
+
+def remove_year(name: str | None) -> str | None:
+  return (
+    None if name is None else (
+      name[:m.start()].strip() if (m := re.search(r"\s+(\d{2,4})(?:-(\d{2,4}))?$", name))
+      and (valid := (lambda y: (10 <= y <= 99) or (2010 <= y <= 2099)))
+      and valid(int(m.group(1)))
+      and (not m.group(2) or valid(int(m.group(2))))
+      else name.strip()
+    )
+  )
+
 # Remove previously set CarName if invalid
 if (car_name := params.get("CarName")) and car_name_to_platform(car_name) is None:
   params.remove("CarName")
@@ -226,6 +245,7 @@ def get_car(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multip
   CP.carFw = car_fw
   CP.fingerprintSource = source
   CP.fuzzyFingerprint = not exact_match
+  CP.carName = remove_year(params.get("CarName") or fingerprint_to_display_name(CP.carFingerprint))
 
   return interfaces[CP.carFingerprint](CP)
 

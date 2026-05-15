@@ -461,6 +461,7 @@ struct CarParams {
   brand @0 :Text;  # Designates which group a platform falls under. Each folder in opendbc/car is assigned one brand string
   carFingerprint @1 :Text;
   fuzzyFingerprint @55 :Bool;
+  carName @79 :Text;
 
   notCar @66 :Bool;  # flag for non-car robotics platforms
 
