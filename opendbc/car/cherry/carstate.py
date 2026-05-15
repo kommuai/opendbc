@@ -14,10 +14,13 @@ from opendbc.car.cherry.values import (
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
+# HUD FOLLOW_DISTANCE raw 1..5 = 5..1 ACC gap bars (Jaecoo J7); map to openpilot personality 0..2.
 CHERRY_FOLLOW_RAW_TO_PERSONALITY = {
-  1: 2,
-  2: 1,
-  3: 0,
+  1: 2,  # 5 bars — max gap / relaxed
+  2: 2,  # 4 bars
+  3: 1,  # 3 bars — standard
+  4: 0,  # 2 bars
+  5: 0,  # 1 bar — min gap / aggressive
 }
 
 _GEAR_TO_STR = {
@@ -33,6 +36,7 @@ class CarState(CarStateBase):
     self.prev_icc = False
     self.prev_cruise = False
     self.distance_val = 1
+    self.pcm_button_counter = 0
     self.prev_angle = 0.0
     self.lkas_info_steer_related = 0.0
     self.steer_related_intervention = False
@@ -88,7 +92,8 @@ class CarState(CarStateBase):
       ret.cruiseState.speedCluster = 0.0
       ret.cruiseState.speed = 0.0
 
-    ret.cruiseState.standstill = False
+    # Stock ACC hold: vehicle stopped while cruise engaged (gates CC.cruiseControl.resume in controlsd).
+    ret.cruiseState.standstill = ret.standstill and ret.cruiseState.enabled
     ret.cruiseState.nonAdaptive = False
 
     self.distance_val = int(cp_cam.vl["HUD"]["FOLLOW_DISTANCE"])
@@ -100,7 +105,8 @@ class CarState(CarStateBase):
     if ret.personality != -1:
       ret.personality = max(0, min(int(ret.personality), 2))
 
-    # PCM buttons (minimal edge detection — expand when CAN semantics confirmed)
+    # PCM buttons — ICC_TOGGLE = ICC/LKAS toggle; CRUISE_BUTTON = main cruise (sparse in logs).
+    self.pcm_button_counter = int(cp.vl["PCM_BUTTONS"]["COUNTER"])
     icc = bool(cp.vl["PCM_BUTTONS"]["ICC_TOGGLE"])
     cruise_btn = bool(cp.vl["PCM_BUTTONS"]["CRUISE_BUTTON"])
     ret.buttonEvents = (

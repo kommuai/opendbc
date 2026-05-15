@@ -144,7 +144,7 @@ BO_ 903 HUD: 8 XXX
  SG_ AEB : 0|1@0+ (1,0) [0|1] "" XXX
  SG_ CANCEL_CRUISE_UNCERTAIN : 5|2@0+ (1,0) [0|3] "" XXX
  SG_ GAS_RESUME_UNCERTAIN : 6|1@0+ (1,0) [0|1] "" XXX
- SG_ FOLLOW_DISTANCE : 9|2@1+ (1,0) [0|3] "" XXX
+ SG_ FOLLOW_DISTANCE : 9|3@1+ (1,0) [0|7] "" XXX
  SG_ NEW_SIGNAL_1 : 16|1@0+ (1,0) [0|1] "" XXX
  SG_ PCW : 31|1@0+ (1,0) [0|1] "" XXX
  SG_ CRUISE_STATE : 34|2@1+ (1,0) [0|3] "" XXX
@@ -178,7 +178,7 @@ BO_ 990 ACC_UNCERTAIN: 8 XXX
 CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 666 AUTO_HOLD "Only gear D it will be active";
 CM_ SG_ 666 BRAKE_PRESSURE "Offset -0.2 removes ~0.2 idle bias (Jaecoo J7); scale 0.002 unchanged.";
-CM_ SG_ 903 FOLLOW_DISTANCE "1 is 3 BAR, 2 is 2 BAR, 3 is 1 BAR";
+CM_ SG_ 903 FOLLOW_DISTANCE "Jaecoo J7 ACC gap bars on HUD byte1 bits 9-11 (3-bit LE). Raw 1=5 bars (max gap) .. raw 5=1 bar (min gap); 0/6/7 unknown. Route 2026-05-14--07-49-04.";
 CM_ BO_ 647 "Driver seatbelt: byte3 bit1 (Intel start bit 25) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 1072 "Driver seatbelt: byte5 bit6 (Intel start bit 46) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 295 "BCM 0x127 (optional): door-related bytes vary; not present on every latch event — do not use alone for doorOpen.";
@@ -190,4 +190,9 @@ CM_ SG_ 903 CRUISE_STATE "3 is ENABLE, 2 is READY, 1 is IDLE";
 CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at straight-ahead vs -773.";
 CM_ SG_ 196 STEERING_ANGLE_NOT_CALIBRATED "Jaecoo J7: raw ~327xx at rest; >=36000 during driver torque / LKAS conflict (route 2026-05-14--07-49-04).";
 CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";
+CM_ SG_ 864 ICC_TOGGLE "ICC/LKAS toggle; stock press 529000010000 on route 2026-05-14--07-49-04 (openpilot resume TX).";
+CM_ SG_ 864 CRUISE_BUTTON "Main cruise / set button (not confirmed as resume in logs; sparse samples).";
+CM_ SG_ 864 CHECKSUM_BUTTONS "Byte 0; Chrysler-style CRC over bytes 1..5 (Jaecoo J7 route 2026-05-14--07-49-04).";
+
+VAL_ 903 FOLLOW_DISTANCE 0 "UNKNOWN" 1 "5_BAR" 2 "4_BAR" 3 "3_BAR" 4 "2_BAR" 5 "1_BAR" 6 "UNKNOWN" 7 "UNKNOWN";
 

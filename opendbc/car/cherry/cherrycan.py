@@ -13,6 +13,7 @@ like BYD STEERING_TORQUE spoof; COUNTER/CHECKSUM come from CANPacker + cherry_ch
 import random
 
 from opendbc.car import rate_limit
+from opendbc.car.chrysler.chryslercan import chrysler_checksum
 from opendbc.car.crc import CRC8J1850
 from opendbc.car.cherry.values import CANBUS
 
@@ -39,6 +40,16 @@ def cherry_checksum(address: int, sig, d: bytearray) -> int:
     crc ^= d[i]
     crc = CRC8J1850[crc]
   return crc ^ 0x0A
+
+
+def cherry_pcm_buttons_checksum(address: int, sig, d: bytearray) -> int:
+  """PCM_BUTTONS (0x360): CHECKSUM_BUTTONS in byte 0 over payload bytes 1..5.
+
+  Matches stock Jaecoo J7 frames on route 2026-05-14--07-49-04 (Chrysler-style CRC).
+  """
+  del address, sig
+  tmp = bytearray(list(d[1:6]) + [0])
+  return chrysler_checksum(0, None, tmp)
 
 
 def create_lane_keep_command(
@@ -127,3 +138,16 @@ def create_lkas_info_torque_spoof(
     "STEER_RELATED": float(steer_related),
   }
   return packer.make_can_msg("LKAS_INFO", CANBUS.main_bus, values)
+
+
+def create_pcm_icc_toggle_press(packer, counter: int):
+  """PCM_BUTTONS ICC_TOGGLE pulse for stock ACC resume from standstill (bus 0)."""
+  return packer.make_can_msg(
+    "PCM_BUTTONS",
+    CANBUS.main_bus,
+    {
+      "ICC_TOGGLE": 1,
+      "CRUISE_BUTTON": 0,
+      "COUNTER": int(counter) % 16,
+    },
+  )

@@ -89,6 +89,11 @@ class TestCherrySafety(unittest.TestCase):
     self.safety.set_controls_allowed(True)
     self.assertTrue(self._tx(self._lkas_info(0.0, 0)))
 
+  def test_pcm_buttons_tx_allowed_when_whitelisted(self):
+    msg = self.packer.make_can_msg_safety("PCM_BUTTONS", 0, {"ICC_TOGGLE": 1, "CRUISE_BUTTON": 0})
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(msg))
+
 
 if __name__ == "__main__":
   unittest.main()

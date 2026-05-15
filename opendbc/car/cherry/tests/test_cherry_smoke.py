@@ -25,6 +25,7 @@ from opendbc.car.cherry.cherrycan import (
   cherry_checksum,
   create_lane_keep_command,
   create_lkas_info_torque_spoof,
+  create_pcm_icc_toggle_press,
 )
 from opendbc.car.cherry.fingerprints import FINGERPRINTS
 from opendbc.car.cherry.interface import CarInterface
@@ -256,43 +257,62 @@ class TestCherrySyntheticCan:
       assert math.isfinite(st.steeringAngleDeg)
       assert st.cruiseState.enabled is True
       assert st.cruiseState.speedCluster > 0.0
+      assert st.cruiseState.standstill is False
       assert CI.CS.lkas_enable_lane is True
       assert CI.CS.lkas_enable_info is True
       assert st.doorOpen is False
       assert st.genericToggle is False
+
+  def test_hud_follow_distance_five_bars_from_stock_frames(self):
+    """3-bit FOLLOW_DISTANCE (bits 9-11): route log 1..5 = 5..1 ACC gap bars."""
+    stock = {
+      1: "000200128c078f2a",
+      2: "0004001288050c3c",
+      3: "000600128c062aab",
+      4: "000800128805c4ee",
+      5: "000a00128c05cbdf",
+    }
+    for bars, hx in stock.items():
+      d = bytes.fromhex(hx)
+      p = CANParser(DBC_NAME, [("HUD", 20)], CANBUS.cam_bus)
+      p.update([(0, [(0x387, d, CANBUS.cam_bus)])])
+      assert int(p.vl["HUD"]["FOLLOW_DISTANCE"]) == bars
 
   def test_personality_from_hud_follow_distance(self):
     """HUD FOLLOW_DISTANCE maps to carState.personality; unknown raw stays -1 (not forced to 0)."""
     from opendbc.car.cherry.carstate import CHERRY_FOLLOW_RAW_TO_PERSONALITY
 
     CP = _cp()
-    CI = CarInterface(CP)
     packer = CANPacker(DBC_NAME)
+    hud_counter = 0
 
-    for raw, want in [(0, -1), (1, 2), (2, 1), (3, 0)]:
+    for raw, want in [(0, -1), (1, 2), (2, 2), (3, 1), (4, 0), (5, 0), (6, -1), (7, -1)]:
+      CI = CarInterface(CP)
       frames = self._frames_one_tick(packer)
       patched = []
       for f in frames:
-        if f.address == 0x387:  # HUD 903
-          _, dat, bus = packer.make_can_msg(
-            "HUD",
-            CANBUS.cam_bus,
-            {
-              "AEB": 0,
-              "CANCEL_CRUISE_UNCERTAIN": 0,
-              "GAS_RESUME_UNCERTAIN": 0,
-              "FOLLOW_DISTANCE": raw,
-              "NEW_SIGNAL_1": 0,
-              "PCW": 0,
-              "CRUISE_STATE": 3,
-              "GAS_OVERRIDE": 0,
-              "AEB_RELATED": 0,
-              "SET_SPEED": 80,
-            },
-          )
-          patched.append(CanData(f.address, dat, f.src))
-        else:
-          patched.append(f)
+        if f.address == 0x387:
+          continue
+        patched.append(f)
+      _, dat, _ = packer.make_can_msg(
+        "HUD",
+        CANBUS.cam_bus,
+        {
+          "AEB": 0,
+          "CANCEL_CRUISE_UNCERTAIN": 0,
+          "GAS_RESUME_UNCERTAIN": 0,
+          "FOLLOW_DISTANCE": raw,
+          "NEW_SIGNAL_1": 0,
+          "PCW": 0,
+          "CRUISE_STATE": 3,
+          "GAS_OVERRIDE": 0,
+          "AEB_RELATED": 0,
+          "SET_SPEED": 80,
+          "COUNTER": hud_counter,
+        },
+      )
+      hud_counter = (hud_counter + 1) % 16
+      patched.append(CanData(0x387, dat, CANBUS.cam_bus))
       st = CI.update([(0, patched)])
       assert st.personality == want, f"FOLLOW_DISTANCE raw={raw} -> personality {st.personality} != {want}"
       assert int(CI.CS.distance_val) == raw
@@ -364,6 +384,16 @@ class TestCherryCarController:
     assert vl["LKAS_ENABLE"] == 1
     assert math.isclose(vl["STEER_CMD_ANGLE"], 7.0, abs_tol=0.05)
 
+  def test_steering_lowpass_smooths_command(self):
+    """Same 2 Hz one-pole as BYD: large step is filtered before rate limits."""
+    from opendbc.car.cherry.carcontroller import lowpass_1pole
+
+    prev = 0.0
+    target = 30.0
+    out = lowpass_1pole(target, prev)
+    assert abs(out) < abs(target)
+    assert math.isfinite(out)
+
   def test_compute_apply_angle_no_raise(self):
     CP = _cp()
     CC = CarController({Bus.pt: DBC_NAME, Bus.cam: DBC_NAME}, CP)
@@ -410,6 +440,60 @@ class TestCherryCarController:
     parser = CANParser(DBC_NAME, [("LANE_KEEP", 2)], CANBUS.main_bus)
     parser.update([0, [lane_keep[-1]]])
     assert parser.vl["LANE_KEEP"]["LKAS_ENABLE"] == 0
+
+  def test_pcm_icc_press_counter_and_checksum(self):
+    """PCM_BUTTONS: pack ICC_TOGGLE + COUNTER + CHECKSUM_BUTTONS (Chrysler CRC over bytes 1..5)."""
+    from opendbc.car.cherry.cherrycan import create_pcm_icc_toggle_press
+
+    packer = CANPacker(DBC_NAME)
+    stock_icc = bytes.fromhex("529000010000")
+    stock_idle = bytes.fromhex("dd9000000000")
+
+    _, packed_icc, _ = create_pcm_icc_toggle_press(packer, 9)
+    assert bytes(packed_icc) == stock_icc
+
+    _, packed_idle, _ = packer.make_can_msg(
+      "PCM_BUTTONS", CANBUS.main_bus, {"ICC_TOGGLE": 0, "CRUISE_BUTTON": 0, "COUNTER": 9}
+    )
+    assert bytes(packed_idle) == stock_idle
+
+    parser = CANParser(DBC_NAME, [("PCM_BUTTONS", 20)], CANBUS.main_bus)
+    parser.update([0, [(0x360, packed_icc, CANBUS.main_bus)]])
+    assert int(parser.vl["PCM_BUTTONS"]["ICC_TOGGLE"]) == 1
+    assert int(parser.vl["PCM_BUTTONS"]["COUNTER"]) == 9
+    assert int(parser.vl["PCM_BUTTONS"]["CHECKSUM_BUTTONS"]) == 0x52
+
+  def test_stock_acc_resume_sends_icc_toggle_press(self):
+    CP = _cp()
+    CC = CarController({Bus.pt: DBC_NAME, Bus.cam: DBC_NAME}, CP)
+    CS = CarState(CP)
+    CS.out = structs.CarState.new_message()
+    CS.out.vEgo = 0.0
+    CS.out.standstill = True
+    CS.out.brakePressed = False
+
+    ctl = structs.CarControl()
+    ctl.enabled = True
+    ctl.latActive = True
+    ctl.cruiseControl.resume = True
+    ctl.actuators.steeringAngleDeg = 0.0
+    ctl = ctl.as_reader()
+
+    can_sends: list = []
+    for _ in range(100):
+      _, sends = CC.update(ctl, CS, 0)
+      can_sends.extend(sends)
+
+    pcm = [x for x in can_sends if x[0] == 0x360]
+    assert len(pcm) >= 1
+    assert pcm[0][2] == CANBUS.main_bus
+    parser = CANParser(DBC_NAME, [("PCM_BUTTONS", 20)], CANBUS.main_bus)
+    parser.update([0, [pcm[0]]])
+    vl = parser.vl["PCM_BUTTONS"]
+    assert int(vl["ICC_TOGGLE"]) == 1
+    assert int(vl["CRUISE_BUTTON"]) == 0
+    assert int(vl["COUNTER"]) == 1
+    assert int(vl["CHECKSUM_BUTTONS"]) != 0
 
   def test_lat_control_not_blocked_by_stock_lka_bit(self):
     CP = _cp()

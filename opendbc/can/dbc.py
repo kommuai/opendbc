@@ -19,7 +19,7 @@ from opendbc.car.body.bodycan import body_checksum
 from opendbc.car.psa.psacan import psa_checksum
 from opendbc.car.proton.protoncan import proton_checksum
 from opendbc.car.byd.bydcan import byd_checksum
-from opendbc.car.cherry.cherrycan import cherry_checksum
+from opendbc.car.cherry.cherrycan import cherry_checksum, cherry_pcm_buttons_checksum
 
 
 class SignalType:
@@ -222,5 +222,8 @@ def set_signal_type(sig: Signal, chk: ChecksumState | None, dbc_name: str, line_
     if sig.name == "CHECKSUM":
       sig.type = chk.checksum_type
       sig.calc_checksum = chk.calc_checksum
+    elif sig.name == "CHECKSUM_BUTTONS" and dbc_name.startswith("cherry_"):
+      sig.type = SignalType.CHRYSLER_CHECKSUM
+      sig.calc_checksum = cherry_pcm_buttons_checksum
     elif sig.name == "COUNTER":
       sig.type = SignalType.COUNTER

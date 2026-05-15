@@ -1,13 +1,32 @@
+import math
+
 import numpy as np
 
 from opendbc.can.packer import CANPacker
 
-from opendbc.car.cherry.cherrycan import create_lane_keep_command, create_lkas_info_torque_spoof
-from opendbc.car.cherry.values import CarControllerParams, DBC, cherry_steering_deg_sign
+from opendbc.car import DT_CTRL
+from opendbc.car.cherry.cherrycan import (
+  create_lane_keep_command,
+  create_lkas_info_torque_spoof,
+  create_pcm_icc_toggle_press,
+)
+from opendbc.car.cherry.values import CANBUS, CarControllerParams, DBC, cherry_steering_deg_sign
 from opendbc.car.interfaces import CarControllerBase
+from opendbc.car.lateral import apply_std_steer_angle_limits
+
+# BYD carcontroller: 2 Hz one-pole on steering command before rate/angle limits (LANE_KEEP @ 50 Hz).
+STEER_LOWPASS_HZ = 2.0
+STEER_DT = 0.02
 
 SPOOF_DURATION_FRAMES = 50
 SPOOF_CYCLE_FRAMES = 150
+
+
+def lowpass_1pole(x: float, y_prev: float | None) -> float:
+  if y_prev is None:
+    return x
+  alpha = math.exp(-2.0 * math.pi * STEER_LOWPASS_HZ * STEER_DT)
+  return alpha * y_prev + (1.0 - alpha) * x
 
 
 class CarController(CarControllerBase):
@@ -16,6 +35,7 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.last_apply_angle = None
     self.steering_deg_sign = cherry_steering_deg_sign(CP)
+    self.last_resume_button_frame = 0
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
     meas_deg = CS.out.steeringAngleDeg
@@ -24,11 +44,15 @@ class CarController(CarControllerBase):
 
     limits = CarControllerParams.ANGLE_LIMITS
     prev = self.last_apply_angle if self.last_apply_angle is not None else meas_deg
-    target = actuators.steeringAngleDeg
-    steer_up = prev * target >= 0. and abs(target) > abs(prev)
-    rate_limits = limits.ANGLE_RATE_LIMIT_UP if steer_up else limits.ANGLE_RATE_LIMIT_DOWN
-    angle_rate_lim = np.interp(CS.out.vEgo, rate_limits[0], rate_limits[1])
-    apply_angle = float(np.clip(target, prev - angle_rate_lim, prev + angle_rate_lim))
+    after_lowpass = lowpass_1pole(actuators.steeringAngleDeg, self.last_apply_angle)
+    apply_angle = apply_std_steer_angle_limits(
+      after_lowpass,
+      prev,
+      CS.out.vEgo,
+      meas_deg,
+      True,
+      limits,
+    )
     self.last_apply_angle = apply_angle
     return apply_angle
 
@@ -79,6 +103,17 @@ class CarController(CarControllerBase):
           apply_spoof_offset=not driver_overriding,
         )
       )
+
+    # Stock ACC resume from standstill: ICC_TOGGLE on PCM_BUTTONS (Chrysler/Honda-style rate limit).
+    if (
+      not self.CP.openpilotLongitudinalControl
+      and CC.cruiseControl.resume
+      and not CS.out.brakePressed
+      and (self.frame - self.last_resume_button_frame) * DT_CTRL > 0.05
+    ):
+      self.last_resume_button_frame = self.frame
+      pcm_ctr = (getattr(CS, "pcm_button_counter", 0) + 1) % 16
+      can_sends.append(create_pcm_icc_toggle_press(self.packer, pcm_ctr))
 
     new_actuators = actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle
