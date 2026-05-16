@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
@@ -19,11 +20,43 @@ class CherryCarDocs(CarDocs):
 
 
 class CANBUS:
-  # Panda bus 0 = vehicle / EPS / ECU (PT). openpilot TX: LANE_KEEP + LKAS_INFO torque spoof.
-  main_bus = 0
-  # Panda bus 2 = stock ADAS camera leg. CarState RX: HUD, LANE_KEEP (read stock). Not LKAS_INFO TX.
-  cam_bus = 2
+  main_bus = 0   # PT / EPS — LANE_KEEP + LKAS_INFO TX
+  cam_bus = 2    # stock camera — HUD, LANE_KEEP RX
 
+
+# --- CarController ---
+STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 2.0 * 0.02)  # 2 Hz @ 50 Hz LANE_KEEP
+LANE_KEEP_STEP = 2
+LKAS_INFO_STEP = 5
+SPOOF_DURATION_FRAMES = 50
+SPOOF_CYCLE_FRAMES = 150
+RESUME_BUTTON_INTERVAL_S = 0.05
+
+# --- CarState ---
+HUD_MULTIPLIER = 1.0
+STEER_RELATED_INTERVENTION_RAW_MIN = 36000
+FOLLOW_RAW_TO_PERSONALITY = {1: 2, 2: 2, 3: 1, 4: 0, 5: 0}  # HUD raw 1..5 bars -> OP personality
+GEAR_MAP = {1: "P", 2: "R", 3: "N", 4: "D"}
+
+PT_PARSER_MSGS = [
+  ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
+  ("TRANSMISSION", 100), ("BRAKE_PEDAL", 50), ("STALK", 50), ("PCM_BUTTONS", 20),
+  ("ADAS_RELATED", 100), ("SPEED_RELATED", 50), ("STEER_RELATED", 100),
+  ("SEATBELT_287", 50), ("SEATBELT_430", 50), ("BCM_STAT_412", math.nan),
+  ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
+]
+CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
+
+# --- cherrycan ---
+LANE_KEEP_PADDING = {
+  "SET_ME_XFF": 255, "SET_ME_XFC": 252, "SET_ME_XF4": 244, "SET_ME_X63": 99, "SET_ME_XF": 15,
+}
+SPOOF_TORQUE_MIN = 5.0
+SPOOF_TORQUE_VAR_MIN = 4.0
+SPOOF_TORQUE_RAMP = 3.0
+SPOOF_TORQUE_MAX = 10.0
+SPOOF_NEG_PROB = 0.3
+SPOOF_VAR_PROB = 0.2
 
 CHERRY_SUPPORT_COMMON_FIELDS = {
   "acc_low_speed": True,
@@ -54,42 +87,24 @@ class CAR(Platforms):
       kommu_supported=True,
       **CHERRY_SUPPORT_COMMON_FIELDS,
     )],
-    # Approximate published curb/wheelbase; replace when confirmed on-vehicle.
     CarSpecs(mass=1980.0, wheelbase=2.67, steerRatio=16.0),
   )
 
 
 DBC = CAR.create_dbc_map()
+ACCEL_MULT = defaultdict(lambda: 1, {CAR.CHERRY_JAECOO_J7_PHEV: 1})
 
 
 def cherry_steering_deg_sign(cp) -> float:
-  """Map EPS / LANE_KEEP DBC angles to openpilot (+deg = left / CCW wheel).
-
-  Jaecoo J7: use +1.0 so steering angle agrees with road-frame yaw in paramsd (steer vs
-  yaw correlation on route logs; inverted sign caused |angleOffset| > 10° and
-  angleOffsetValid=false / "Steering misalignment detected").
-
-  RX: steeringAngleDeg = s * EPS["STEERING_ANGLE"] (see carstate.py).
-  TX: STEER_CMD_ANGLE packed with s * (OP command or OP meas) so CAN matches EPS units
-      (see cherrycan.create_lane_keep_command).
-
-  On-car check if lateral is backwards: log EPS decode vs carState while turning left;
-  if steeringAngleDeg moves opposite expectation, flip s for this fingerprint.
-  """
-  if cp.carFingerprint == CAR.CHERRY_JAECOO_J7_PHEV:
-    return 1.0
+  """+1: OP +deg = left; matches EPS / LANE_KEEP DBC on Jaecoo J7."""
   return 1.0
 
 
-ACCEL_MULT = defaultdict(
-  lambda: 1,
-  {CAR.CHERRY_JAECOO_J7_PHEV: 1},
-)
-HUD_MULTIPLIER = 1.0
-
-# Jaecoo J7 route 2026-05-14--07-49-04: STEER_RELATED (0xC4) STEERING_ANGLE_NOT_CALIBRATED raw value
-# rises from ~327xx at rest to >=36000 when the driver applies meaningful torque while LKAS is active.
-STEER_RELATED_INTERVENTION_RAW_MIN = 36000
+def lowpass_steer_cmd(x: float, y_prev: float | None) -> float:
+  if y_prev is None:
+    return x
+  a = STEER_LOWPASS_ALPHA
+  return a * y_prev + (1.0 - a) * x
 
 
 class CarControllerParams:
@@ -100,3 +115,6 @@ class CarControllerParams:
 
   def __init__(self, CP):
     pass
+
+# Back-compat alias for tests / external imports
+CHERRY_FOLLOW_RAW_TO_PERSONALITY = FOLLOW_RAW_TO_PERSONALITY

@@ -280,7 +280,7 @@ class TestCherrySyntheticCan:
 
   def test_personality_from_hud_follow_distance(self):
     """HUD FOLLOW_DISTANCE maps to carState.personality; unknown raw stays -1 (not forced to 0)."""
-    from opendbc.car.cherry.carstate import CHERRY_FOLLOW_RAW_TO_PERSONALITY
+    from opendbc.car.cherry.values import CHERRY_FOLLOW_RAW_TO_PERSONALITY
 
     CP = _cp()
     packer = CANPacker(DBC_NAME)
@@ -386,11 +386,10 @@ class TestCherryCarController:
 
   def test_steering_lowpass_smooths_command(self):
     """Same 2 Hz one-pole as BYD: large step is filtered before rate limits."""
-    from opendbc.car.cherry.carcontroller import lowpass_1pole
+    from opendbc.car.cherry.values import lowpass_steer_cmd
 
-    prev = 0.0
     target = 30.0
-    out = lowpass_1pole(target, prev)
+    out = lowpass_steer_cmd(target, 0.0)
     assert abs(out) < abs(target)
     assert math.isfinite(out)
 
