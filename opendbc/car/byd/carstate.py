@@ -79,8 +79,6 @@ class CarState(CarStateBase):
       cp.vl["WHEEL_SPEED"]["WHEELSPEED_BR"],
     )
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
-    if self.CP.carFingerprint == CAR.BYD_SHARK:
-      ret.vEgoCluster *= 0.961
     ret.standstill = ret.vEgoRaw < 0.01
 
     can_gear = int(cp.vl["DRIVE_STATE"]["GEAR"])

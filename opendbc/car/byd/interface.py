@@ -44,6 +44,7 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[0].safetyParam = 2
       ret.openpilotLongitudinalControl = False
       ret.radarUnavailable = True
+      ret.wheelSpeedFactor = 0.6336
     else:
       ret.dashcamOnly = True
       ret.safetyModel = car.CarParams.SafetyModel.noOutput
