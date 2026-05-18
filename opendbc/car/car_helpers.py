@@ -57,6 +57,14 @@ def supported_cars() -> list[str]:
 def car_name_to_platform(car_name: str) -> str | None:
   return next((p for p, ns in CAR_MAPPING.items() if car_name in ns), None)
 
+
+def ignore_ignition_line_for_onroad(car_name: str | None) -> bool:
+  """Pre-FL Proton X50: harness ignition line is unreliable; use CAN ignition only."""
+  if not car_name:
+    return False
+  return car_name_to_platform(car_name) == "PROTON_X50"
+
+
 # Remove previously set CarName if invalid
 if (car_name := params.get("CarName")) and car_name_to_platform(car_name) is None:
   params.remove("CarName")

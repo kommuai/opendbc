@@ -20,6 +20,10 @@ static bool proton_pcm_saw_stock_engaged = false;
 // ~100 ms at nominal 50 Hz ACC_CMD before treating stock cruise as disengaged (avoids brief bus glitches).
 #define PROTON_PCM_DISENGAGE_FRAMES 5U
 
+// safety_param bits (match opendbc.car.proton.values.ProtonSafetyFlags)
+#define PROTON_SAFETY_PARAM_STOCK_ACC 1U
+#define PROTON_SAFETY_PARAM_IGNORE_IGNITION_LINE 2U
+
 static uint8_t proton_get_counter(const CANPacket_t *msg) {
   uint8_t counter = 0U;
   if (msg->addr == PROTON_ACC_CMD) {
@@ -149,7 +153,7 @@ static bool proton_fwd_hook(int bus_num, int addr) {
 }
 
 static safety_config proton_init(uint16_t param) {
-  (void)param;
+  ignore_ignition_line = ((param & PROTON_SAFETY_PARAM_IGNORE_IGNITION_LINE) != 0U);
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
   proton_acc_tx_block_frames = 0U;
   proton_pcm_stock_off_count = 0U;

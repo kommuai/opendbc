@@ -4,7 +4,7 @@ from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.proton.carcontroller import CarController
 from opendbc.car.proton.carstate import CarState
-from opendbc.car.proton.values import CAR
+from opendbc.car.proton.values import CAR, ProtonSafetyFlags
 
 from openpilot.common.features import Features
 
@@ -18,7 +18,12 @@ class CarInterface(CarInterfaceBase):
     ret.brand = "proton"
 
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.proton)]
-    ret.safetyConfigs[0].safetyParam = 2 if Features().has("stock-acc") else 1
+    safety_param = ProtonSafetyFlags(0)
+    if Features().has("stock-acc"):
+      safety_param |= ProtonSafetyFlags.STOCK_ACC
+    if candidate == CAR.PROTON_X50:
+      safety_param |= ProtonSafetyFlags.IGNORE_IGNITION_LINE
+    ret.safetyConfigs[0].safetyParam = int(safety_param)
 
     ret.steerControlType = car.CarParams.SteerControlType.torque
     ret.steerLimitTimer = 0.1
