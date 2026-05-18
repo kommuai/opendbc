@@ -28,6 +28,8 @@ static uint8_t proton_get_counter(const CANPacket_t *msg) {
     counter = msg->data[6] & 0xFU;
   } else if (msg->addr == PROTON_PCM_BUTTONS) {
     counter = msg->data[6] & 0xFU;
+  } else {
+    /* no action */
   }
   return counter;
 }
@@ -79,6 +81,8 @@ static void proton_rx_hook(const CANPacket_t *msg) {
       proton_pcm_stock_off_count = 0U;
     } else if (proton_pcm_saw_stock_engaged && (proton_pcm_stock_off_count < 255U)) {
       proton_pcm_stock_off_count++;
+    } else {
+      /* no action */
     }
 
     bool pcm_engaged =
@@ -105,7 +109,7 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
       violation = true;
     }
 
-    if (steer_cmd > PROTON_MAX_STEER_SEEN) {
+    if (steer_cmd > (uint32_t)PROTON_MAX_STEER_SEEN) {
       violation = true;
     }
   }
@@ -126,19 +130,22 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
 }
 
 static bool proton_fwd_hook(int bus_num, int addr) {
+  bool block = false;
+
   if (bus_num == 0) {
-    return false;
-  }
-  if (bus_num == 2) {
+    block = false;
+  } else if (bus_num == 2) {
     bool is_lkas_msg = (addr == (int)PROTON_ADAS_LKAS);
     // Block camera ACC only for the brief window after device ACC_CMD transmit; then allow stock again.
     bool is_acc_msg = (addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U);
     if ((addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U)) {
       proton_acc_tx_block_frames--;
     }
-    return is_lkas_msg || is_acc_msg;
+    block = is_lkas_msg || is_acc_msg;
+  } else {
+    /* no action */
   }
-  return false;
+  return block;
 }
 
 static safety_config proton_init(uint16_t param) {
