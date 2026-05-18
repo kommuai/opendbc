@@ -10,6 +10,8 @@ from opendbc.can import CANPacker
 from opendbc.safety import ALTERNATIVE_EXPERIENCE
 from opendbc.safety.tests.libsafety import libsafety_py
 
+_KA2 = os.path.isfile('/KA2')
+
 MAX_WRONG_COUNTERS = 5
 MAX_SAMPLE_VALS = 6
 VEHICLE_SPEED_FACTOR = 1000
@@ -870,7 +872,10 @@ class SafetyTest(SafetyTestBase):
       for attr in dir(test):
         if attr.startswith("Test") and attr != current_test:
           tc = getattr(test, attr)
-          tx = tc.TX_MSGS
+          if _KA2:
+            tx = getattr(tc, 'TX_MSGS', None)
+          else:
+            tx = tc.TX_MSGS
           if tx is not None and not attr.endswith('Base'):
             # No point in comparing different Tesla safety modes
             if 'Tesla' in attr and 'Tesla' in current_test:

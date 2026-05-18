@@ -17,4 +17,12 @@ EOF
 
 scons -j4 -D
 
-mull-runner-18 --debug --ld-search-path /lib/x86_64-linux-gnu/ ./libsafety/libsafety.so -test-program=pytest -- -n8 --ignore-glob=misra/*
+if [ -f /KA2 ]; then
+  case "$(uname -m)" in
+    aarch64|arm64) MULL_LD_SEARCH_PATH="/lib/aarch64-linux-gnu/" ;;
+    *) MULL_LD_SEARCH_PATH="/lib/x86_64-linux-gnu/" ;;
+  esac
+else
+  MULL_LD_SEARCH_PATH="/lib/x86_64-linux-gnu/"
+fi
+mull-runner-18 --debug --ld-search-path "$MULL_LD_SEARCH_PATH" ./libsafety/libsafety.so -test-program=pytest -- -n8 --ignore-glob=misra/*
