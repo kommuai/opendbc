@@ -2,36 +2,6 @@
 
 #include "opendbc/safety/declarations.h"
 
-/* ACC_BRAKE encoding bounds for create_brake_command() clip logic:
- *   decel_cmd in [0.0, 1.56] -> MAGNITUDE raw in [44, 200] using (raw * 0.01 - 2)
- *   pump in [0.0, 1.0] -> PUMP_REACTION1 raw in [0, 10] using (raw * 0.1)
- */
-static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MIN = 44U;
-static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MAX = 200U;
-static const uint8_t DNGA_ACC_BRAKE_PUMP_RAW_MAX = 10U;
-
-static const CanMsg DNGA_TX_MSGS[] = {
-  {464, 0, 8, .check_relay = true},   /* STEERING_LKAS */
-  {628, 0, 8, .check_relay = true},   /* LKAS_HUD */
-  {625, 0, 8, .check_relay = true},   /* ACC_BRAKE */
-  {627, 0, 8, .check_relay = true},   /* ACC_CMD_HUD */
-  {519, 0, 6, .check_relay = false},  /* PCM_BUTTONS_HYBRID */
-  {520, 0, 6, .check_relay = false},  /* PCM_BUTTONS */
-  {2015, 0, 8, .check_relay = false}, /* DTC clear */
-};
-
-static RxCheck dnga_rx_checks[] = {
-  /* Wheel speed (used for vehicle_moving and for lag bookkeeping). */
-  {.msg = {{416, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
-  /* Gas pressed signal (carstate.py: gasPressed = not bool(GAS_PEDAL_2.GAS_PEDAL_STEP)). */
-  {.msg = {{399, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
-  /* Brake pressed. */
-  {.msg = {{161, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
-  /* Cruise engagement. */
-  {.msg = {{627, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
-  {.msg = {{625, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
-};
-
 static uint32_t dnga_get_wheelspeed_raw(const CANPacket_t *msg)
 {
   uint32_t wheelspeed_raw;
@@ -135,6 +105,13 @@ static void dnga_rx_hook(const CANPacket_t *msg)
 
 static bool dnga_tx_hook(const CANPacket_t *msg)
 {
+  /* ACC_BRAKE encoding bounds for create_brake_command() clip logic:
+   *   decel_cmd in [0.0, 1.56] -> MAGNITUDE raw in [44, 200] using (raw * 0.01 - 2)
+   *   pump in [0.0, 1.0] -> PUMP_REACTION1 raw in [0, 10] using (raw * 0.1)
+   */
+  static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MIN = 44U;
+  static const uint8_t DNGA_ACC_BRAKE_MAGNITUDE_RAW_MAX = 200U;
+  static const uint8_t DNGA_ACC_BRAKE_PUMP_RAW_MAX = 10U;
   bool tx;
 
   tx = true;
@@ -160,8 +137,6 @@ static bool dnga_tx_hook(const CANPacket_t *msg)
     bool bit_37_set;
     bool bit_38_set;
     bool engage_requested;
-    uint32_t acc_cmd_raw;
-
     set_me_1_2 = dnga_get_bit_bool(msg, 9U);
     set_1_when_engage = dnga_get_bit_bool(msg, 13U);
     bit_37_set = dnga_get_bit_bool(msg, 37U);
@@ -170,6 +145,7 @@ static bool dnga_tx_hook(const CANPacket_t *msg)
     engage_requested = set_me_1_2 || set_1_when_engage || bit_37_set || bit_38_set;
 
     if (!engage_requested) {
+      uint32_t acc_cmd_raw;
       acc_cmd_raw = dnga_get_acc_cmd_raw(msg);
       if (acc_cmd_raw != 0U) {
         tx = false;
@@ -212,7 +188,6 @@ static bool dnga_tx_hook(const CANPacket_t *msg)
   /* ACC_BRAKE: when engagement isn’t requested, BRAKE_REQ should be 0. */
   if (msg->addr == 625U) {
     bool set_me_1_when_engage;
-    bool brake_req;
     uint8_t magnitude_raw;
     uint8_t pump_raw;
     uint8_t pump_inverse_raw;
@@ -220,6 +195,7 @@ static bool dnga_tx_hook(const CANPacket_t *msg)
     set_me_1_when_engage = dnga_get_bit_bool(msg, 8U);
 
     if (!set_me_1_when_engage) {
+      bool brake_req;
       brake_req = dnga_get_bit_bool(msg, 13U);
       if (brake_req) {
         tx = false;
@@ -293,6 +269,26 @@ static bool dnga_tx_hook(const CANPacket_t *msg)
 
 static safety_config dnga_init(uint16_t param)
 {
+  static const CanMsg DNGA_TX_MSGS[] = {
+    {464, 0, 8, .check_relay = true},   /* STEERING_LKAS */
+    {628, 0, 8, .check_relay = true},   /* LKAS_HUD */
+    {625, 0, 8, .check_relay = true},   /* ACC_BRAKE */
+    {627, 0, 8, .check_relay = true},   /* ACC_CMD_HUD */
+    {519, 0, 6, .check_relay = false},  /* PCM_BUTTONS_HYBRID */
+    {520, 0, 6, .check_relay = false},  /* PCM_BUTTONS */
+    {2015, 0, 8, .check_relay = false}, /* DTC clear */
+  };
+  static RxCheck dnga_rx_checks[] = {
+    /* Wheel speed (used for vehicle_moving and for lag bookkeeping). */
+    {.msg = {{416, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
+    /* Gas pressed signal (carstate.py: gasPressed = not bool(GAS_PEDAL_2.GAS_PEDAL_STEP)). */
+    {.msg = {{399, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
+    /* Brake pressed. */
+    {.msg = {{161, 0, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
+    /* Cruise engagement. */
+    {.msg = {{627, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
+    {.msg = {{625, 2, 8, 1U, .ignore_checksum = true, .ignore_counter = true, .max_counter = 0U, .ignore_quality_flag = true}, {0}, {0}}},
+  };
   SAFETY_UNUSED(param);
 
   /* TODO / SUGGESTED SAFETY CHECK:
