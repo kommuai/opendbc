@@ -1,10 +1,9 @@
 from cereal import car
 from opendbc.car import get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
-from opendbc.car.cherry.carcontroller import CarController
-from opendbc.car.cherry.carstate import CarState
-from opendbc.car.cherry.radar_interface import RadarInterface
-from opendbc.car.cherry.values import CAR
+from opendbc.car.chery.carcontroller import CarController
+from opendbc.car.chery.carstate import CarState
+from opendbc.car.chery.radar_interface import RadarInterface
 
 
 class CarInterface(CarInterfaceBase):
@@ -15,8 +14,8 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, alpha_long, is_release, docs):
     del fingerprint, car_fw, alpha_long, is_release, docs, candidate
-    ret.brand = "cherry"
-    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.cherry)]
+    ret.brand = "chery"
+    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.chery)]
     ret.steerControlType = car.CarParams.SteerControlType.angle
     ret.steerLimitTimer = 0.6
     ret.steerActuatorDelay = 0.01

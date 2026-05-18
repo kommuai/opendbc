@@ -10,12 +10,12 @@ from opendbc.car.lateral import AngleSteeringLimits
 
 
 @dataclass
-class CherryPlatformConfig(PlatformConfig):
-  dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("cherry_general_pt", None))
+class CheryPlatformConfig(PlatformConfig):
+  dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("chery_general_pt", None))
 
 
 @dataclass
-class CherryCarDocs(CarDocs):
+class CheryCarDocs(CarDocs):
   car_parts: CarParts = field(default_factory=CUSTOM_CAR_PARTS)
 
 
@@ -47,7 +47,7 @@ PT_PARSER_MSGS = [
 ]
 CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
-# --- cherrycan ---
+# --- cherycan ---
 LANE_KEEP_PADDING = {
   "SET_ME_XFF": 255, "SET_ME_XFC": 252, "SET_ME_XF4": 244, "SET_ME_X63": 99, "SET_ME_XF": 15,
 }
@@ -58,7 +58,7 @@ SPOOF_TORQUE_MAX = 10.0
 SPOOF_NEG_PROB = 0.3
 SPOOF_VAR_PROB = 0.2
 
-CHERRY_SUPPORT_COMMON_FIELDS = {
+CHERY_SUPPORT_COMMON_FIELDS = {
   "acc_low_speed": True,
   "acc_speed_range": "0 - 150",
   "acc_stop_and_go": True,
@@ -67,35 +67,35 @@ CHERRY_SUPPORT_COMMON_FIELDS = {
   "max_steering_angle": "TBD",
 }
 
-CHERRY_LKC_ACC_NOTE = CarFootnote(
-  "Support: under validation on cherry_general_pt.dbc (Jaecoo J7 PHEV).",
+CHERY_LKC_ACC_NOTE = CarFootnote(
+  "Support: under validation on chery_general_pt.dbc (Jaecoo J7 PHEV).",
   Column.LONGITUDINAL,
 )
 
 
 class Footnote(Enum):
-  J7_NOTE = CHERRY_LKC_ACC_NOTE
+  J7_NOTE = CHERY_LKC_ACC_NOTE
 
 
 class CAR(Platforms):
-  CHERRY_JAECOO_J7_PHEV = CherryPlatformConfig(
-    [CherryCarDocs(
-      "Jaecoo J7 PHEV",
+  CHERY_JAECOO_J7_PHEV = CheryPlatformConfig(
+    [CheryCarDocs(
+      "Jaecoo J7 PHEV 2024-26",
       "ALL",
       footnotes=[Footnote.J7_NOTE],
       variant="All",
       kommu_supported=True,
-      **CHERRY_SUPPORT_COMMON_FIELDS,
+      **CHERY_SUPPORT_COMMON_FIELDS,
     )],
     CarSpecs(mass=1980.0, wheelbase=2.67, steerRatio=16.0),
   )
 
 
 DBC = CAR.create_dbc_map()
-ACCEL_MULT = defaultdict(lambda: 1, {CAR.CHERRY_JAECOO_J7_PHEV: 1})
+ACCEL_MULT = defaultdict(lambda: 1, {CAR.CHERY_JAECOO_J7_PHEV: 1})
 
 
-def cherry_steering_deg_sign(cp) -> float:
+def chery_steering_deg_sign(cp) -> float:
   """+1: OP +deg = left; matches EPS / LANE_KEEP DBC on Jaecoo J7."""
   return 1.0
 
@@ -117,4 +117,4 @@ class CarControllerParams:
     pass
 
 # Back-compat alias for tests / external imports
-CHERRY_FOLLOW_RAW_TO_PERSONALITY = FOLLOW_RAW_TO_PERSONALITY
+CHERY_FOLLOW_RAW_TO_PERSONALITY = FOLLOW_RAW_TO_PERSONALITY

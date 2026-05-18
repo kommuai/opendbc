@@ -33,11 +33,11 @@
 #define SAFETY_PSA 31U
 #define SAFETY_RIVIAN 33U
 #define SAFETY_VOLKSWAGEN_MEB 34U
-// Must match car.capnp SafetyModel enum: proton @35, byd @36, dnga @37, cherry @38
+// Must match car.capnp SafetyModel enum: proton @35, byd @36, dnga @37, chery @38
 #define SAFETY_PROTON 35U
 #define SAFETY_BYD 36U
 #define SAFETY_DNGA 37U
-#define SAFETY_CHERRY 38U
+#define SAFETY_CHERY 38U
 
 #define GET_BIT(msg, b) ((bool)!!(((msg)->data[((b) / 8U)] >> ((b) % 8U)) & 0x1U))
 #define GET_FLAG(value, mask) (((value) & (mask)) == (mask))
@@ -252,6 +252,8 @@ void safety_tick(const safety_config *safety_config);
 
 // This can be set by the safety hooks
 extern bool controls_allowed;
+extern bool ignore_ignition_line;
+extern bool ignore_ignition_line_redundant;
 extern bool relay_malfunction;
 extern bool gas_pressed;
 extern bool gas_pressed_prev;
@@ -346,3 +348,7 @@ extern const safety_hooks volkswagen_mqb_hooks;
 extern const safety_hooks volkswagen_pq_hooks;
 extern const safety_hooks rivian_hooks;
 extern const safety_hooks psa_hooks;
+extern const safety_hooks proton_hooks;
+extern const safety_hooks byd_hooks;
+extern const safety_hooks dnga_hooks;
+extern const safety_hooks chery_hooks;

@@ -19,7 +19,7 @@ from opendbc.car.body.bodycan import body_checksum
 from opendbc.car.psa.psacan import psa_checksum
 from opendbc.car.proton.protoncan import proton_checksum
 from opendbc.car.byd.bydcan import byd_checksum
-from opendbc.car.cherry.cherrycan import cherry_checksum, cherry_pcm_buttons_checksum
+from opendbc.car.chery.cherycan import chery_checksum, chery_pcm_buttons_checksum
 
 
 class SignalType:
@@ -39,7 +39,7 @@ class SignalType:
   VOLKSWAGEN_MLB_CHECKSUM = 13
   PROTON_CHECKSUM = 14
   BYD_CHECKSUM = 15
-  CHERRY_CHECKSUM = 16
+  CHERY_CHECKSUM = 16
 
 
 @dataclass
@@ -209,8 +209,8 @@ def get_checksum_state(dbc_name: str) -> ChecksumState | None:
     return ChecksumState(8, 4, 7, -1, False, SignalType.PROTON_CHECKSUM, proton_checksum)
   elif dbc_name.startswith("byd_"):
     return ChecksumState(8, 4, 7, -1, False, SignalType.BYD_CHECKSUM, byd_checksum)
-  elif dbc_name.startswith("cherry_"):
-    return ChecksumState(8, 4, 7, -1, False, SignalType.CHERRY_CHECKSUM, cherry_checksum)
+  elif dbc_name.startswith("chery_"):
+    return ChecksumState(8, 4, 7, -1, False, SignalType.CHERY_CHECKSUM, chery_checksum)
   return None
 
 
@@ -222,8 +222,8 @@ def set_signal_type(sig: Signal, chk: ChecksumState | None, dbc_name: str, line_
     if sig.name == "CHECKSUM":
       sig.type = chk.checksum_type
       sig.calc_checksum = chk.calc_checksum
-    elif sig.name == "CHECKSUM_BUTTONS" and dbc_name.startswith("cherry_"):
+    elif sig.name == "CHECKSUM_BUTTONS" and dbc_name.startswith("chery_"):
       sig.type = SignalType.CHRYSLER_CHECKSUM
-      sig.calc_checksum = cherry_pcm_buttons_checksum
+      sig.calc_checksum = chery_pcm_buttons_checksum
     elif sig.name == "COUNTER":
       sig.type = SignalType.COUNTER

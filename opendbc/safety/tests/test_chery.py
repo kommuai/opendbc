@@ -6,14 +6,14 @@ from opendbc.safety.tests.libsafety import libsafety_py
 from opendbc.safety.tests.common import CANPackerSafety
 
 
-class TestCherrySafety(unittest.TestCase):
-  """Cherry safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
+class TestCherySafety(unittest.TestCase):
+  """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
-    self.safety.set_safety_hooks(CarParams.SafetyModel.cherry, 1)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.chery, 1)
     self.safety.init_tests()
-    self.packer = CANPackerSafety("cherry_general_pt")
+    self.packer = CANPackerSafety("chery_general_pt")
 
   def _rx(self, msg):
     return self.safety.safety_rx_hook(msg)
@@ -66,7 +66,7 @@ class TestCherrySafety(unittest.TestCase):
     self.assertFalse(self.safety.get_controls_allowed())
 
   def test_lane_keep_tx_allowed_when_whitelisted(self):
-    """LANE_KEEP is on the TX whitelist; cherry_tx_hook does not further gate by controls_allowed."""
+    """LANE_KEEP is on the TX whitelist; chery_tx_hook does not further gate by controls_allowed."""
     self.safety.set_controls_allowed(False)
     self.assertTrue(self._tx(self._lane_keep(0.0, 0)))
     self.safety.set_controls_allowed(True)

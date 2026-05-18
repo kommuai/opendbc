@@ -30,7 +30,7 @@
 #include "opendbc/safety/modes/byd.h"
 #include "opendbc/safety/modes/dnga.h"
 #include "opendbc/safety/modes/proton.h"
-#include "opendbc/safety/modes/cherry.h"
+#include "opendbc/safety/modes/chery.h"
 
 uint32_t GET_BYTES(const CANPacket_t *msg, int start, int len) {
   uint32_t ret = 0U;
@@ -45,6 +45,8 @@ const int MAX_WRONG_COUNTERS = 5;
 
 // This can be set by the safety hooks
 bool controls_allowed = false;
+bool ignore_ignition_line = false;
+bool ignore_ignition_line_redundant = false;
 bool relay_malfunction = false;
 bool gas_pressed = false;
 bool gas_pressed_prev = false;
@@ -417,7 +419,7 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
     {SAFETY_BYD, &byd_hooks},
     {SAFETY_DNGA, &dnga_hooks},
     {SAFETY_PROTON, &proton_hooks},
-    {SAFETY_CHERRY, &cherry_hooks},
+    {SAFETY_CHERY, &chery_hooks},
   };
 
   // reset state set by safety mode
@@ -452,6 +454,8 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
   reset_sample(&angle_meas);
 
   controls_allowed = false;
+  ignore_ignition_line = false;
+  ignore_ignition_line_redundant = false;
   relay_malfunction_reset();
   safety_rx_checks_invalid = false;
 

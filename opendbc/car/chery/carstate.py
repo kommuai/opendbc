@@ -1,11 +1,9 @@
-import math
-
 from cereal import car
 from opendbc.can import CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.cherry.values import (
+from opendbc.car.chery.values import (
   CAM_PARSER_MSGS,
   CANBUS,
   DBC,
@@ -14,7 +12,7 @@ from opendbc.car.cherry.values import (
   HUD_MULTIPLIER,
   PT_PARSER_MSGS,
   STEER_RELATED_INTERVENTION_RAW_MIN,
-  cherry_steering_deg_sign,
+  chery_steering_deg_sign,
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -41,7 +39,7 @@ class CarState(CarStateBase):
       cp.vl["WHEELSPEED_1"]["WHEEL_BL"], cp.vl["WHEELSPEED_1"]["WHEEL_BR"],
     )
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
-    sign = cherry_steering_deg_sign(self.CP)
+    sign = chery_steering_deg_sign(self.CP)
     ret.steeringAngleDeg = sign * float(cp.vl["EPS"]["STEERING_ANGLE"])
     ret.steeringTorque = cp.vl["EPS"]["DRIVER_TORQUE"]
     steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1

@@ -1,4 +1,4 @@
-"""Cherry / Jaecoo ADAS CAN TX (cherry_general_pt.dbc)."""
+"""Chery / Jaecoo ADAS CAN TX (chery_general_pt.dbc)."""
 
 import random
 from dataclasses import dataclass, field
@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from opendbc.car import rate_limit
 from opendbc.car.chrysler.chryslercan import chrysler_checksum
 from opendbc.car.crc import CRC8J1850
-from opendbc.car.cherry.values import (
+from opendbc.car.chery.values import (
   CANBUS,
   LANE_KEEP_PADDING,
   SPOOF_NEG_PROB,
@@ -18,7 +18,7 @@ from opendbc.car.cherry.values import (
 )
 
 
-def cherry_checksum(address: int, sig, d: bytearray) -> int:
+def chery_checksum(address: int, sig, d: bytearray) -> int:
   del address, sig
   crc = 0
   for i in range(len(d) - 1):
@@ -27,7 +27,7 @@ def cherry_checksum(address: int, sig, d: bytearray) -> int:
   return crc ^ 0x0A
 
 
-def cherry_pcm_buttons_checksum(address: int, sig, d: bytearray) -> int:
+def chery_pcm_buttons_checksum(address: int, sig, d: bytearray) -> int:
   del address, sig
   return chrysler_checksum(0, None, bytearray(list(d[1:6]) + [0]))
 

@@ -644,7 +644,7 @@ struct CarParams {
     proton @35;
     byd @36;
     dnga @37;
-    cherry @38;
+    chery @38;
   }
 
   enum SteerControlType {

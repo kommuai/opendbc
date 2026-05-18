@@ -19,7 +19,7 @@ from opendbc.car.psa.values import CAR as PSA
 from opendbc.car.proton.values import CAR as PROTON
 from opendbc.car.byd.values import CAR as BYD
 from opendbc.car.dnga.values import CAR as DNGA
-from opendbc.car.cherry.values import CAR as CHERRY
+from opendbc.car.chery.values import CAR as CHERY
 
 # FIXME: add routes for these cars
 non_tested_cars = [
@@ -53,8 +53,8 @@ non_tested_cars = [
   DNGA.PERODUA_MYVI,
   DNGA.TOYOTA_VIOS,
 
-  # Cherry (no comma.ai test route yet)
-  CHERRY.CHERRY_JAECOO_J7_PHEV,
+  # Chery (no comma.ai test route yet)
+  CHERY.CHERY_JAECOO_J7_PHEV,
 ]
 
 

@@ -1,8 +1,8 @@
 from opendbc.can.packer import CANPacker
 
 from opendbc.car import DT_CTRL
-from opendbc.car.cherry import cherrycan
-from opendbc.car.cherry.values import (
+from opendbc.car.chery import cherycan
+from opendbc.car.chery.values import (
   CarControllerParams,
   DBC,
   LANE_KEEP_STEP,
@@ -10,7 +10,7 @@ from opendbc.car.cherry.values import (
   RESUME_BUTTON_INTERVAL_S,
   SPOOF_CYCLE_FRAMES,
   SPOOF_DURATION_FRAMES,
-  cherry_steering_deg_sign,
+  chery_steering_deg_sign,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
@@ -21,7 +21,7 @@ class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):
     super().__init__(dbc_names, CP)
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
-    self.steer_sign = cherry_steering_deg_sign(CP)
+    self.steer_sign = chery_steering_deg_sign(CP)
     self.last_apply_angle = None
     self.last_resume_button_frame = 0
 
@@ -46,12 +46,12 @@ class CarController(CarControllerBase):
 
     if self.frame % LANE_KEEP_STEP == 0:
       apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
-      can_sends.append(cherrycan.create_lane_keep_command(
+      can_sends.append(cherycan.create_lane_keep_command(
         self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg, self.steer_sign,
       ))
 
     if self.frame % LKAS_INFO_STEP == 0:
-      can_sends.append(cherrycan.create_lkas_info_torque_spoof(
+      can_sends.append(cherycan.create_lkas_info_torque_spoof(
         self.packer, lat_active, CS.out.steeringTorque,
         (self.frame % SPOOF_CYCLE_FRAMES) < SPOOF_DURATION_FRAMES,
         lkas_enable=steer_req, steer_related=CS.lkas_info_steer_related,
@@ -62,7 +62,7 @@ class CarController(CarControllerBase):
         and not CS.out.brakePressed
         and (self.frame - self.last_resume_button_frame) * DT_CTRL > RESUME_BUTTON_INTERVAL_S):
       self.last_resume_button_frame = self.frame
-      can_sends.append(cherrycan.create_pcm_icc_toggle_press(self.packer, (CS.pcm_button_counter + 1) % 16))
+      can_sends.append(cherycan.create_pcm_icc_toggle_press(self.packer, (CS.pcm_button_counter + 1) % 16))
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle
