@@ -43,12 +43,8 @@ BYD_LKC_ACC_STOCK_NOTE = CarFootnote(
 
 
 class Footnote(Enum):
-  # Aliases: BYD vehicles share two longitudinal note strings.
-  ATTO3_NOTE = BYD_LKC_ACC_INTELLIGENT_NOTE
-  M6_NOTE = BYD_LKC_ACC_INTELLIGENT_NOTE
-  SEAL_NOTE = BYD_LKC_ACC_STOCK_NOTE
-  SEALION7_NOTE = BYD_LKC_ACC_STOCK_NOTE
-  SHARK_NOTE = BYD_LKC_ACC_STOCK_NOTE
+  LKC_ACC_INTELLIGENT = BYD_LKC_ACC_INTELLIGENT_NOTE
+  LKC_ACC_STOCK = BYD_LKC_ACC_STOCK_NOTE
 
 
 class CAR(Platforms):
@@ -56,7 +52,7 @@ class CAR(Platforms):
     [BYDCarDocs(
       "BYD Atto 3 2023-26",
       "ALL",
-      footnotes=[Footnote.ATTO3_NOTE],
+      footnotes=[Footnote.LKC_ACC_INTELLIGENT],
       variant="All",
       kommu_supported=True,
       **BYD_SUPPORT_COMMON_FIELDS,
@@ -67,7 +63,7 @@ class CAR(Platforms):
     [BYDCarDocs(
       "BYD M6 2024-26",
       "ALL",
-      footnotes=[Footnote.M6_NOTE],
+      footnotes=[Footnote.LKC_ACC_INTELLIGENT],
       variant="Extended",
       kommu_supported=True,
       **BYD_SUPPORT_COMMON_FIELDS,
@@ -79,7 +75,7 @@ class CAR(Platforms):
       BYDCarDocs(
         "BYD Seal 2024-26",
         "ALL",
-        footnotes=[Footnote.SEAL_NOTE],
+        footnotes=[Footnote.LKC_ACC_STOCK],
         variant="All",
         kommu_supported=True,
         **BYD_SUPPORT_COMMON_FIELDS,
@@ -87,7 +83,7 @@ class CAR(Platforms):
         BYDCarDocs(
         "BYD Dolphin 2023-26",
         "ALL",
-        footnotes=[Footnote.SEAL_NOTE],
+        footnotes=[Footnote.LKC_ACC_STOCK],
         variant="All",
         kommu_supported=True,
         **BYD_SUPPORT_COMMON_FIELDS,
@@ -99,7 +95,7 @@ class CAR(Platforms):
     [BYDCarDocs(
       "BYD Sealion 7 2024-26",
       "ALL",
-      footnotes=[Footnote.SEALION7_NOTE],
+      footnotes=[Footnote.LKC_ACC_STOCK],
       variant="All",
       kommu_supported=True,
       **BYD_SUPPORT_COMMON_FIELDS,
@@ -110,7 +106,7 @@ class CAR(Platforms):
     [BYDCarDocs(
       "BYD Shark 2024-26",
       "ALL",
-      footnotes=[Footnote.SHARK_NOTE],
+      footnotes=[Footnote.LKC_ACC_STOCK],
       variant="All",
       kommu_supported=True,
       **BYD_SUPPORT_COMMON_FIELDS,

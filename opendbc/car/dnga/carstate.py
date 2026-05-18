@@ -1,5 +1,4 @@
 from cereal import car
-import math
 from opendbc.can import CANDefine, CANParser
 import numpy as np
 from opendbc.car.common.conversions import Conversions as CV

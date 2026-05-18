@@ -5,7 +5,7 @@ import numpy as np
 
 from opendbc.can.packer import CANPacker
 from opendbc.car.common.conversions import Conversions as CV
-from opendbc.car import DT_CTRL, make_can_msg, rate_limit, structs
+from opendbc.car import DT_CTRL, make_can_msg, rate_limit
 from opendbc.car.dnga.dngacan import (
   BRAKE_DECEL_CMD_MAX,
   create_accel_command,

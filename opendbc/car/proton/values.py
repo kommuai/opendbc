@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntFlag
 
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
 from opendbc.car.docs_definitions import CarDocs, CarParts, CUSTOM_CAR_PARTS, CarFootnote, Column
@@ -37,13 +37,13 @@ PROTON_LKC_ACC_NOTE = CarFootnote(
 )
 
 
+class ProtonSafetyFlags(IntFlag):
+  STOCK_ACC = 1
+  IGNORE_IGNITION_LINE = 2
+
+
 class Footnote(Enum):
-  # Aliases: all Proton vehicles share the same longitudinal support note text.
-  S70_NOTE = PROTON_LKC_ACC_NOTE
-  X50_NOTE = PROTON_LKC_ACC_NOTE
-  X50_FL_NOTE = PROTON_LKC_ACC_NOTE
-  X70_FL_NOTE = PROTON_LKC_ACC_NOTE
-  X90_NOTE = PROTON_LKC_ACC_NOTE
+  LKC_ACC = PROTON_LKC_ACC_NOTE
 
 
 class CAR(Platforms):
@@ -52,7 +52,7 @@ class CAR(Platforms):
       ProtonCarDocs(
         "Proton S70 2023-26",
         "All",
-        footnotes=[Footnote.S70_NOTE],
+        footnotes=[Footnote.LKC_ACC],
         variant="Flagship, Flagship X",
         kommu_supported=True,
         **PROTON_SUPPORT_COMMON_FIELDS,
@@ -60,7 +60,7 @@ class CAR(Platforms):
       ProtonCarDocs(
         "Proton X50 FL 2025-26",
         "All",
-        footnotes=[Footnote.X50_FL_NOTE],
+        footnotes=[Footnote.LKC_ACC],
         variant="Premium, Flagship",
         kommu_supported=True,
         **PROTON_SUPPORT_COMMON_FIELDS,
@@ -73,7 +73,7 @@ class CAR(Platforms):
       ProtonCarDocs(
         "Proton X50 2020-24",
         "All",
-        footnotes=[Footnote.X50_NOTE],
+        footnotes=[Footnote.LKC_ACC],
         variant="Flagship",
         kommu_supported=True,
         **PROTON_SUPPORT_COMMON_FIELDS,
@@ -86,7 +86,7 @@ class CAR(Platforms):
       ProtonCarDocs(
         "Proton X70 FL 2024-26",
         "All",
-        footnotes=[Footnote.X70_FL_NOTE],
+        footnotes=[Footnote.LKC_ACC],
         variant="Premium, Premium X",
         kommu_supported=True,
         **PROTON_SUPPORT_COMMON_FIELDS,
@@ -99,7 +99,7 @@ class CAR(Platforms):
       ProtonCarDocs(
         "Proton X90 2023-25",
         "All",
-        footnotes=[Footnote.X90_NOTE],
+        footnotes=[Footnote.LKC_ACC],
         variant="Premium, Flagship",
         kommu_supported=True,
         **PROTON_SUPPORT_COMMON_FIELDS,

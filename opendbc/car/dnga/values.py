@@ -28,7 +28,10 @@ class Footnote(Enum):
     Column.LONGITUDINAL,
   )
   BRAKE_PUMP_NOTE = CarFootnote(
-    "Braking at 0km/h will produce a brake pump sound which is completely normal. Vehicle without radar will use both bukapilot and stock braking as redundancy.",
+    (
+      "Braking at 0km/h will produce a brake pump sound which is completely normal. "
+      + "Vehicle without radar will use both bukapilot and stock braking as redundancy."
+    ),
     Column.LONGITUDINAL,
   )
 
@@ -61,7 +64,7 @@ class CAR(Platforms):
   )
   PERODUA_MYVI = DNGAPlatformConfig(
     [dnga_car("Perodua Myvi 2022-26", Footnote.BRAKE_PUMP_NOTE, kommu_supported=True)],
-    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.0),
+    CarSpecs(mass=1025.0, wheelbase=2.500, steerRatio=17.4),
   )
   TOYOTA_VIOS = DNGAPlatformConfig(
     [dnga_car("Toyota Vios 2023-26", Footnote.NO_RADAR_REDUNDANCY, kommu_supported=True)],
