@@ -9,6 +9,9 @@ from opendbc.safety.tests.common import CANPackerSafety
 class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
+  # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
+  TX_MSGS = [[837, 0], [916, 0], [864, 0]]  # LANE_KEEP, LKAS_INFO, PCM_BUTTONS
+
   def setUp(self):
     self.safety = libsafety_py.libsafety
     self.safety.set_safety_hooks(CarParams.SafetyModel.chery, 1)
