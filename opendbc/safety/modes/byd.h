@@ -28,24 +28,26 @@ static void byd_rx_hook(const CANPacket_t *msg) {
     }
 
     if (addr == 496) {
-      float fl_ms = (float)(((msg->data[1] & 0x0FU) << 8) | msg->data[0]) * 0.1f / 3.6f;
-      float bl_ms = (float)(((msg->data[3] & 0x0FU) << 8) | msg->data[2]) * 0.1f / 3.6f;
+      uint16_t fl_raw = (uint16_t)(((msg->data[1] & 0x0FU) << 8U) | msg->data[0]);
+      uint16_t bl_raw = (uint16_t)(((msg->data[3] & 0x0FU) << 8U) | msg->data[2]);
+      float fl_ms = ((float)fl_raw) * 0.1f * (1.0f / 3.6f);
+      float bl_ms = ((float)bl_raw) * 0.1f * (1.0f / 3.6f);
       float speed = (fl_ms + bl_ms) * 0.5f;
       vehicle_moving = SAFETY_ABS(speed) > 0.1f;
       UPDATE_VEHICLE_SPEED(speed);
     }
 
     if (addr == 944) {
-      int set_pressed = (msg->data[0] >> 3U) & 1U;
-      int res_pressed = (msg->data[0] >> 4U) & 1U;
-      int icc_pressed = (msg->data[0] >> 6U) & 1U;
-      int acc_pressed = (msg->data[2] >> 3U) & 1U;
-      int cancel = (msg->data[2] >> 3U) & 1U;
+      bool set_pressed = (((msg->data[0] >> 3U) & 1U) != 0U);
+      bool res_pressed = (((msg->data[0] >> 4U) & 1U) != 0U);
+      bool icc_pressed = (((msg->data[0] >> 6U) & 1U) != 0U);
+      bool acc_pressed = (((msg->data[2] >> 3U) & 1U) != 0U);
+      bool cancel_pressed = (((msg->data[2] >> 3U) & 1U) != 0U);
 
-      if (set_pressed | res_pressed | icc_pressed | acc_pressed) {
+      if (set_pressed || res_pressed || icc_pressed || acc_pressed) {
         controls_allowed = true;
       }
-      if (cancel) {
+      if (cancel_pressed) {
         controls_allowed = false;
       }
     }
@@ -69,7 +71,7 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
   bool violation = false;
   int addr = (int)msg->addr;
 
-  if (addr == BYD_STEERING_MODULE_ADAS) {
+  if (addr == (int)BYD_STEERING_MODULE_ADAS) {
     int desired_angle = (GET_BYTES(msg, 3, 2) & 0xFFFFU);
     bool lka_active = (msg->data[2] >> 5) & 1U;
     desired_angle = to_signed(desired_angle, 16);
@@ -100,7 +102,7 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
     }
   }
 
-  if (addr == BYD_ACC_CMD) {
+  if (addr == (int)BYD_ACC_CMD) {
     // ACCEL_CMD raw byte; DBC physical = raw - 100. Stock logs use down to ~-80 (raw 20).
     static const LongitudinalLimits BYD_LONG_LIMITS = {
       .max_accel = 135,
@@ -113,19 +115,23 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
 }
 
 static bool byd_fwd_hook(int bus_num, int addr) {
+  bool block = false;
+
   if (bus_num == 0) {
     bool is_torque_msg = (addr == (int)BYD_STEERING_TORQUE);
-    return is_torque_msg && byd_steering_torque_spoof;
-  }
-  if (bus_num == 2) {
+    block = is_torque_msg && byd_steering_torque_spoof;
+  } else if (bus_num == 2) {
     bool is_lkas_msg = (addr == 0x1E2) || (addr == 0x316);
     bool is_acc_msg = (addr == (int)BYD_ACC_CMD);
-    return is_lkas_msg || is_acc_msg;
+    block = is_lkas_msg || is_acc_msg;
+  } else {
+    /* no action */
   }
-  return false;
+  return block;
 }
 
 static safety_config byd_init(uint16_t param) {
+  safety_config cfg;
   static const CanMsg BYD_TX_MSGS[] = {
     {0x1E2, 0, 8, .check_relay = true},   // STEERING_MODULE_ADAS
     {0x316, 0, 8, .check_relay = true},   // LKAS_HUD_ADAS
@@ -144,29 +150,28 @@ static safety_config byd_init(uint16_t param) {
     {.msg = {{814, 2, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
 
-  static RxCheck byd_rx_checks_alt[] = {
-    {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{496, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{508, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{834, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{944, 0, 8, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-    {.msg = {{813, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-  };
-
+  cfg = BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS);
   if (param == 1U) {
-    return BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS);
-  }
-  if (param == 2U) {
+    /* default cfg already selected */
+  } else if (param == 2U) {
+    static RxCheck byd_rx_checks_alt[] = {
+      {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{496, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{508, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{834, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{944, 0, 8, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{813, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    };
     byd_alt_engage = true;
     byd_steering_torque_spoof = true;
-    return BUILD_SAFETY_CFG(byd_rx_checks_alt, BYD_TX_MSGS);
-  }
-  if (param == 3U) {
+    cfg = BUILD_SAFETY_CFG(byd_rx_checks_alt, BYD_TX_MSGS);
+  } else if (param == 3U) {
     byd_alt_engage = true;
     byd_steering_torque_spoof = true;
-    return BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS);
+  } else {
+    /* keep default cfg */
   }
-  return BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS);
+  return cfg;
 }
 
 const safety_hooks byd_hooks = {
