@@ -20,6 +20,7 @@ from opendbc.car.proton.values import CAR as PROTON
 from opendbc.car.byd.values import CAR as BYD
 from opendbc.car.dnga.values import CAR as DNGA
 from opendbc.car.chery.values import CAR as CHERY
+from opendbc.car.geely.values import CAR as GEELY
 
 # FIXME: add routes for these cars
 non_tested_cars = [
@@ -55,6 +56,9 @@ non_tested_cars = [
 
   # Chery (no comma.ai test route yet)
   CHERY.CHERY_JAECOO_J7_PHEV,
+
+  # Geely (bootstrap fingerprint; replace with full bus-0 capture before on-road)
+  GEELY.GEELY_GALAXY_E5,
 ]
 
 

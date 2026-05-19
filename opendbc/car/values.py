@@ -18,10 +18,11 @@ from opendbc.car.proton.values import CAR as PROTON
 from opendbc.car.dnga.values import CAR as DNGA
 from opendbc.car.byd.values import CAR as BYD
 from opendbc.car.chery.values import CAR as CHERY
+from opendbc.car.geely.values import CAR as GEELY
 
 Platform = (
   BODY | CHRYSLER | FORD | GM | HONDA | HYUNDAI | MAZDA | MOCK | NISSAN | PSA | RIVIAN | SUBARU
-  | TESLA | TOYOTA | VOLKSWAGEN | PROTON | DNGA | BYD | CHERY
+  | TESLA | TOYOTA | VOLKSWAGEN | PROTON | DNGA | BYD | CHERY | GEELY
 )
 BRANDS = get_args(Platform)
 

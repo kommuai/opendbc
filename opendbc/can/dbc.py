@@ -20,6 +20,7 @@ from opendbc.car.psa.psacan import psa_checksum
 from opendbc.car.proton.protoncan import proton_checksum
 from opendbc.car.byd.bydcan import byd_checksum
 from opendbc.car.chery.cherycan import chery_checksum, chery_pcm_buttons_checksum
+from opendbc.car.geely.geelycan import geely_checksum
 
 
 class SignalType:
@@ -40,6 +41,7 @@ class SignalType:
   PROTON_CHECKSUM = 14
   BYD_CHECKSUM = 15
   CHERY_CHECKSUM = 16
+  GEELY_CHECKSUM = 17
 
 
 @dataclass
@@ -141,7 +143,7 @@ class DBC:
           msb = start_bit
 
         sig = Signal(sig_name, start_bit, msb, lsb, size, is_signed, factor, offset_val, is_little_endian)
-        set_signal_type(sig, checksum_state, self.name, line_num)
+        set_signal_type(sig, checksum_state, self.name, line_num, address)
         signals_temp[address][sig_name] = sig
       elif line.startswith("VAL_ "):
         m = VAL_RE.search(line)
@@ -211,15 +213,20 @@ def get_checksum_state(dbc_name: str) -> ChecksumState | None:
     return ChecksumState(8, 4, 7, -1, False, SignalType.BYD_CHECKSUM, byd_checksum)
   elif dbc_name.startswith("chery_"):
     return ChecksumState(8, 4, 7, -1, False, SignalType.CHERY_CHECKSUM, chery_checksum)
+  elif dbc_name.startswith("geely_"):
+    return ChecksumState(8, 4, 39, 47, False, SignalType.GEELY_CHECKSUM, geely_checksum)
   return None
 
 
-def set_signal_type(sig: Signal, chk: ChecksumState | None, dbc_name: str, line_num: int) -> None:
+def set_signal_type(sig: Signal, chk: ChecksumState | None, dbc_name: str, line_num: int, address: int = 0) -> None:
   sig.calc_checksum = None
   if chk:
     if chk.setup_signal:
       chk.setup_signal(sig, dbc_name, line_num)
     if sig.name == "CHECKSUM":
+      # geely_lkas_0x33_checksum applies to LKAS (BO_ 51 / 0x33) only, not EPS etc.
+      if dbc_name.startswith("geely_") and address != 0x33:
+        return
       sig.type = chk.checksum_type
       sig.calc_checksum = chk.calc_checksum
     elif sig.name == "CHECKSUM_BUTTONS" and dbc_name.startswith("chery_"):
