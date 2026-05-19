@@ -43,20 +43,30 @@ class CarController(CarControllerBase):
     self.accel_mult = ACCEL_MULT[CP.carFingerprint]
     self.lka_cooldown = 0
     self.prev_press = False
+    self.prev_res_press = False
     self.lka_latched = False
     self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6) else CANBUS.main_bus
 
   def _update_lka_latch_state(self, CS):
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SHARK, CAR.BYD_SEALION7):
-      rising_edge = CS.lkas_rdy_btn and not self.prev_press
-      if rising_edge:
+      lkas_rising = CS.lkas_rdy_btn and not self.prev_press
+      if lkas_rising:
         if not self.lka_latched:
           self.lka_latched = True
         else:
           self.lka_latched = False
           self.lka_cooldown = 0
           self.lka_active = False
+      elif (
+        self.CP.carFingerprint == CAR.BYD_SHARK
+        and CS.res_btn
+        and not self.prev_res_press
+        and not self.lka_latched
+      ):
+        # Shark: stock RES (resume) also arms LKA latch; disengage still via LKAS btn or brake.
+        self.lka_latched = True
       self.prev_press = CS.lkas_rdy_btn
+      self.prev_res_press = CS.res_btn
 
       if CS.out.brakePressed:
         self.lka_latched = False
@@ -149,7 +159,7 @@ class CarController(CarControllerBase):
         brake_hold = CS.out.standstill and actuators.accel < 0
         can_sends.append(create_accel_command(self.packer, actuators.accel, long_active, self.accel_mult, brake_hold))
       else:
-        if CS.out.genericToggle or (CS.out.standstill and CC.enabled and (self.frame % BUTTON_KEEPALIVE_FRAMES == 0)):
+        if CS.out.standstill and CC.enabled and (self.frame % BUTTON_KEEPALIVE_FRAMES == 0):
           can_sends.append(send_buttons(self.packer, 1, 0, self.button_send_bus))
 
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
