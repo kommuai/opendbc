@@ -28,14 +28,13 @@ class CANBUS:
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 2.0 * 0.02)  # 2 Hz @ 50 Hz LANE_KEEP
 LANE_KEEP_STEP = 2
 LKAS_INFO_STEP = 5
-SPOOF_DURATION_FRAMES = 50
-SPOOF_CYCLE_FRAMES = 150
 RESUME_BUTTON_INTERVAL_S = 0.05
 
 # --- CarState ---
 HUD_MULTIPLIER = 1.0
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
-FOLLOW_RAW_TO_PERSONALITY = {1: 2, 2: 2, 3: 1, 4: 0, 5: 0}  # HUD raw 1..5 bars -> OP personality
+# HUD FOLLOW_DISTANCE raw 1 = closest (1 bar), raw 5 = farthest (5 bars); 0/6/7 unknown
+FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}  # aggressive / standard / relaxed
 GEAR_MAP = {1: "P", 2: "R", 3: "N", 4: "D"}
 
 PT_PARSER_MSGS = [

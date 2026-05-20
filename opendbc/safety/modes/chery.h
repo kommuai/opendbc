@@ -24,9 +24,9 @@ static safety_config chery_init(uint16_t param) {
     {.msg = {{CHERY_HUD, 2U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static const CanMsg CHERY_TX_MSGS[] = {
-    {CHERY_LANE_KEEP, 0, 8, .check_relay = true},  // bus 0 = vehicle/ECU side; stock cam TXes on bus 2.
-    {CHERY_LKAS_INFO, 0, 8, .check_relay = true},  // torque spoof on PT bus (CarState LKAS_INFO).
-    {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},  // stock ACC resume (ICC_TOGGLE press).
+    {CHERY_LANE_KEEP, 0, 8, .check_relay = false},
+    {CHERY_LKAS_INFO, 0, 8, .check_relay = false},
+    {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
   };
   SAFETY_UNUSED(param);
   controls_allowed = false;

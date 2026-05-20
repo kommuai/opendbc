@@ -32,6 +32,7 @@ class CarState(CarStateBase):
     self.lkas_info_steer_related = 0.0
     self.steer_related_intervention = False
     self.lkas_enable_lane = self.lkas_enable_info = False
+    self.hands_on_wheel_steer_warn = False
 
   def _parse_motion(self, ret, cp):
     self.parse_wheel_speeds(
@@ -45,7 +46,7 @@ class CarState(CarStateBase):
     steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
     self.prev_angle = ret.steeringAngleDeg
     ret.steeringTorqueEps = ret.steeringTorque * steer_dir
-    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 10, 5)
+    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
     ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     ret.brake = cp.vl["BRAKE_PEDAL"]["BRAKE_PRESSURE"]
     ret.brakePressed = ret.brake > 0.01
@@ -56,13 +57,14 @@ class CarState(CarStateBase):
     left, right = self.update_blinker_from_stalk(3, cp.vl["STALK"]["LEFT_BLINKER"], cp.vl["STALK"]["RIGHT_BLINKER"])
     ret.leftBlinker, ret.rightBlinker = left, right
     ret.doorOpen = bool(int(cp.vl["STALK"]["PAYLOAD391_B3"]) & 1)
-    ret.genericToggle = False
+    ret.genericToggle = bool(cp.vl["STALK"]["GENERIC_TOGGLE"])
     ret.seatbeltUnlatched = bool(
       cp.vl["SEATBELT_287"]["DRIVER_UNBUCKLED"] or cp.vl["SEATBELT_430"]["DRIVER_UNBUCKLED"]
     )
     ret.espDisabled = False
     ret.stockAeb = bool(cam.vl["HUD"]["AEB"])
     ret.stockFcw = bool(cam.vl["HUD"]["PCW"])
+    self.hands_on_wheel_steer_warn = bool(cam.vl["HUD"]["HANDS_ON_WHEEL_STEER"])
 
   def _parse_cruise(self, ret, cam):
     hud = cam.vl["HUD"]

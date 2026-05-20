@@ -97,6 +97,21 @@ class TestCherySafety(unittest.TestCase):
     self.safety.set_controls_allowed(False)
     self.assertTrue(self._tx(msg))
 
+  def test_pt_bus_stock_adas_does_not_trigger_relay_malfunction(self):
+    """LKAS_INFO and LANE_KEEP on bus 0 are expected on Jaecoo PT; must not trip relayMalfunction."""
+    self.assertFalse(self.safety.get_relay_malfunction())
+    self._rx(self._lkas_info(0.0, 0))
+    self.assertFalse(self.safety.get_relay_malfunction())
+    self._rx(self._lane_keep(0.0, 0))
+    self.assertFalse(self.safety.get_relay_malfunction())
+    self._tx(self._lane_keep(1.0, 1))
+    self._rx(self._lane_keep(1.0, 1))
+    self.assertFalse(self.safety.get_relay_malfunction())
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 837))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 916))
+
 
 if __name__ == "__main__":
   unittest.main()

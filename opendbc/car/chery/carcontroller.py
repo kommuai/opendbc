@@ -8,8 +8,6 @@ from opendbc.car.chery.values import (
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
   RESUME_BUTTON_INTERVAL_S,
-  SPOOF_CYCLE_FRAMES,
-  SPOOF_DURATION_FRAMES,
   chery_steering_deg_sign,
   lowpass_steer_cmd,
 )
@@ -51,9 +49,11 @@ class CarController(CarControllerBase):
       ))
 
     if self.frame % LKAS_INFO_STEP == 0:
+      # Spoof whenever LKAS is commanded on: duty-cycled spoof left MAIN_TORQUE at 0
+      # for ~1s and the stock camera raised HUD HANDS_ON_WHEEL_STEER (route 2026-05-20--03-59-40).
       can_sends.append(cherycan.create_lkas_info_torque_spoof(
         self.packer, lat_active, CS.out.steeringTorque,
-        (self.frame % SPOOF_CYCLE_FRAMES) < SPOOF_DURATION_FRAMES,
+        steer_req,
         lkas_enable=steer_req, steer_related=CS.lkas_info_steer_related,
         apply_spoof_offset=not driver_over,
       ))
