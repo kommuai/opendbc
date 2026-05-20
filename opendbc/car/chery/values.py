@@ -28,6 +28,7 @@ class CANBUS:
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 2.0 * 0.02)  # 2 Hz @ 50 Hz LANE_KEEP
 LANE_KEEP_STEP = 2
 LKAS_INFO_STEP = 5
+RES_RETRIGGER_S = 0.5  # interval between auto-resume bursts while stopped
 
 # --- CarState ---
 HUD_MULTIPLIER = 1.0

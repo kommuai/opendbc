@@ -7,6 +7,7 @@ from opendbc.car.chery.values import (
   DBC,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
+  RES_RETRIGGER_S,
   chery_steering_deg_sign,
   lowpass_steer_cmd,
 )
@@ -20,7 +21,6 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.steer_sign = chery_steering_deg_sign(CP)
     self.last_apply_angle = None
-    self.prev_generic_toggle = False
     self.res_burst_frames_left = 0
     self.res_last_burst_frame = -10_000
 
@@ -59,12 +59,16 @@ class CarController(CarControllerBase):
         apply_spoof_offset=not driver_over,
       ))
 
-    # Stock RES: 4 frames at ~50 Hz (PCM_BUTTONS RES_BUTTON). Retrigger while toggle held.
-    if not self.CP.openpilotLongitudinalControl and not CS.out.brakePressed:
-      toggle_rising = CS.out.genericToggle and not self.prev_generic_toggle
-      res_active = CS.out.genericToggle or CC.cruiseControl.resume
-      if toggle_rising or (res_active and self.res_burst_frames_left == 0
-                           and (self.frame - self.res_last_burst_frame) * DT_CTRL >= 0.30):
+    # Auto-resume from standstill: while ACC is engaged and the car is stopped (e.g. lead vehicle
+    # pulled away), simulate stock RES taps until we start moving. Each tap is a 4-frame burst at
+    # ~50 Hz (PCM_BUTTONS RES_BUTTON), retriggered every RES_RETRIGGER_S while still stopped.
+    auto_resume = (not self.CP.openpilotLongitudinalControl
+                   and not CS.out.brakePressed
+                   and CS.out.cruiseState.enabled
+                   and CS.out.standstill)
+    if auto_resume:
+      if self.res_burst_frames_left == 0 \
+         and (self.frame - self.res_last_burst_frame) * DT_CTRL >= RES_RETRIGGER_S:
         self.res_burst_frames_left = 4
         self.res_last_burst_frame = self.frame
 
@@ -73,7 +77,8 @@ class CarController(CarControllerBase):
         can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 0))
         can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 2))
         self.res_burst_frames_left -= 1
-    self.prev_generic_toggle = CS.out.genericToggle
+    else:
+      self.res_burst_frames_left = 0
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle
