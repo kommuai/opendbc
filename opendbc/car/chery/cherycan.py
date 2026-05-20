@@ -41,9 +41,11 @@ def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg,
   })
 
 
-def create_pcm_icc_toggle_press(packer, counter: int):
-  return packer.make_can_msg("PCM_BUTTONS", CANBUS.main_bus, {
-    "ICC_TOGGLE": 1, "CRUISE_BUTTON": 0, "COUNTER": int(counter) % 16,
+def create_pcm_res_press(packer, counter: int, bus: int):
+  """Stock RES button (PCM_BUTTONS byte3 bit6). Must TX on PT (bus 0) and camera (bus 2):
+  panda does not forward openpilot's own TX between buses."""
+  return packer.make_can_msg("PCM_BUTTONS", bus, {
+    "ICC_TOGGLE": 0, "CRUISE_BUTTON": 0, "RES_BUTTON": 1, "COUNTER": int(counter) % 16,
   })
 
 

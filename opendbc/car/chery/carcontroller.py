@@ -7,7 +7,6 @@ from opendbc.car.chery.values import (
   DBC,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
-  RESUME_BUTTON_INTERVAL_S,
   chery_steering_deg_sign,
   lowpass_steer_cmd,
 )
@@ -21,7 +20,9 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.steer_sign = chery_steering_deg_sign(CP)
     self.last_apply_angle = None
-    self.last_resume_button_frame = 0
+    self.prev_generic_toggle = False
+    self.res_burst_frames_left = 0
+    self.res_last_burst_frame = -10_000
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
     if not lat_active:
@@ -58,11 +59,21 @@ class CarController(CarControllerBase):
         apply_spoof_offset=not driver_over,
       ))
 
-    if (not self.CP.openpilotLongitudinalControl and CC.cruiseControl.resume
-        and not CS.out.brakePressed
-        and (self.frame - self.last_resume_button_frame) * DT_CTRL > RESUME_BUTTON_INTERVAL_S):
-      self.last_resume_button_frame = self.frame
-      can_sends.append(cherycan.create_pcm_icc_toggle_press(self.packer, (CS.pcm_button_counter + 1) % 16))
+    # Stock RES: 4 frames at ~50 Hz (PCM_BUTTONS RES_BUTTON). Retrigger while toggle held.
+    if not self.CP.openpilotLongitudinalControl and not CS.out.brakePressed:
+      toggle_rising = CS.out.genericToggle and not self.prev_generic_toggle
+      res_active = CS.out.genericToggle or CC.cruiseControl.resume
+      if toggle_rising or (res_active and self.res_burst_frames_left == 0
+                           and (self.frame - self.res_last_burst_frame) * DT_CTRL >= 0.30):
+        self.res_burst_frames_left = 4
+        self.res_last_burst_frame = self.frame
+
+      if self.res_burst_frames_left > 0 and self.frame % 2 == 0:
+        ctr = (CS.pcm_button_counter + 1) % 16
+        can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 0))
+        can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 2))
+        self.res_burst_frames_left -= 1
+    self.prev_generic_toggle = CS.out.genericToggle
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle

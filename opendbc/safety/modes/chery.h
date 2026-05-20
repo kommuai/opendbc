@@ -27,6 +27,7 @@ static safety_config chery_init(uint16_t param) {
     {CHERY_LANE_KEEP, 0, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 0, 8, .check_relay = false},
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
+    {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
   };
   SAFETY_UNUSED(param);
   controls_allowed = false;

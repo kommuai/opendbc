@@ -10,7 +10,7 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  TX_MSGS = [[837, 0], [916, 0], [864, 0]]  # LANE_KEEP, LKAS_INFO, PCM_BUTTONS
+  TX_MSGS = [[837, 0], [916, 0], [864, 0], [864, 2]]  # LANE_KEEP, LKAS_INFO, PCM_BUTTONS (PT + cam)
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
@@ -93,9 +93,10 @@ class TestCherySafety(unittest.TestCase):
     self.assertTrue(self._tx(self._lkas_info(0.0, 0)))
 
   def test_pcm_buttons_tx_allowed_when_whitelisted(self):
-    msg = self.packer.make_can_msg_safety("PCM_BUTTONS", 0, {"ICC_TOGGLE": 1, "CRUISE_BUTTON": 0})
-    self.safety.set_controls_allowed(False)
-    self.assertTrue(self._tx(msg))
+    for bus in (0, 2):
+      msg = self.packer.make_can_msg_safety("PCM_BUTTONS", bus, {"RES_BUTTON": 1, "COUNTER": 0})
+      self.safety.set_controls_allowed(False)
+      self.assertTrue(self._tx(msg))
 
   def test_pt_bus_stock_adas_does_not_trigger_relay_malfunction(self):
     """LKAS_INFO and LANE_KEEP on bus 0 are expected on Jaecoo PT; must not trip relayMalfunction."""
