@@ -62,6 +62,11 @@ class CarState(CarStateBase):
       cp.vl["SEATBELT_287"]["DRIVER_UNBUCKLED"] or cp.vl["SEATBELT_430"]["DRIVER_UNBUCKLED"]
     )
     ret.espDisabled = False
+    if self.CP.enableBsm:
+      bsm_l = cp.vl["BSM_LEFT"]
+      bsm_r = cp.vl["BSM_RIGHT"]
+      ret.leftBlindspot = bool(bsm_l["LEFT_APPROACHING"]) or bool(bsm_l["LEFT_FAR_APPROACHING"])
+      ret.rightBlindspot = bool(bsm_r["RIGHT_APPROACHING"]) or bool(bsm_r["RIGHT_FAR_APPROACHING"])
     ret.stockAeb = bool(cam.vl["HUD"]["AEB"])
     ret.stockFcw = bool(cam.vl["HUD"]["PCW"])
     self.hands_on_wheel_steer_warn = bool(cam.vl["HUD"]["HANDS_ON_WHEEL_STEER"])
