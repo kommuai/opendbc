@@ -1,3 +1,4 @@
+from cereal import car
 from opendbc.can.packer import CANPacker
 
 from opendbc.car import DT_CTRL
@@ -14,6 +15,8 @@ from opendbc.car.chery.values import (
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_std_steer_angle_limits
 
+ButtonType = car.CarState.ButtonEvent.Type
+
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):
@@ -23,6 +26,8 @@ class CarController(CarControllerBase):
     self.last_apply_angle = None
     self.res_burst_frames_left = 0
     self.res_last_burst_frame = -10_000
+    self.acc_armed = False
+    self.prev_brake_pressed = False
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
     if not lat_active:
@@ -59,13 +64,29 @@ class CarController(CarControllerBase):
         apply_spoof_offset=not driver_over,
       ))
 
-    # Auto-resume from standstill: while ACC is engaged and the car is stopped (e.g. lead vehicle
-    # pulled away), simulate stock RES taps until we start moving. Each tap is a 4-frame burst at
-    # ~50 Hz (PCM_BUTTONS RES_BUTTON), retriggered every RES_RETRIGGER_S while still stopped.
-    auto_resume = (not self.CP.openpilotLongitudinalControl
+    # Auto-resume from standstill. The Jaecoo drops CRUISE_STATE 3->1 only ~200-340 ms after
+    # vEgo reaches 0 (route 2026-05-20--05-56-41), and on a long stop the ACC stays in IDLE
+    # (CS=1) forever. So we maintain an `acc_armed` state machine instead of a time-based latch:
+    # - ARM when ACC is engaged at speed (proper, intentional engagement)
+    # - DISARM only on explicit driver-cancel events: brake-press rising edge, or stock
+    #   ICC/CRUISE button press. A standstill auto-disengage doesn't disarm us.
+    # While armed and stopped, keep spamming stock RES at RES_RETRIGGER_S intervals.
+    if CS.out.cruiseState.enabled and not CS.out.standstill:
+      self.acc_armed = True
+
+    brake_press_edge = CS.out.brakePressed and not self.prev_brake_pressed
+    button_press_edge = any(
+      be.pressed and be.type in (ButtonType.altButton2, ButtonType.mainCruise)
+      for be in CS.out.buttonEvents
+    )
+    if brake_press_edge or button_press_edge:
+      self.acc_armed = False
+    self.prev_brake_pressed = CS.out.brakePressed
+
+    auto_resume = (self.acc_armed
+                   and CS.out.standstill
                    and not CS.out.brakePressed
-                   and CS.out.cruiseState.enabled
-                   and CS.out.standstill)
+                   and not self.CP.openpilotLongitudinalControl)
     if auto_resume:
       if self.res_burst_frames_left == 0 \
          and (self.frame - self.res_last_burst_frame) * DT_CTRL >= RES_RETRIGGER_S:

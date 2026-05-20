@@ -25,10 +25,15 @@ class CANBUS:
 
 
 # --- CarController ---
-STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 2.0 * 0.02)  # 2 Hz @ 50 Hz LANE_KEEP
+# TESTING: 10 Hz lowpass (was 2 Hz) to barely filter the OP angle command at all.
+STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)  # 10 Hz @ 50 Hz LANE_KEEP
 LANE_KEEP_STEP = 2
 LKAS_INFO_STEP = 5
-RES_RETRIGGER_S = 0.5  # interval between auto-resume bursts while stopped
+# Auto-resume tuning: car drops CRUISE_STATE 3->1 about 200-340 ms after vEgo hits 0
+# (route 2026-05-20--05-56-41), so retrigger fast enough that a burst is always in flight
+# during the brief engaged@standstill window; keep spamming for a couple seconds afterwards
+# in case the car can re-engage from IDLE@standstill (observed CS 1->3 at low speed creep).
+RES_RETRIGGER_S = 3
 
 # --- CarState ---
 HUD_MULTIPLIER = 1.0
@@ -108,8 +113,10 @@ def lowpass_steer_cmd(x: float, y_prev: float | None) -> float:
 
 class CarControllerParams:
   STEER_ANGLE_MAX = 120.0
-  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0.0, 5.0, 15.0], angle_v=[6.0, 4.0, 3.0])
-  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0.0, 5.0, 15.0], angle_v=[8.0, 6.0, 4.0])
+  # TESTING: very permissive rate limits — was UP=[6,4,3] / DOWN=[8,6,4] deg/step at 0/5/15 m/s.
+  # Bumped ~6-8x to see how the EPS actually reacts. Revert before production.
+  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0.0, 5.0, 15.0], angle_v=[50.0, 40.0, 25.0])
+  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0.0, 5.0, 15.0], angle_v=[60.0, 50.0, 30.0])
   ANGLE_LIMITS = AngleSteeringLimits(STEER_ANGLE_MAX, ANGLE_RATE_LIMIT_UP, ANGLE_RATE_LIMIT_DOWN)
 
   def __init__(self, CP):
