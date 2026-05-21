@@ -29,11 +29,9 @@ class CANBUS:
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)  # 10 Hz @ 50 Hz LANE_KEEP
 LANE_KEEP_STEP = 2
 LKAS_INFO_STEP = 5
-# Auto-resume tuning: car drops CRUISE_STATE 3->1 about 200-340 ms after vEgo hits 0
-# (route 2026-05-20--05-56-41), so retrigger fast enough that a burst is always in flight
-# during the brief engaged@standstill window; keep spamming for a couple seconds afterwards
-# in case the car can re-engage from IDLE@standstill (observed CS 1->3 at low speed creep).
-RES_RETRIGGER_S = 3
+# Auto-resume at standstill: alternate one RES burst then one SET burst (SET undoes RES set-speed+).
+AUTORESUME_CYCLE_S = 1.2
+AUTORESUME_BURST_FRAMES = 4
 
 # --- CarState ---
 HUD_MULTIPLIER = 1.0
@@ -48,7 +46,6 @@ PT_PARSER_MSGS = [
   ("ADAS_RELATED", 100), ("SPEED_RELATED", 50), ("STEER_RELATED", 100),
   ("SEATBELT_287", 50), ("SEATBELT_430", 50), ("BCM_STAT_412", math.nan),
   ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
-  ("BSM_LEFT", 20), ("BSM_RIGHT", 20),
 ]
 CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 

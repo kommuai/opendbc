@@ -4,11 +4,12 @@ from opendbc.can.packer import CANPacker
 from opendbc.car import DT_CTRL
 from opendbc.car.chery import cherycan
 from opendbc.car.chery.values import (
+  AUTORESUME_BURST_FRAMES,
+  AUTORESUME_CYCLE_S,
   CarControllerParams,
   DBC,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
-  RES_RETRIGGER_S,
   chery_steering_deg_sign,
   lowpass_steer_cmd,
 )
@@ -24,10 +25,12 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.steer_sign = chery_steering_deg_sign(CP)
     self.last_apply_angle = None
-    self.res_burst_frames_left = 0
-    self.res_last_burst_frame = -10_000
+    self.autoresume_burst_left = 0
+    self.autoresume_last_burst_frame = -10_000
     self.acc_armed = False
     self.prev_brake_pressed = False
+    self.autoresume_next_is_set = False  # toggled after each burst; False schedules RES first
+    self.autoresume_burst_is_set = False
 
   def _compute_apply_angle(self, CS, actuators, lat_active):
     if not lat_active:
@@ -55,8 +58,6 @@ class CarController(CarControllerBase):
       ))
 
     if self.frame % LKAS_INFO_STEP == 0:
-      # Spoof whenever LKAS is commanded on: duty-cycled spoof left MAIN_TORQUE at 0
-      # for ~1s and the stock camera raised HUD HANDS_ON_WHEEL_STEER (route 2026-05-20--03-59-40).
       can_sends.append(cherycan.create_lkas_info_torque_spoof(
         self.packer, lat_active, CS.out.steeringTorque,
         steer_req,
@@ -64,21 +65,12 @@ class CarController(CarControllerBase):
         apply_spoof_offset=not driver_over,
       ))
 
-    # Auto-resume from standstill. The Jaecoo drops CRUISE_STATE 3->1 only ~200-340 ms after
-    # vEgo reaches 0 (route 2026-05-20--05-56-41), and on a long stop the ACC stays in IDLE
-    # (CS=1) forever. So we maintain an `acc_armed` state machine instead of a time-based latch:
-    # - ARM when ACC is engaged at speed (proper, intentional engagement)
-    # - DISARM only on explicit driver-cancel events: brake-press rising edge, or stock
-    #   ICC/CRUISE button press. A standstill auto-disengage doesn't disarm us.
-    # While armed and stopped, keep spamming stock RES at RES_RETRIGGER_S intervals.
+    # Auto-resume from standstill (acc_armed state machine; disarm on brake or ICC only).
     if CS.out.cruiseState.enabled and not CS.out.standstill:
       self.acc_armed = True
 
     brake_press_edge = CS.out.brakePressed and not self.prev_brake_pressed
-    button_press_edge = any(
-      be.pressed and be.type in (ButtonType.altButton2, ButtonType.mainCruise)
-      for be in CS.out.buttonEvents
-    )
+    button_press_edge = any(be.pressed and be.type == ButtonType.altButton2 for be in CS.out.buttonEvents)
     if brake_press_edge or button_press_edge:
       self.acc_armed = False
     self.prev_brake_pressed = CS.out.brakePressed
@@ -88,18 +80,23 @@ class CarController(CarControllerBase):
                    and not CS.out.brakePressed
                    and not self.CP.openpilotLongitudinalControl)
     if auto_resume:
-      if self.res_burst_frames_left == 0 \
-         and (self.frame - self.res_last_burst_frame) * DT_CTRL >= RES_RETRIGGER_S:
-        self.res_burst_frames_left = 4
-        self.res_last_burst_frame = self.frame
+      if self.autoresume_burst_left == 0 \
+         and (self.frame - self.autoresume_last_burst_frame) * DT_CTRL >= AUTORESUME_CYCLE_S:
+        self.autoresume_burst_is_set = self.autoresume_next_is_set
+        self.autoresume_next_is_set = not self.autoresume_next_is_set
+        self.autoresume_burst_left = AUTORESUME_BURST_FRAMES
+        self.autoresume_last_burst_frame = self.frame
 
-      if self.res_burst_frames_left > 0 and self.frame % 2 == 0:
+      if self.autoresume_burst_left > 0 and self.frame % 2 == 0:
         ctr = (CS.pcm_button_counter + 1) % 16
-        can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 0))
-        can_sends.append(cherycan.create_pcm_res_press(self.packer, ctr, 2))
-        self.res_burst_frames_left -= 1
+        press = cherycan.create_pcm_set_press if self.autoresume_burst_is_set else cherycan.create_pcm_res_press
+        can_sends.append(press(self.packer, ctr, 0))
+        can_sends.append(press(self.packer, ctr, 2))
+        self.autoresume_burst_left -= 1
     else:
-      self.res_burst_frames_left = 0
+      self.autoresume_burst_left = 0
+      self.autoresume_next_is_set = False
+      self.autoresume_burst_is_set = False
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steeringAngleDeg = apply_angle
