@@ -17,6 +17,7 @@ from opendbc.car.chery.values import (
   SPOOF_VAR_PROB,
 )
 
+# --- Re-exported / referenced by opendbc.can.dbc; do not rename. ---
 
 def chery_checksum(address: int, sig, d: bytearray) -> int:
   del address, sig
@@ -32,8 +33,10 @@ def chery_pcm_buttons_checksum(address: int, sig, d: bytearray) -> int:
   return chrysler_checksum(0, None, bytearray(list(d[1:6]) + [0]))
 
 
-def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg, steering_deg_sign=1.0):
-  cmd = steering_deg_sign * (steer_angle_deg if steer_req else meas_angle_deg)
+# --- TX builders ---
+
+def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg):
+  cmd = steer_angle_deg if steer_req else meas_angle_deg
   return packer.make_can_msg("LANE_KEEP", CANBUS.main_bus, {
     "STEER_CMD_ANGLE": float(cmd),
     "LKAS_ENABLE": int(steer_req),
@@ -41,13 +44,21 @@ def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg,
   })
 
 
-def create_pcm_res_press(packer, counter: int, bus: int):
-  """Stock RES button (PCM_BUTTONS byte3 bit6). Must TX on PT (bus 0) and camera (bus 2):
-  panda does not forward openpilot's own TX between buses."""
-  return packer.make_can_msg("PCM_BUTTONS", bus, {
-    "ICC_TOGGLE": 0, "CRUISE_BUTTON": 0, "RES_BUTTON": 1, "COUNTER": int(counter) % 16,
-  })
+_PCM_BUTTON_FIELDS = ("ICC_TOGGLE", "CRUISE_BUTTON", "RES_BUTTON")
 
+
+def create_pcm_button(packer, counter: int, bus: int, button: str):
+  """Build a PCM_BUTTONS frame asserting exactly one of ICC_TOGGLE / CRUISE_BUTTON (SET) / RES_BUTTON.
+
+  TX on bus 0 (PT) and bus 2 (camera): panda does not forward our own TX between buses.
+  """
+  assert button in _PCM_BUTTON_FIELDS, button
+  signals = {b: int(b == button) for b in _PCM_BUTTON_FIELDS}
+  signals["COUNTER"] = int(counter) % 16
+  return packer.make_can_msg("PCM_BUTTONS", bus, signals)
+
+
+# --- LKAS torque spoof: keeps stock "hands on wheel" detector quiet during LKAS. ---
 
 @dataclass
 class _TorqueSpoof:
@@ -85,13 +96,9 @@ class _TorqueSpoof:
 _SPOOF = _TorqueSpoof()
 
 
-def create_lkas_info_torque_spoof(
-  packer, lat_active, main_torque, spoof_active,
-  lkas_enable=None, steer_related=0.0, apply_spoof_offset=True,
-):
+def create_lkas_info_torque_spoof(packer, main_torque, lkas_enable, spoof_active,
+                                  steer_related=0.0, apply_spoof_offset=True):
   torque = float(main_torque) + _SPOOF.step(spoof_active, apply_spoof_offset)
-  if lkas_enable is None:
-    lkas_enable = lat_active
   return packer.make_can_msg("LKAS_INFO", CANBUS.main_bus, {
     "MAIN_TORQUE": max(0.0, min(torque, 1023.0)),
     "LKAS_ENABLE": int(lkas_enable),
