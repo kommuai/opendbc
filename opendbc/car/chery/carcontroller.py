@@ -8,6 +8,7 @@ from opendbc.car.chery.values import (
   AUTORESUME_CYCLE_S,
   CarControllerParams,
   DBC,
+  HUD_STEP,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
   lowpass_steer_cmd,
@@ -30,6 +31,7 @@ class CarController(CarControllerBase):
     self.autoresume_burst_left = 0
     self.autoresume_last_burst_frame = -10_000
     self.autoresume_burst_idx = 0  # alternates RES (even) / SET (odd)
+    self.hud_counter = 0
 
   def _compute_apply_angle(self, CS, actuators, steer_req):
     if not steer_req:
@@ -94,10 +96,14 @@ class CarController(CarControllerBase):
 
     if self.frame % LKAS_INFO_STEP == 0:
       can_sends.append(cherycan.create_lkas_info_torque_spoof(
-        self.packer, CS.out.steeringTorque, steer_req, steer_req,
+        self.packer, steer_req, steer_req,
         steer_related=CS.lkas_info_steer_related,
         apply_spoof_offset=not driver_over,
       ))
+
+    if self.frame % HUD_STEP == 0:
+      can_sends.append(cherycan.create_hud_override(self.packer, CS.cam_hud, self.hud_counter))
+      self.hud_counter = (self.hud_counter + 1) % 16
 
     self._update_acc_armed(CS)
     self._auto_resume(CS, can_sends)

@@ -47,6 +47,18 @@ def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg)
 _PCM_BUTTON_FIELDS = ("ICC_TOGGLE", "CRUISE_BUTTON", "RES_BUTTON")
 
 
+def create_hud_override(packer, cam_hud: dict, counter: int):
+  """Re-emit camera HUD on PT bus with HANDS_ON_WHEEL_STEER cleared.
+
+  Stock camera sets HOW on bus 2; cluster on bus 0 only displays forwarded HUD.
+  Panda blocks camera HUD fwd (chery_fwd_hook); this frame is the only HUD on bus 0.
+  """
+  signals = {k: cam_hud[k] for k in cam_hud if k != "HANDS_ON_WHEEL_STEER"}
+  signals["HANDS_ON_WHEEL_STEER"] = 0
+  signals["COUNTER"] = int(counter) % 16
+  return packer.make_can_msg("HUD", CANBUS.main_bus, signals)
+
+
 def create_pcm_button(packer, counter: int, bus: int, button: str):
   """Build a PCM_BUTTONS frame asserting exactly one of ICC_TOGGLE / CRUISE_BUTTON (SET) / RES_BUTTON.
 
@@ -96,11 +108,12 @@ class _TorqueSpoof:
 _SPOOF = _TorqueSpoof()
 
 
-def create_lkas_info_torque_spoof(packer, main_torque, lkas_enable, spoof_active,
+def create_lkas_info_torque_spoof(packer, lkas_enable, spoof_active,
                                   steer_related=0.0, apply_spoof_offset=True):
-  torque = float(main_torque) + _SPOOF.step(spoof_active, apply_spoof_offset)
+  """MAIN_TORQUE is spoof-only (not EPS driver torque); stock p50 ~63 when LKAS active."""
+  torque = _SPOOF.step(spoof_active, apply_spoof_offset)
   return packer.make_can_msg("LKAS_INFO", CANBUS.main_bus, {
-    "MAIN_TORQUE": max(0.0, min(torque, 1023.0)),
+    "MAIN_TORQUE": max(0.0, min(abs(torque), 1023.0)),
     "LKAS_ENABLE": int(lkas_enable),
     "STEER_RELATED": float(steer_related),
   })

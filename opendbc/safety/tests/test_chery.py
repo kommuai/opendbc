@@ -10,7 +10,7 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  TX_MSGS = [[837, 0], [916, 0], [864, 0], [864, 2]]  # LANE_KEEP, LKAS_INFO, PCM_BUTTONS (PT + cam)
+  TX_MSGS = [[837, 0], [916, 0], [903, 0], [864, 0], [864, 2]]  # LANE_KEEP, LKAS_INFO, HUD, PCM_BUTTONS
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
@@ -109,9 +109,31 @@ class TestCherySafety(unittest.TestCase):
     self._rx(self._lane_keep(1.0, 1))
     self.assertFalse(self.safety.get_relay_malfunction())
 
+  def test_hud_tx_allowed_when_whitelisted(self):
+    msg = self.packer.make_can_msg_safety(
+      "HUD", 0,
+      {
+        "AEB": 0,
+        "HANDS_ON_WHEEL_STEER": 0,
+        "CANCEL_CRUISE_UNCERTAIN": 0,
+        "GAS_RESUME_UNCERTAIN": 0,
+        "FOLLOW_DISTANCE": 1,
+        "NEW_SIGNAL_1": 0,
+        "PCW": 0,
+        "CRUISE_STATE": 3,
+        "GAS_OVERRIDE": 0,
+        "AEB_RELATED": 0,
+        "SET_SPEED": 80,
+        "COUNTER": 0,
+      },
+    )
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(msg))
+
   def test_fwd_blocks_camera_lane_keep(self):
     self.assertEqual(-1, self.safety.safety_fwd_hook(2, 837))
     self.assertEqual(-1, self.safety.safety_fwd_hook(2, 916))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 903))
 
 
 if __name__ == "__main__":

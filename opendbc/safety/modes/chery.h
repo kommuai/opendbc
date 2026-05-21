@@ -26,6 +26,7 @@ static safety_config chery_init(uint16_t param) {
   static const CanMsg CHERY_TX_MSGS[] = {
     {CHERY_LANE_KEEP, 0, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 0, 8, .check_relay = false},
+    {CHERY_HUD, 0, 8, .check_relay = false},
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
   };
@@ -48,6 +49,8 @@ static bool chery_fwd_hook(int bus_num, int addr) {
       block = true;
     } else if (chery_torque_spoof && (addr == (int)CHERY_LKAS_INFO)) {
       block = true;
+    } else if (addr == (int)CHERY_HUD) {
+      block = true;  // cluster HUD comes from our bus-0 TX override (HOW=0)
     } else {
       /* no action */
     }

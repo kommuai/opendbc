@@ -15,7 +15,8 @@ class CANBUS:
 
 # --- CarController timing ---
 LANE_KEEP_STEP = 2   # 50 Hz @ DT_CTRL=0.01
-LKAS_INFO_STEP = 5   # 20 Hz
+LKAS_INFO_STEP = 2   # 50 Hz — match stock LKAS_INFO on bus 2
+HUD_STEP = 5         # 20 Hz — match stock HUD parser rate
 
 # 10 Hz lowpass on the OP angle command (barely filters at 50 Hz LANE_KEEP).
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)
@@ -47,11 +48,11 @@ LANE_KEEP_PADDING = {
   "SET_ME_XFF": 255, "SET_ME_XFC": 252, "SET_ME_XF4": 244, "SET_ME_X63": 99, "SET_ME_XF": 15,
 }
 
-# LKAS torque spoof params: keep stock "hands on wheel" detector quiet while LKAS is active.
-SPOOF_TORQUE_MIN = 5.0
-SPOOF_TORQUE_VAR_MIN = 4.0
-SPOOF_TORQUE_RAMP = 3.0
-SPOOF_TORQUE_MAX = 10.0
+# LKAS torque spoof params (tuned to stock MAIN_TORQUE distribution: p10=7, p50=63, p90=149).
+SPOOF_TORQUE_MIN = 30.0
+SPOOF_TORQUE_VAR_MIN = 25.0
+SPOOF_TORQUE_RAMP = 8.0
+SPOOF_TORQUE_MAX = 110.0
 SPOOF_NEG_PROB = 0.3
 SPOOF_VAR_PROB = 0.2
 

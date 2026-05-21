@@ -15,6 +15,13 @@ from opendbc.car.chery.values import (
 
 ButtonType = car.CarState.ButtonEvent.Type
 
+# Camera HUD fields mirrored on bus 0 by CarController (HANDS_ON_WHEEL_STEER forced to 0).
+_CAM_HUD_FIELDS = (
+  "AEB", "CANCEL_CRUISE_UNCERTAIN", "GAS_RESUME_UNCERTAIN", "FOLLOW_DISTANCE",
+  "NEW_SIGNAL_1", "PCW", "CRUISE_STATE", "GAS_OVERRIDE", "AEB_RELATED", "SET_SPEED",
+  "HANDS_ON_WHEEL_STEER",
+)
+
 
 class CarState(CarStateBase):
   def __init__(self, CP):
@@ -26,6 +33,7 @@ class CarState(CarStateBase):
     self.pcm_button_counter = 0
     self.lkas_info_steer_related = 0.0
     self.steer_related_intervention = False
+    self.cam_hud = {f: 0 for f in _CAM_HUD_FIELDS}
 
   def update(self, can_parsers):
     cp, cam = can_parsers[Bus.pt], can_parsers[Bus.cam]
@@ -67,6 +75,7 @@ class CarState(CarStateBase):
 
     # --- Cruise / HUD (from camera bus) ---
     hud = cam.vl["HUD"]
+    self.cam_hud = {f: hud[f] for f in _CAM_HUD_FIELDS}
     ret.stockAeb = bool(hud["AEB"])
     ret.stockFcw = bool(hud["PCW"])
 
