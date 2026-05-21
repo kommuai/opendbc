@@ -254,6 +254,8 @@ void safety_tick(const safety_config *safety_config);
 extern bool controls_allowed;
 extern bool ignore_ignition_line;
 extern bool ignore_ignition_line_redundant;
+// Sticky PROTON_SAFETY_PARAM_IGNORE_IGNITION_LINE ProtonSafetyFlags IGNORE_IGNITION_LINE RAM for SOM bootkick after SILENT when Linux is off.
+extern bool ignore_ignition_line_sticky;
 extern bool relay_malfunction;
 extern bool gas_pressed;
 extern bool gas_pressed_prev;

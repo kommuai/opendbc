@@ -11,7 +11,9 @@ from opendbc.car.fw_versions import ObdCallback, get_fw_versions_ordered, get_pr
 from opendbc.car.mock.values import CAR as MOCK
 from opendbc.car.values import BRANDS, PLATFORMS
 from opendbc.car.vin import get_vin, is_valid_vin, VIN_UNKNOWN
+from cereal import log
 from openpilot.common.params import Params
+from opendbc.car.proton.values import ProtonSafetyFlags
 
 FRAME_FINGERPRINT = 100  # 1s
 
@@ -56,14 +58,6 @@ def supported_cars() -> list[str]:
 
 def car_name_to_platform(car_name: str) -> str | None:
   return next((p for p, ns in CAR_MAPPING.items() if car_name in ns), None)
-
-
-def ignore_ignition_line_for_onroad(car_name: str | None) -> bool:
-  """Pre-FL Proton X50: harness ignition line is unreliable; use CAN ignition only."""
-  if not car_name:
-    return False
-  return car_name_to_platform(car_name) == "PROTON_X50"
-
 
 def fingerprint_to_display_name(fp: str | None) -> str:
   if not fp:
@@ -263,3 +257,10 @@ def get_demo_car_params():
   CarInterface = interfaces[platform]
   CP = CarInterface.get_non_essential_params(platform)
   return CP
+
+
+def ignition_onroad(states) -> bool:
+  """Onroad ignition: line|CAN, or CAN-only when safetyParam ignores harness line."""
+  known = [ps for ps in states if ps.pandaType != log.PandaState.PandaType.unknown]
+  return any(ps.ignitionCan for ps in known) if any(ps.safetyModel == CarParams.SafetyModel.proton and
+    ps.safetyParam & ProtonSafetyFlags.IGNORE_IGNITION_LINE for ps in known) else any(ps.ignitionLine or ps.ignitionCan for ps in known)
