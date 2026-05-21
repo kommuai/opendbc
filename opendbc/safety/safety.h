@@ -47,6 +47,7 @@ const int MAX_WRONG_COUNTERS = 5;
 bool controls_allowed = false;
 bool ignore_ignition_line = false;
 bool ignore_ignition_line_redundant = false;
+bool ignore_ignition_line_sticky = false;
 bool relay_malfunction = false;
 bool gas_pressed = false;
 bool gas_pressed_prev = false;
@@ -389,6 +390,12 @@ static void reset_sample(struct sample_t *sample) {
 }
 
 int set_safety_hooks(uint16_t mode, uint16_t param) {
+  // Keep sticky through SILENT ELM327 NO_OUTPUT ALL_OUTPUT PROTON for SOM bootkick clear on any other vehicle mode.
+  const bool preserve_ignition_line_sticky =
+      (mode == SAFETY_SILENT) || (mode == SAFETY_ELM327) || (mode == SAFETY_NOOUTPUT) ||
+      (mode == SAFETY_ALLOUTPUT) || (mode == SAFETY_PROTON);
+  if (!preserve_ignition_line_sticky) { ignore_ignition_line_sticky = false; }
+
   const safety_hook_config safety_hook_registry[] = {
     {SAFETY_SILENT, &nooutput_hooks},
     {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},

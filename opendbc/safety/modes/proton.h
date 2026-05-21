@@ -154,6 +154,8 @@ static bool proton_fwd_hook(int bus_num, int addr) {
 
 static safety_config proton_init(uint16_t param) {
   ignore_ignition_line = ((param & PROTON_SAFETY_PARAM_IGNORE_IGNITION_LINE) != 0U);
+  // Sticky copies PROTON_SAFETY_PARAM_IGNORE_IGNITION_LINE for SOM bootkick after SILENT clears ignore_ignition_line on powered panda.
+  ignore_ignition_line_sticky = ignore_ignition_line;
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
   proton_acc_tx_block_frames = 0U;
   proton_pcm_stock_off_count = 0U;
