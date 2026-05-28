@@ -17,6 +17,20 @@ class CANBUS:
 LANE_KEEP_STEP = 2   # 50 Hz @ DT_CTRL=0.01
 LKAS_INFO_STEP = 2   # 50 Hz — match stock LKAS_INFO on bus 2
 HUD_STEP = 5         # 20 Hz — match stock HUD parser rate
+EPS_SPOOF_STEP = 1   # 100 Hz — match stock EPS rate
+
+# EPS DRIVER_TORQUE pass-through + periodic "tap" injection.
+# Stock distribution measured on this car (route 2026-05-26--04-52-57):
+#   standstill, hands off, cruise off:  T=0 in 99% of frames
+#   moving, hands off, cruise off:      T=0 in 61% of frames, 1..5 in 32%
+#   moving, hands on (light grip):      T=10..15 typical, p99=15
+#   moving, hands on (override):        T>=80 spikes briefly
+# Any constant non-zero value while the wheel isn't moving reads as "fault" to the cam.
+# Strategy: mirror real DRIVER_TORQUE exactly, and only when LKAS is asking for steering
+# inject a brief light-touch tap every few seconds to keep the HOW timer reset.
+EPS_TAP_TORQUE = 12            # mid of stock "light grip" band (10..15)
+EPS_TAP_FRAMES = 8             # ~80 ms tap at 100 Hz
+EPS_TAP_PERIOD_FRAMES = 400    # ~4 s between taps
 
 # 10 Hz lowpass on the OP angle command (barely filters at 50 Hz LANE_KEEP).
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)

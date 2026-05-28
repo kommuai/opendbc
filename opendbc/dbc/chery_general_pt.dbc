@@ -138,8 +138,8 @@ BO_ 864 PCM_BUTTONS: 6 XXX
  SG_ CHECKSUM_BUTTONS : 7|8@0+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 15|4@0+ (1,0) [0|15] "" XXX
  SG_ ICC_TOGGLE : 24|1@0+ (1,0) [0|1] "" XXX
- SG_ CRUISE_BUTTON : 26|1@0+ (1,0) [0|1] "" XXX
  SG_ RES_BUTTON : 30|1@0+ (1,0) [0|1] "" XXX
+ SG_ CRUISE_BUTTON : 32|1@0+ (1,0) [0|1] "" XXX
 
 BO_ 903 HUD: 8 XXX
  SG_ AEB : 0|1@0+ (1,0) [0|1] "" XXX
@@ -184,6 +184,11 @@ BO_ 775 STEER_STATUS: 8 XXX
  SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
  SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
 
+BO_ 933 LKA_STATUS: 8 XXX
+ SG_ HANDS_ON_WHEEL_WARN : 44|1@0+ (1,0) [0|1] "" XXX
+ SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
+ SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
+
 BO_ 1201 BSM_LEFT: 8 XXX
  SG_ LEFT_FAR_APPROACHING : 12|1@0+ (1,0) [0|1] "" XXX
  SG_ LEFT_APPROACHING : 14|1@0+ (1,0) [0|1] "" XXX
@@ -197,7 +202,9 @@ CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 666 AUTO_HOLD "Only gear D it will be active";
 CM_ SG_ 666 BRAKE_PRESSURE "Offset -0.2 removes ~0.2 idle bias (Jaecoo J7); scale 0.002 unchanged.";
 CM_ SG_ 903 FOLLOW_DISTANCE "Jaecoo J7 ACC gap bars on HUD byte1 bits 9-11 (3-bit LE). Raw 1=1 bar (min gap) .. raw 5=5 bars (max gap); 0/6/7 unknown.";
-CM_ SG_ 903 HANDS_ON_WHEEL_STEER "Cluster 'hands on steering wheel' during LKAS; HUD 0x387 byte0 bit4 (0x10). Set ~1-2s after low MAIN_TORQUE with LKAS on (route 2026-05-20--03-59-40). Was mislabeled in CANCEL_CRUISE_UNCERTAIN 5|2.";
+CM_ SG_ 903 HANDS_ON_WHEEL_STEER "HUD 0x387 byte0 bit4 (0x10): 'ACC cancelled / uncertain' indicator the cluster latches AFTER cruise drops to CRUISE_STATE=1. NOT the active in-LKAS hands-on-wheel icon — CarController re-emits HUD on PT with this bit forced 0 to suppress spurious cancel glyphs.";
+CM_ SG_ 903 CANCEL_CRUISE_UNCERTAIN "HUD 0x387 byte0 bit5 (0x20).";
+CM_ SG_ 933 HANDS_ON_WHEEL_WARN "LKA_STATUS 0x3a5 byte5 bit4 (0x10). Co-fires with the HUD cancel indicator after cruise drops — not the active in-LKAS hands-on-wheel icon.";
 CM_ BO_ 647 "Driver seatbelt: byte3 bit1 (Intel start bit 25) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 1072 "Driver seatbelt: byte5 bit6 (Intel start bit 46) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 295 "BCM 0x127 (optional): door-related bytes vary; not present on every latch event — do not use alone for doorOpen.";
@@ -211,13 +218,14 @@ CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at st
 CM_ SG_ 196 STEERING_ANGLE_NOT_CALIBRATED "Jaecoo J7: raw ~327xx at rest; >=36000 during driver torque / LKAS conflict (route 2026-05-14--07-49-04).";
 CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";
 CM_ SG_ 864 ICC_TOGGLE "Cruise on/off (byte3 bit0).";
-CM_ SG_ 864 CRUISE_BUTTON "Cruise set (byte3 bit2).";
-CM_ SG_ 864 RES_BUTTON "RES / resume (byte3 bit6); 3-5 frames per tap.";
+CM_ SG_ 864 CRUISE_BUTTON "Cruise SET (byte4 bit0, mask 0x01). Verified on capture 2026-05-26.";
+CM_ SG_ 864 RES_BUTTON "RES / resume (byte3 bit6, mask 0x40); 3-5 frames per tap.";
 CM_ SG_ 775 LKAS_FAULT "Camera-broadcast LKAS fault flag (byte0 bit6). Set when EPS rejects LKAS, e.g. driver torque overpowers (route 2026-05-20--05-56-41 t=454.06: 0x80->0x40 the instant LKAS_ENABLE in 0x394 drops).";
 CM_ SG_ 775 LKAS_AVAILABLE "Camera LKAS-OK flag (byte0 bit7); inverse of LKAS_FAULT.";
 CM_ SG_ 864 CHECKSUM_BUTTONS "Byte 0; Chrysler-style CRC over bytes 1..5 (Jaecoo J7 route 2026-05-14--07-49-04).";
 
 VAL_ 903 FOLLOW_DISTANCE 0 "UNKNOWN" 1 "1_BAR" 2 "2_BAR" 3 "3_BAR" 4 "4_BAR" 5 "5_BAR" 6 "UNKNOWN" 7 "UNKNOWN";
-VAL_ 903 HANDS_ON_WHEEL_STEER 0 "NO_WARNING" 1 "WARNING";
+VAL_ 903 HANDS_ON_WHEEL_STEER 0 "NORMAL" 1 "ACC_CANCELLED_INDICATOR";
+VAL_ 933 HANDS_ON_WHEEL_WARN 0 "NO_WARNING" 1 "WARNING";
 VAL_ 913 GENERIC_TOGGLE 0 "OFF" 1 "ON";
 

@@ -34,6 +34,11 @@ class CarState(CarStateBase):
     self.lkas_info_steer_related = 0.0
     self.steer_related_intervention = False
     self.cam_hud = {f: 0 for f in _CAM_HUD_FIELDS}
+    # Live EPS snapshot — used by CarController to rebuild EPS on bus 2 byte-identical
+    # to stock (panda blocks native fwd while our spoof loop is active).
+    self.eps_steering_angle = 0.0
+    self.eps_driver_torque = 0
+    self.eps_counter = 0
 
   def update(self, can_parsers):
     cp, cam = can_parsers[Bus.pt], can_parsers[Bus.cam]
@@ -48,8 +53,12 @@ class CarState(CarStateBase):
     ret.vEgoCluster = ret.vEgo
     ret.standstill = ret.vEgoRaw < 0.01
 
-    ret.steeringAngleDeg = float(cp.vl["EPS"]["STEERING_ANGLE"])
-    ret.steeringTorque = cp.vl["EPS"]["DRIVER_TORQUE"]
+    eps = cp.vl["EPS"]
+    ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
+    ret.steeringTorque = eps["DRIVER_TORQUE"]
+    self.eps_steering_angle = float(eps["STEERING_ANGLE"])
+    self.eps_driver_torque = int(eps["DRIVER_TORQUE"])
+    self.eps_counter = int(eps["COUNTER"])
     # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
     steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
     self.prev_angle = ret.steeringAngleDeg
