@@ -106,8 +106,20 @@ class CAR(Platforms):
       lkc_torque="TBD",
       lkc_speed_range="0 - 150",
       max_steering_angle="TBD",
+    ), CarDocs(
+      "Chery Tiggo 8 PHEV 2025-26", "ALL",
+      car_parts=CUSTOM_CAR_PARTS(),
+      footnotes=[Footnote.J7_NOTE],
+      variant="All",
+      kommu_supported=True,
+      acc_low_speed=True,
+      acc_speed_range="0 - 150",
+      acc_stop_and_go=True,
+      lkc_torque="TBD",
+      lkc_speed_range="0 - 150",
+      max_steering_angle="TBD",
     )],
-    CarSpecs(mass=1980.0, wheelbase=2.67, steerRatio=16.0),
+    CarSpecs(mass=1916.0, wheelbase=2.71, steerRatio=16.0),
     dbc_dict("chery_general_pt", None),
   )
 
