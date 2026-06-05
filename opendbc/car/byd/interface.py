@@ -4,7 +4,7 @@ from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.byd.carcontroller import CarController
 from opendbc.car.byd.carstate import CarState
 from opendbc.car.byd.radar_interface import RadarInterface
-from opendbc.car.byd.values import CAR
+from opendbc.car.byd.values import CAR, BYD_ATTO_STYLE_PLATFORMS, BYD_OP_LONG_PLATFORMS
 
 class CarInterface(CarInterfaceBase):
   CarState = CarState
@@ -34,11 +34,14 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kf = 0.00015
     ret.wheelSpeedFactor = 0.66
 
-    if candidate == CAR.BYD_ATTO3:
+    if candidate in BYD_ATTO_STYLE_PLATFORMS:
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-    elif candidate == CAR.BYD_M6:
-      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-      ret.safetyConfigs[0].safetyParam = 3
+      if candidate == CAR.BYD_M6:
+        ret.safetyConfigs[0].safetyParam = 3
+      elif candidate == CAR.BYD_SONG_PLUS_DMI_21:
+        ret.openpilotLongitudinalControl = False
+        ret.safetyConfigs[0].safetyParam = 2
+        ret.radarUnavailable = True
     elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
       ret.safetyConfigs[0].safetyParam = 2

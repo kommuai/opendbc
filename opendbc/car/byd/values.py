@@ -70,6 +70,17 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2374.0, wheelbase=2.80, steerRatio=16.0),
   )
+  BYD_SONG_PLUS_DMI_21 = BYDPlatformConfig(
+    [BYDCarDocs(
+      "BYD Song Plus DMI 2021",
+      "ALL",
+      footnotes=[Footnote.LKC_ACC_STOCK],
+      variant="All",
+      kommu_supported=True,
+      **BYD_SUPPORT_COMMON_FIELDS,
+    )],
+    CarSpecs(mass=1785.0, wheelbase=2.765, steerRatio=15.0),
+  )
   BYD_SEAL = BYDPlatformConfig(
     [
       BYDCarDocs(
@@ -114,12 +125,26 @@ class CAR(Platforms):
     CarSpecs(mass=2710.0, wheelbase=3.26, steerRatio=16.0),
   )
 
+# Atto 3 / M6 / Song Plus DMI: shared PT+cam layout (byd_general_pt), Atto-style LKA latch on cam bus.
+BYD_ATTO_STYLE_PLATFORMS = (
+  CAR.BYD_ATTO3,
+  CAR.BYD_M6,
+  CAR.BYD_SONG_PLUS_DMI_21,
+)
+
+# Openpilot longitudinal (ACC_CMD TX) on cam bus — not Song (stock ACC only for now).
+BYD_OP_LONG_PLATFORMS = (
+  CAR.BYD_ATTO3,
+  CAR.BYD_M6,
+)
+
 DBC = CAR.create_dbc_map()
 ACCEL_MULT = defaultdict(
   lambda: 1,
   {
     CAR.BYD_ATTO3: 26,
     CAR.BYD_M6: 26,
+    CAR.BYD_SONG_PLUS_DMI_21: 26,
     CAR.BYD_SEAL: 1,
     CAR.BYD_SEALION7: 1,
     CAR.BYD_SHARK: 1,

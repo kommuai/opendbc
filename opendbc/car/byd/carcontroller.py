@@ -10,7 +10,7 @@ from opendbc.car.byd.bydcan import (
   create_steering_torque_spoof_camera,
   send_buttons,
 )
-from opendbc.car.byd.values import DBC, CAR, ACCEL_MULT, CANBUS
+from opendbc.car.byd.values import DBC, CAR, ACCEL_MULT, CANBUS, BYD_ATTO_STYLE_PLATFORMS, BYD_OP_LONG_PLATFORMS
 from opendbc.car.byd.values import CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_std_steer_angle_limits
@@ -45,7 +45,7 @@ class CarController(CarControllerBase):
     self.prev_press = False
     self.prev_res_press = False
     self.lka_latched = False
-    self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in (CAR.BYD_ATTO3, CAR.BYD_M6) else CANBUS.main_bus
+    self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in BYD_ATTO_STYLE_PLATFORMS else CANBUS.main_bus
 
   def _update_lka_latch_state(self, CS):
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SHARK, CAR.BYD_SEALION7):
@@ -154,7 +154,7 @@ class CarController(CarControllerBase):
         )
       )
 
-      if self.CP.openpilotLongitudinalControl:
+      if self.CP.carFingerprint in BYD_OP_LONG_PLATFORMS and self.CP.openpilotLongitudinalControl:
         long_active = CC.enabled and not CS.out.gasPressed
         brake_hold = CS.out.standstill and actuators.accel < 0
         can_sends.append(create_accel_command(self.packer, actuators.accel, long_active, self.accel_mult, brake_hold))
