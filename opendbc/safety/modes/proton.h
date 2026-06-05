@@ -4,6 +4,7 @@
 
 static uint8_t proton_crc8_lut_8h2f[256];
 static uint8_t proton_acc_tx_block_frames = 0U;
+static uint8_t proton_lka_tx_block_frames = 0U;
 static uint8_t proton_pcm_stock_off_count = 0U;
 static bool proton_pcm_saw_stock_engaged = false;
 
@@ -16,7 +17,7 @@ static bool proton_pcm_saw_stock_engaged = false;
 #define PROTON_WHEEL_SPEED     0x122U  // 290
 #define PROTON_MAX_STEER_SEEN  599
 
-#define PROTON_ACC_TX_BLOCK_MAX 1U
+#define PROTON_ACC_TX_BLOCK_MAX 3U
 // ~100 ms at nominal 50 Hz ACC_CMD before treating stock cruise as disengaged (avoids brief bus glitches).
 #define PROTON_PCM_DISENGAGE_FRAMES 5U
 
@@ -116,6 +117,9 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
     if (steer_cmd > (uint32_t)PROTON_MAX_STEER_SEEN) {
       violation = true;
     }
+
+    // After device sends LKAS, block camera LKA for one short step (stops both sources clashing).
+    proton_lka_tx_block_frames = PROTON_ACC_TX_BLOCK_MAX;
   }
 
   if (addr == (int)PROTON_ACC_CMD) {
@@ -139,13 +143,17 @@ static bool proton_fwd_hook(int bus_num, int addr) {
   if (bus_num == 0) {
     block = false;
   } else if (bus_num == 2) {
-    bool is_lkas_msg = (addr == (int)PROTON_ADAS_LKAS);
+    // Block camera LKA only for the brief window after device LKAS transmit; then allow stock again.
+    bool is_lka_msg = (addr == (int)PROTON_ADAS_LKAS) && (proton_lka_tx_block_frames > 0U);
+    if ((addr == (int)PROTON_ADAS_LKAS) && (proton_lka_tx_block_frames > 0U)) {
+      proton_lka_tx_block_frames--;
+    }
     // Block camera ACC only for the brief window after device ACC_CMD transmit; then allow stock again.
     bool is_acc_msg = (addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U);
     if ((addr == (int)PROTON_ACC_CMD) && (proton_acc_tx_block_frames > 0U)) {
       proton_acc_tx_block_frames--;
     }
-    block = is_lkas_msg || is_acc_msg;
+    block = is_lka_msg || is_acc_msg;
   } else {
     /* no action */
   }
@@ -158,12 +166,13 @@ static safety_config proton_init(uint16_t param) {
   ignore_ignition_line_sticky = ignore_ignition_line;
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
   proton_acc_tx_block_frames = 0U;
+  proton_lka_tx_block_frames = 0U;
   proton_pcm_stock_off_count = 0U;
   proton_pcm_saw_stock_engaged = false;
   controls_allowed = false;
 
   static const CanMsg PROTON_TX_MSGS[] = {
-    {PROTON_ADAS_LKAS, 0, 8, .check_relay = true},
+    {PROTON_ADAS_LKAS, 0, 8, .check_relay = true, .disable_static_blocking = true},
     {PROTON_ACC_CMD, 0, 8, .check_relay = true, .disable_static_blocking = true},
     {PROTON_ACC_BUTTONS, 2, 8, .check_relay = false},
   };
