@@ -14,7 +14,6 @@ from opendbc.car.dnga.dngacan import (
   create_hud,
   dnga_buttons,
 )
-from opendbc.car.lateral import apply_driver_steer_torque_limits
 from opendbc.car.dnga.values import BRAKE_SCALE, DBC, SNG_CAR, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 
@@ -58,6 +57,25 @@ def psd_brake(apply_brake, last_pump):
   pump = rate_limit(pump, last_pump, -0.1, 0.1)
   brake_req = int(apply_brake >= BRAKE_THRESHOLD)
   return pump, brake_req, pump
+
+
+def apply_steer_torque_limits(apply_torque: int, apply_torque_last: int, driver_torque: float, blinker_on: bool, LIMITS) -> int:
+  # Keep release_ka2 DNGA behavior: reduce authority while blinker is active.
+  reduced_torque_mult = 10 if blinker_on else 1.5
+  driver_max_torque = 255 + driver_torque * reduced_torque_mult
+  driver_min_torque = -255 - driver_torque * reduced_torque_mult
+  max_steer_allowed = max(min(255, driver_max_torque), 0)
+  min_steer_allowed = min(max(-255, driver_min_torque), 0)
+  apply_torque = np.clip(apply_torque, min_steer_allowed, max_steer_allowed)
+
+  if apply_torque_last > 0:
+    apply_torque = np.clip(apply_torque, max(apply_torque_last - LIMITS.STEER_DELTA_DOWN, -LIMITS.STEER_DELTA_UP),
+                           apply_torque_last + LIMITS.STEER_DELTA_UP)
+  else:
+    apply_torque = np.clip(apply_torque, apply_torque_last - LIMITS.STEER_DELTA_UP,
+                           min(apply_torque_last + LIMITS.STEER_DELTA_DOWN, LIMITS.STEER_DELTA_UP))
+
+  return int(round(float(apply_torque)))
 
 
 class CarController(CarControllerBase):
@@ -142,10 +160,12 @@ class CarController(CarControllerBase):
     lat_active = CC.latActive
     actuators = CC.actuators
     hud_control = CC.hudControl
+    is_blinker_on = CS.out.leftBlinker != CS.out.rightBlinker
 
-    new_steer = int(round(actuators.torque * self.params.STEER_MAX))
-    apply_steer = apply_driver_steer_torque_limits(
-      new_steer, self.last_steer, 0, self.params
+    steer_cmd = float(getattr(actuators, "steer", actuators.torque))
+    new_steer = int(round(steer_cmd * self.params.STEER_MAX))
+    apply_steer = apply_steer_torque_limits(
+      new_steer, self.last_steer, CS.out.steeringTorqueEps, is_blinker_on, self.params
     )
 
     stock_brake_mag = float(getattr(CS, "stock_brake_mag", 0.0))
@@ -212,6 +232,8 @@ class CarController(CarControllerBase):
 
     self.last_steer = apply_steer
     new_actuators = actuators.as_builder()
+    if hasattr(new_actuators, "steer"):
+      new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.torque = apply_steer / self.params.STEER_MAX
     new_actuators.torqueOutputCan = apply_steer
     new_actuators.accel = acceleration
