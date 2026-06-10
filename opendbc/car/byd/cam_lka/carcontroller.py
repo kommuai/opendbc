@@ -3,7 +3,7 @@ import numpy as np
 
 from opendbc.can.packer import CANPacker
 
-from opendbc.car.byd.bydcan import (
+from opendbc.car.byd.cam_lka.bydcan import (
   create_accel_command,
   create_can_steer_command,
   create_lkas_hud,

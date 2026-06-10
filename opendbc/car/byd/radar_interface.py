@@ -7,7 +7,7 @@ from opendbc.car import Bus
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import RadarInterfaceBase
 from opendbc.car.structs import RadarData
-from opendbc.car.byd.values import CANBUS, DBC
+from opendbc.car.byd.values import CANBUS, DBC, PLATFORM_MPC_LKA
 
 RADAR_START_ADDR = 0x280
 RADAR_MSG_COUNT = 10
@@ -64,8 +64,11 @@ class RadarInterface(RadarInterfaceBase):
 
     # Ego speed on PT bus for vRel = v_lead_radar - v_ego (same wheel scaling as CarState)
     self.speed_cp = None
-    if Bus.pt in DBC[CP.carFingerprint]:
-      self.speed_cp = CANParser(DBC[CP.carFingerprint][Bus.pt], [("WHEEL_SPEED", 50)], CANBUS.main_bus)
+    if not CP.radarUnavailable and Bus.pt in DBC[CP.carFingerprint]:
+      if CP.carFingerprint in PLATFORM_MPC_LKA:
+        self.speed_cp = CANParser(DBC[CP.carFingerprint][Bus.pt], [("CARSPEED", 50)], CANBUS.main_bus)
+      else:
+        self.speed_cp = CANParser(DBC[CP.carFingerprint][Bus.pt], [("WHEEL_SPEED", 50)], CANBUS.main_bus)
 
     # Track persistence: store last known position/velocity for disappeared tracks
     # This helps match reappearing tracks to their previous track IDs
@@ -76,6 +79,9 @@ class RadarInterface(RadarInterfaceBase):
   def _ego_speed_accel(self) -> tuple[float, float]:
     if self.speed_cp is None:
       return 0.0, 0.0
+    if self.CP.carFingerprint in PLATFORM_MPC_LKA:
+      speed_raw = int(self.speed_cp.vl["CARSPEED"]["CarDisplaySpeed"])
+      return float(speed_raw * CV.KPH_TO_MS), 0.0
     vl = self.speed_cp.vl["WHEEL_SPEED"]
     fl = float(vl["WHEELSPEED_FL"])
     fr = float(vl["WHEELSPEED_FR"])

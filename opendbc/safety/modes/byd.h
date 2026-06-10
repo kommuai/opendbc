@@ -4,12 +4,15 @@
 
 // BYD (Atto 3, Seal, Sealion, etc.) - ported from panda safety
 #define BYD_STEERING_MODULE_ADAS 0x1E2U   // 482
+#define BYD_ACC_MPC_STATE        0x316U   // 790 mpc_lka LKAS command
+#define BYD_ACC_EPS_STATE        0x318U   // 792 mpc_lka EPS handshake
 #define BYD_ACC_CMD              0x32EU   // 814
 #define BYD_PCM_BUTTONS          0x3B0U   // 944
 #define BYD_STEERING_TORQUE      0x1FCU   // 508
 
 static bool byd_alt_engage = false;
 static bool byd_steering_torque_spoof = false;
+static bool byd_mpc_lka_engage = false;
 
 static void byd_rx_hook(const CANPacket_t *msg) {
   int bus = (int)msg->bus;
@@ -37,6 +40,19 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       UPDATE_VEHICLE_SPEED(speed);
     }
 
+    if (byd_mpc_lka_engage && (addr == 289)) {
+      uint16_t speed_raw = (uint16_t)(msg->data[0] | ((msg->data[1] & 0x0FU) << 8U));
+      float speed = ((float)speed_raw) * (1.0f / 3.6f);
+      vehicle_moving = SAFETY_ABS(speed) > 0.1f;
+      UPDATE_VEHICLE_SPEED(speed);
+    }
+
+    if (byd_mpc_lka_engage && (addr == (int)BYD_ACC_EPS_STATE)) {
+      int torque_motor = (int)(((msg->data[2] & 0x0FU) << 8U) | msg->data[1]);
+      torque_motor = to_signed(torque_motor, 12);
+      update_sample(&torque_meas, torque_motor);
+    }
+
     if (addr == 944) {
       bool set_pressed = (((msg->data[0] >> 3U) & 1U) != 0U);
       bool res_pressed = (((msg->data[0] >> 4U) & 1U) != 0U);
@@ -53,7 +69,13 @@ static void byd_rx_hook(const CANPacket_t *msg) {
     }
   }
 
-  if (byd_alt_engage) {
+  if (byd_mpc_lka_engage) {
+    if (addr == 813) {
+      uint8_t acc_state = (msg->data[2] >> 3) & 0x7U;
+      bool engaged = (acc_state == 3U) || (acc_state == 5U);
+      pcm_cruise_check(engaged);
+    }
+  } else if (byd_alt_engage) {
     if (addr == 813) {
       uint8_t state = (msg->data[5] >> 4) & 0xFU;
       bool engaged = (state == 3U) || (state == 5U) || (state == 6U) || (state == 7U);
@@ -70,6 +92,25 @@ static void byd_rx_hook(const CANPacket_t *msg) {
 static bool byd_tx_hook(const CANPacket_t *msg) {
   bool violation = false;
   int addr = (int)msg->addr;
+  int bus = (int)msg->bus;
+
+  if (byd_mpc_lka_engage && (bus == 0) && (addr == (int)BYD_ACC_MPC_STATE)) {
+    static const TorqueSteeringLimits BYD_MPC_LKA_STEERING_LIMITS = {
+      .max_torque = 300,
+      .max_rate_up = 9,
+      .max_rate_down = 9,
+      .max_torque_error = 80,
+      .max_rt_delta = 113,
+      .type = TorqueMotorLimited,
+    };
+    int desired_torque = (int)(((msg->data[3] & 0x07U) << 8U) | msg->data[2]);
+    desired_torque = to_signed(desired_torque, 11);
+    bool steer_req = (msg->data[3] >> 4) & 1U;
+    if (steer_torque_cmd_checks(desired_torque, steer_req, BYD_MPC_LKA_STEERING_LIMITS)) {
+      violation = true;
+    }
+    return !violation;
+  }
 
   if (addr == (int)BYD_STEERING_MODULE_ADAS) {
     int desired_angle = (GET_BYTES(msg, 3, 2) & 0xFFFFU);
@@ -116,6 +157,15 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
 
 static bool byd_fwd_hook(int bus_num, int addr) {
   bool block = false;
+
+  if (byd_mpc_lka_engage) {
+    if ((bus_num == 0) && (addr == (int)BYD_ACC_EPS_STATE)) {
+      block = true;
+    } else if ((bus_num == 2) && ((addr == (int)BYD_ACC_MPC_STATE) || (addr == (int)BYD_ACC_CMD))) {
+      block = true;
+    }
+    return block;
+  }
 
   if (bus_num == 0) {
     bool is_torque_msg = (addr == (int)BYD_STEERING_TORQUE);
@@ -168,6 +218,22 @@ static safety_config byd_init(uint16_t param) {
   } else if (param == 3U) {
     byd_alt_engage = true;
     byd_steering_torque_spoof = true;
+  } else if (param == 4U) {
+    static const CanMsg BYD_MPC_LKA_TX_MSGS[] = {
+      {0x316, 0, 8, .check_relay = true},   // ACC_MPC_STATE -> EPS
+      {0x318, 2, 8, .check_relay = false},  // ACC_EPS_STATE fake -> MPC
+    };
+    static RxCheck byd_rx_checks_mpc_lka[] = {
+      {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{289, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{834, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{944, 0, 8, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{792, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{813, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{790, 2, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    };
+    byd_mpc_lka_engage = true;
+    cfg = BUILD_SAFETY_CFG(byd_rx_checks_mpc_lka, BYD_MPC_LKA_TX_MSGS);
   } else {
     /* keep default cfg */
   }

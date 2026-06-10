@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntEnum, IntFlag
 
 from opendbc.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
 from opendbc.car.byd.angle_rate_limit import AngleRateLimit
@@ -9,8 +9,15 @@ from opendbc.car.docs_definitions import CarDocs, CarParts, CUSTOM_CAR_PARTS, Ca
 
 
 @dataclass
-class BYDPlatformConfig(PlatformConfig):
+class CamLkaPlatformConfig(PlatformConfig):
+  """482 STEERING_MODULE_ADAS + 790 LKAS_HUD_ADAS (byd_general_pt)."""
   dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("byd_general_pt", "byd_radar_fd"))
+
+
+@dataclass
+class MpcLkaPlatformConfig(PlatformConfig):
+  """790 ACC_MPC_STATE + 792 ACC_EPS_STATE (byd_han_dmev_2020)."""
+  dbc_dict: DbcDict = field(default_factory=lambda: dbc_dict("byd_han_dmev_2020", None))
 
 
 @dataclass
@@ -22,6 +29,20 @@ class CANBUS:
   main_bus = 0
   radar_bus = 1
   cam_bus = 2
+
+
+class BydFlags(IntFlag):
+  MPC_LKA = 1
+  # Flipped harness: ACC_HUD_ADAS + ACC_CMD on ESC bus 0; ACC_MPC_STATE alone on MPC bus 2.
+  ACC_ON_ESC = 2
+
+
+class LKASConfig(IntEnum):
+  DISABLE = 0
+  ALARM = 1
+  LKA = 2
+  ALARM_AND_LKA = 3
+
 
 BYD_SUPPORT_COMMON_FIELDS = {
   "acc_low_speed": True,
@@ -48,7 +69,7 @@ class Footnote(Enum):
 
 
 class CAR(Platforms):
-  BYD_ATTO3 = BYDPlatformConfig(
+  BYD_ATTO3 = CamLkaPlatformConfig(
     [BYDCarDocs(
       "BYD Atto 3 2023-26",
       "ALL",
@@ -59,7 +80,7 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2090.0, wheelbase=2.72, steerRatio=16.0),
   )
-  BYD_M6 = BYDPlatformConfig(
+  BYD_M6 = CamLkaPlatformConfig(
     [BYDCarDocs(
       "BYD M6 2024-26",
       "ALL",
@@ -70,7 +91,7 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2374.0, wheelbase=2.80, steerRatio=16.0),
   )
-  BYD_SONG_PLUS_DMI_21 = BYDPlatformConfig(
+  BYD_SONG_PLUS_DMI_21 = MpcLkaPlatformConfig(
     [BYDCarDocs(
       "BYD Song Plus DMI 2021",
       "ALL",
@@ -80,8 +101,9 @@ class CAR(Platforms):
       **BYD_SUPPORT_COMMON_FIELDS,
     )],
     CarSpecs(mass=1785.0, wheelbase=2.765, steerRatio=15.0),
+    flags=BydFlags.MPC_LKA | BydFlags.ACC_ON_ESC,
   )
-  BYD_SEAL = BYDPlatformConfig(
+  BYD_SEAL = CamLkaPlatformConfig(
     [
       BYDCarDocs(
         "BYD Seal 2024-26",
@@ -102,7 +124,7 @@ class CAR(Platforms):
     ],
     CarSpecs(mass=2180.0, wheelbase=2.92, steerRatio=16.0),
   )
-  BYD_SEALION7 = BYDPlatformConfig(
+  BYD_SEALION7 = CamLkaPlatformConfig(
     [BYDCarDocs(
       "BYD Sealion 7 2024-26",
       "ALL",
@@ -113,7 +135,7 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
   )
-  BYD_SHARK = BYDPlatformConfig(
+  BYD_SHARK = CamLkaPlatformConfig(
     [BYDCarDocs(
       "BYD Shark 2024-26",
       "ALL",
@@ -125,14 +147,24 @@ class CAR(Platforms):
     CarSpecs(mass=2710.0, wheelbase=3.26, steerRatio=16.0),
   )
 
-# Atto 3 / M6 / Song Plus DMI: shared PT+cam layout (byd_general_pt), Atto-style LKA latch on cam bus.
-BYD_ATTO_STYLE_PLATFORMS = (
+PLATFORM_CAM_LKA = (
   CAR.BYD_ATTO3,
   CAR.BYD_M6,
+  CAR.BYD_SEAL,
+  CAR.BYD_SEALION7,
+  CAR.BYD_SHARK,
+)
+
+PLATFORM_MPC_LKA = (
   CAR.BYD_SONG_PLUS_DMI_21,
 )
 
-# Openpilot longitudinal (ACC_CMD TX) on cam bus — not Song (stock ACC only for now).
+# Atto 3 / M6: cam_lka PT+cam layout, Atto-style LKA latch on cam bus.
+BYD_ATTO_STYLE_PLATFORMS = (
+  CAR.BYD_ATTO3,
+  CAR.BYD_M6,
+)
+
 BYD_OP_LONG_PLATFORMS = (
   CAR.BYD_ATTO3,
   CAR.BYD_M6,
@@ -144,13 +176,13 @@ ACCEL_MULT = defaultdict(
   {
     CAR.BYD_ATTO3: 26,
     CAR.BYD_M6: 26,
-    CAR.BYD_SONG_PLUS_DMI_21: 26,
     CAR.BYD_SEAL: 1,
     CAR.BYD_SEALION7: 1,
     CAR.BYD_SHARK: 1,
   },
 )
 HUD_MULTIPLIER = 1.12
+
 
 class CarControllerParams:
   STEER_ANGLE_MAX = 120.0  # deg
@@ -160,3 +192,20 @@ class CarControllerParams:
 
   def __init__(self, CP):
     pass
+
+
+class MpcLkaCarControllerParams:
+  """Torque LKAS limits for mpc_lka platforms (790 ACC_MPC_STATE path)."""
+  STEER_MAX = 300
+  STEER_DELTA_UP = 7
+  STEER_DELTA_DOWN = 10
+  STEER_DRIVER_ALLOWANCE = 68
+  STEER_DRIVER_MULTIPLIER = 3
+  STEER_DRIVER_FACTOR = 1
+  STEER_ERROR_MAX = 50
+  STEER_STEP = 2
+  STEER_SOFTSTART_STEP = 6
+  USE_STEERING_SPEED_LIMITER = False
+
+  def __init__(self, CP):
+    del CP

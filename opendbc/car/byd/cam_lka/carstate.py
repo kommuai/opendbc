@@ -3,9 +3,9 @@ import math
 from opendbc.can import CANDefine, CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
-from opendbc.car.byd.bydcan import pack_lkas_hud_status_passthrough
+from opendbc.car.byd.cam_lka.bydcan import pack_lkas_hud_status_passthrough
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.byd.values import DBC, CANBUS, HUD_MULTIPLIER, CAR, BYD_ATTO_STYLE_PLATFORMS, BYD_OP_LONG_PLATFORMS
+from opendbc.car.byd.values import DBC, CANBUS, HUD_MULTIPLIER, CAR, BYD_OP_LONG_PLATFORMS
 
 ButtonType = car.CarState.ButtonEvent.Type
 BYD_DISTANCE_TO_PERSONALITY = {
@@ -39,19 +39,9 @@ class CarState(CarStateBase):
     self.op_long = True
     self.distance_val = 1
 
-  def _read_lkas_healthy(self, cp_cam) -> bool:
-    # Song Plus DMI often has no 0x1E2 on bus 2; steering TX still uses STEERING_MODULE_ADAS.
-    if self.CP.carFingerprint == CAR.BYD_SONG_PLUS_DMI_21:
-      return True
-    return bool(cp_cam.vl["STEERING_MODULE_ADAS"]["EPS_OK"])
-
   def _select_long_parser(self, cp, cp_cam):
     if self.CP.carFingerprint in BYD_OP_LONG_PLATFORMS:
       self.op_long = True
-      return cp_cam
-    if self.CP.carFingerprint == CAR.BYD_SONG_PLUS_DMI_21:
-      # Stock ACC on cam bus; no openpilot ACC_CMD TX.
-      self.op_long = False
       return cp_cam
     self.op_long = False
     return cp
@@ -76,7 +66,7 @@ class CarState(CarStateBase):
     self.pt4 = cp_cam.vl["LKAS_HUD_ADAS"]["PT4"]
     self.pt5 = cp_cam.vl["LKAS_HUD_ADAS"]["PT5"]
     self.lkas_hud_status_passthrough = pack_lkas_hud_status_passthrough(self.abh, self.passthrough)
-    self.lkas_healthy = self._read_lkas_healthy(cp_cam)
+    self.lkas_healthy = bool(cp_cam.vl["STEERING_MODULE_ADAS"]["EPS_OK"])
     ret.lkaDisabled = (self.CP.carFingerprint == CAR.BYD_ATTO3) and (not self.lka_on)
 
     ret.brakeHoldActive = False
@@ -163,7 +153,7 @@ class CarState(CarStateBase):
     if hud_clears_latch or ret.brakePressed or acc_cmd_clears_latch:
       self.is_cruise_latch = False
 
-    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK, CAR.BYD_M6, CAR.BYD_SONG_PLUS_DMI_21):
+    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK, CAR.BYD_M6):
       cruise_state = parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"]
       ret.cruiseState.enabled = cruise_state in (3, 5, 6, 7)
     else:
@@ -218,8 +208,6 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in BYD_OP_LONG_PLATFORMS:
       signals.append(("ACC_CMD", 50))
-      signals.append(("ACC_HUD_ADAS", 50))
-    elif CP.carFingerprint == CAR.BYD_SONG_PLUS_DMI_21:
       signals.append(("ACC_HUD_ADAS", 50))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.cam_bus)
