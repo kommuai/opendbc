@@ -7,7 +7,7 @@ from opendbc.car import Bus
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import RadarInterfaceBase
 from opendbc.car.structs import RadarData
-from opendbc.car.byd.values import CANBUS, DBC, PLATFORM_MPC_LKA
+from opendbc.car.byd.values import CANBUS, DBC
 
 RADAR_START_ADDR = 0x280
 RADAR_MSG_COUNT = 10
