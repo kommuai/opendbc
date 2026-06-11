@@ -13,6 +13,7 @@
 static bool byd_alt_engage = false;
 static bool byd_steering_torque_spoof = false;
 static bool byd_mpc_lka_engage = false;
+static bool byd_relax_controls = false;
 
 static void byd_rx_hook(const CANPacket_t *msg) {
   int bus = (int)msg->bus;
@@ -86,6 +87,12 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       bool engaged = (msg->data[5] >> 4) & 1U;
       pcm_cruise_check(engaged);
     }
+  }
+
+  // SEAL platform (safetyParam 2): pcm_cruise_check only grants on ACC rising edge, so OP
+  // can enable while stock ACC is already active and never get controls_allowed.
+  if (byd_relax_controls) {
+    controls_allowed = true;
   }
 }
 
@@ -214,6 +221,7 @@ static safety_config byd_init(uint16_t param) {
     };
     byd_alt_engage = true;
     byd_steering_torque_spoof = true;
+    byd_relax_controls = true;
     cfg = BUILD_SAFETY_CFG(byd_rx_checks_alt, BYD_TX_MSGS);
   } else if (param == 3U) {
     byd_alt_engage = true;

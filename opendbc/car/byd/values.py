@@ -113,14 +113,14 @@ class CAR(Platforms):
         kommu_supported=True,
         **BYD_SUPPORT_COMMON_FIELDS,
       ),
-        BYDCarDocs(
+      BYDCarDocs(
         "BYD Dolphin 2023-26",
         "ALL",
         footnotes=[Footnote.LKC_ACC_STOCK],
         variant="All",
         kommu_supported=True,
         **BYD_SUPPORT_COMMON_FIELDS,
-      )
+      ),
     ],
     CarSpecs(mass=2180.0, wheelbase=2.92, steerRatio=16.0),
   )
