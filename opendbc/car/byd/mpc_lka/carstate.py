@@ -56,11 +56,15 @@ class CarState(CarStateBase):
     self.btn_acc_dist_inc = int(cp.vl["PCM_BUTTONS"]["BTN_AccDistanceIncrease"])
     self.btn_acc_dist_dec = int(cp.vl["PCM_BUTTONS"]["BTN_AccDistanceDecrease"])
 
-    speed_raw = int(cp.vl["CARSPEED"]["CarDisplaySpeed"])
-    ret.vEgoRaw = float(speed_raw * CV.KPH_TO_MS)
-    ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
+    # Song Plus flipped harness: wheel speed on bus 0 (byd_general_pt layout), not Han CARSPEED.
+    self.parse_wheel_speeds(ret,
+      cp.vl["WHEEL_SPEED"]["WHEELSPEED_FL"],
+      cp.vl["WHEEL_SPEED"]["WHEELSPEED_FR"],
+      cp.vl["WHEEL_SPEED"]["WHEELSPEED_BL"],
+      cp.vl["WHEEL_SPEED"]["WHEELSPEED_BR"],
+    )
     ret.vEgoCluster = ret.vEgo
-    ret.standstill = speed_raw == 0
+    ret.standstill = ret.vEgoRaw < 0.01
 
     can_gear = int(cp.vl["DRIVE_STATE"]["Gear"])
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
@@ -131,7 +135,7 @@ class CarState(CarStateBase):
   def get_can_parser(CP):
     signals = [
       ("EPS", 100),
-      ("CARSPEED", 50),
+      ("WHEEL_SPEED", 50),
       ("PEDAL", 50),
       ("EPB", 1),
       ("ACC_EPS_STATE", 50),

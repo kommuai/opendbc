@@ -6,7 +6,7 @@ from opendbc.car.byd.cam_lka.carstate import CarState as CamLkaCarState
 from opendbc.car.byd.mpc_lka.carcontroller import CarController as MpcLkaCarController
 from opendbc.car.byd.mpc_lka.carstate import CarState as MpcLkaCarState
 from opendbc.car.byd.radar_interface import RadarInterface
-from opendbc.car.byd.values import CAR, PLATFORM_MPC_LKA
+from opendbc.car.byd.values import CAR, PLATFORM_MPC_LKA, BydFlags
 
 
 class CarInterface(CarInterfaceBase):
@@ -49,6 +49,7 @@ class CarInterface(CarInterfaceBase):
     if candidate in PLATFORM_MPC_LKA:
       ret.steerControlType = car.CarParams.SteerControlType.torque
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
+      ret.flags |= int(BydFlags.MPC_LKA | BydFlags.ACC_ON_ESC)
       ret.safetyConfigs[0].safetyParam = 4
       ret.openpilotLongitudinalControl = False
       ret.radarUnavailable = True

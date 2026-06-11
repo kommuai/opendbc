@@ -48,6 +48,18 @@ BO_ 287 EPS: 5 XXX
 BO_ 289 CARSPEED: 8 XXX
  SG_ CarDisplaySpeed : 0|12@1+ (1,0) [0|255] "" XXX
 
+BO_ 496 WHEEL_SPEED: 8 XXX
+ SG_ FAULT_FR : 12|1@1+ (1,0) [0|1] "" XXX
+ SG_ FAULT_FL : 13|1@1+ (1,0) [0|1] "" XXX
+ SG_ FAULT_BR : 14|1@1+ (1,0) [0|1] "" XXX
+ SG_ FAULT_BL : 15|1@1+ (1,0) [0|1] "" XXX
+ SG_ WHEELSPEED_FL : 0|12@1+ (0.1,0) [0|281.4625] "km/h" XXX
+ SG_ WHEELSPEED_FR : 16|12@1+ (0.1,0) [0|281.4625] "km/h" XXX
+ SG_ WHEELSPEED_BL : 28|12@1+ (0.1,0) [0|281.4625] "km/h" XXX
+ SG_ WHEELSPEED_BR : 40|12@1+ (0.1,0) [0|281.4625] "km/h" XXX
+ SG_ COUNTER : 55|4@0+ (1,0) [0|15] "" XXX
+ SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
+
 BO_ 301 BCM: 8 XXX
  SG_ FrontLeftDoor : 0|1@0+ (1,0) [0|1] "" XXX
  SG_ FrontRightDoor : 1|1@0+ (1,0) [0|1] "" XXX

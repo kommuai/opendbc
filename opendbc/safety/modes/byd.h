@@ -41,13 +41,6 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       UPDATE_VEHICLE_SPEED(speed);
     }
 
-    if (byd_mpc_lka_engage && (addr == 289)) {
-      uint16_t speed_raw = (uint16_t)(msg->data[0] | ((msg->data[1] & 0x0FU) << 8U));
-      float speed = ((float)speed_raw) * (1.0f / 3.6f);
-      vehicle_moving = SAFETY_ABS(speed) > 0.1f;
-      UPDATE_VEHICLE_SPEED(speed);
-    }
-
     if (byd_mpc_lka_engage && (addr == (int)BYD_ACC_EPS_STATE)) {
       int torque_motor = (int)(((msg->data[2] & 0x0FU) << 8U) | msg->data[1]);
       torque_motor = to_signed(torque_motor, 12);
@@ -233,7 +226,7 @@ static safety_config byd_init(uint16_t param) {
     };
     static RxCheck byd_rx_checks_mpc_lka[] = {
       {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
-      {.msg = {{289, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{496, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
       {.msg = {{834, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
       {.msg = {{944, 0, 8, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
       {.msg = {{792, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
