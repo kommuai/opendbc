@@ -5,6 +5,7 @@ from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car import DT_CTRL, Bus, create_button_events
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.dnga.values import DBC, CANBUS, HYBRID_CAR
+import math
 
 HUD_MULTIPLIER = 1.04
 
@@ -254,7 +255,7 @@ class CarState(CarStateBase):
       ("BRAKE", 100),
       ("RIGHT_STALK", 33),
       ("METER_CLUSTER", 15),
-      ("BSM", 15),
+      ("BSM", math.nan),
       ("STEERING_MODULE", 100),
       ("EPS_SHAFT_TORQUE", 40),
       ("PCM_BUTTONS", 30),
