@@ -64,7 +64,7 @@ static void byd_rx_hook(const CANPacket_t *msg) {
   }
 
   if (byd_mpc_lka_engage) {
-    if (addr == 813) {
+    if ((bus == 0) && (addr == 813)) {
       uint8_t acc_state = (msg->data[2] >> 3) & 0x7U;
       bool engaged = (acc_state == 3U) || (acc_state == 5U);
       pcm_cruise_check(engaged);
@@ -82,8 +82,9 @@ static void byd_rx_hook(const CANPacket_t *msg) {
     }
   }
 
-  // SEAL platform (safetyParam 2): pcm_cruise_check only grants on ACC rising edge, so OP
-  // can enable while stock ACC is already active and never get controls_allowed.
+  // SEAL (safetyParam 2) and Song Plus MPC LKA (safetyParam 4): pcm_cruise_check only
+  // grants on ACC rising edge and safety_tick can clear controls_allowed while stock ACC
+  // stays engaged, so OP lateral TX gets blocked without relax_controls.
   if (byd_relax_controls) {
     controls_allowed = true;
   }
@@ -234,6 +235,7 @@ static safety_config byd_init(uint16_t param) {
       {.msg = {{790, 2, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     };
     byd_mpc_lka_engage = true;
+    byd_relax_controls = true;
     cfg = BUILD_SAFETY_CFG(byd_rx_checks_mpc_lka, BYD_MPC_LKA_TX_MSGS);
   } else {
     /* keep default cfg */

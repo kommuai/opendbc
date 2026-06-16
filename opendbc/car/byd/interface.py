@@ -52,8 +52,9 @@ class CarInterface(CarInterfaceBase):
       ret.flags |= int(BydFlags.MPC_LKA | BydFlags.ACC_ON_ESC)
       ret.safetyConfigs[0].safetyParam = 4
       ret.openpilotLongitudinalControl = False
+      ret.pcmCruise = True  # stock ACC rising edge triggers pcmEnable → lateral
       ret.radarUnavailable = True
-      ret.wheelSpeedFactor = 1.0
+      ret.wheelSpeedFactor = 0.66  # Song Plus wheel speed calibration (1.0 was ~40-50% high vs GPS)
       ret.minSteerSpeed = 0.0
     elif candidate in (CAR.BYD_ATTO3, CAR.BYD_M6):
       ret.steerControlType = car.CarParams.SteerControlType.angle

@@ -207,7 +207,7 @@ def main():
   safety_ok = all(r.safety_tick_invalid <= 5 for r in results)
   acc_real = any(r.cruise_avail_pct > 1 for r in results)
   acc_syn = syn.cruise_avail_pct > 90 and syn.cruise_enabled_pct > 50
-  ctrl_syn = syn.safety_controls_allowed_pct > 1
+  ctrl_syn = syn.safety_controls_allowed_pct > 40
 
   print('\n=== ENGAGE READINESS ===')
   checks = [
