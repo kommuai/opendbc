@@ -71,7 +71,7 @@ def create_acc_cmd(packer, accel_cmd, long_active, gas_override, car_standstill,
       4 if (not long_active or cmd < 0) else 6 if cmd > 0 else 1
     ),
 
-    "NOT_MOVE_BLOCK": stock_values["NOT_MOVE_BLOCK"], # If forced to 0, the car stays at standstill and the set speed changes.
+    "ACCEL_ALLOWED": 0 if gas_override else stock_values["ACCEL_ALLOWED"] if car_standstill or not long_active else 1, # 0 blocks ACC acceleration
     "BRAKE_ENGAGED": stock_values["BRAKE_ENGAGED"], # Not sure, so pass stock value.
     "RISING_ENGAGE": stock_values["RISING_ENGAGE"], # Becomes True then False after resume button presses.
   }
