@@ -197,7 +197,7 @@ class CarState(CarStateBase):
     ret.cruiseState.standstill = False
     ret.cruiseState.nonAdaptive = False
     ret.cruiseState.enabled = (
-      cp_cam.vl["ACC_CMD"]["ACC_REQ"] + cp_cam.vl["ACC_CMD"]["STANDSTILL_REQ"] + cp_cam.vl["ACC_CMD"]["NOT_MOVE_BLOCK"]
+      cp_cam.vl["ACC_CMD"]["ACC_REQ"] + cp_cam.vl["ACC_CMD"]["STANDSTILL_REQ"] + cp_cam.vl["ACC_CMD"]["ACCEL_ALLOWED"]
     ) > 1
 
     ret.leftBlinker = bool(cp.vl["LEFT_STALK"]["LEFT_SIGNAL"])
