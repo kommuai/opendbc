@@ -57,6 +57,8 @@ non_tested_cars = [
 
   # Chery (no comma.ai test route yet)
   CHERY.CHERY_JAECOO_J7_PHEV,
+  CHERY.CHERY_TIGGO_8_PRO,
+  CHERY.CHERY_OMODA_5,
 
   # Geely (bootstrap fingerprint; replace with full bus-0 capture before on-road)
   GEELY.GEELY_GALAXY_E5,

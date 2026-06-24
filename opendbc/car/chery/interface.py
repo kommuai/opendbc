@@ -4,6 +4,7 @@ from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.chery.carcontroller import CarController
 from opendbc.car.chery.carstate import CarState
 from opendbc.car.chery.radar_interface import RadarInterface
+from opendbc.car.chery.values import CAR
 
 
 class CarInterface(CarInterfaceBase):
@@ -13,7 +14,7 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, alpha_long, is_release, docs):
-    del candidate, fingerprint, car_fw, alpha_long, is_release, docs
+    del fingerprint, car_fw, alpha_long, is_release, docs
     ret.brand = "chery"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.chery)]
     ret.steerControlType = car.CarParams.SteerControlType.angle
@@ -25,4 +26,6 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = False
     ret.radarUnavailable = True
     ret.enableBsm = True
+    if candidate == CAR.CHERY_OMODA_5:
+      ret.safetyConfigs[0].safetyParam = 1
     return ret

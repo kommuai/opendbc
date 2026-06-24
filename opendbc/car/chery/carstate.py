@@ -6,9 +6,13 @@ from opendbc.car.interfaces import CarStateBase
 from opendbc.car.chery.values import (
   CAM_PARSER_MSGS,
   CANBUS,
+  CAR,
   DBC,
   FOLLOW_RAW_TO_PERSONALITY,
   GEAR_MAP,
+  OMODA_CAM_PARSER_MSGS,
+  OMODA_GEAR_MAP,
+  OMODA_PT_PARSER_MSGS,
   PT_PARSER_MSGS,
   STEER_RELATED_INTERVENTION_RAW_MIN,
 )
@@ -44,6 +48,7 @@ class CarState(CarStateBase):
     cp, cam = can_parsers[Bus.pt], can_parsers[Bus.cam]
     ret = car.CarState.new_message()
     ret.personality = -1
+    omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
 
     # --- Wheels / pedals / gear ---
     self.parse_wheel_speeds(
@@ -66,9 +71,15 @@ class CarState(CarStateBase):
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
 
     ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
-    ret.brake = cp.vl["BRAKE_PEDAL"]["BRAKE_PRESSURE"]
-    ret.brakePressed = ret.brake > 0.01
-    ret.gearShifter = self.parse_gear_shifter(GEAR_MAP.get(int(cp.vl["TRANSMISSION"]["GEAR"])))
+    if omoda:
+      brake = float(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"])
+      ret.brake = brake if brake <= 1.0 else 0.0
+      ret.brakePressed = ret.brake > 0.01
+      ret.gearShifter = self.parse_gear_shifter(OMODA_GEAR_MAP.get(int(cp.vl["OMODA_TRANSMISSION"]["GEAR"])))
+    else:
+      ret.brake = cp.vl["BRAKE_PEDAL"]["BRAKE_PRESSURE"]
+      ret.brakePressed = ret.brake > 0.01
+      ret.gearShifter = self.parse_gear_shifter(GEAR_MAP.get(int(cp.vl["TRANSMISSION"]["GEAR"])))
 
     # --- Body / stalk ---
     stalk = cp.vl["STALK"]
@@ -82,8 +93,8 @@ class CarState(CarStateBase):
     )
     ret.espDisabled = False
 
-    # --- Cruise / HUD (from camera bus) ---
-    hud = cam.vl["HUD"]
+    # --- Cruise / HUD ---
+    hud = cp.vl["HUD"] if omoda else cam.vl["HUD"]
     self.cam_hud = {f: hud[f] for f in _CAM_HUD_FIELDS}
     ret.stockAeb = bool(hud["AEB"])
     ret.stockFcw = bool(hud["PCW"])
@@ -123,8 +134,10 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can_parser(CP):
-    return CANParser(DBC[CP.carFingerprint]["pt"], PT_PARSER_MSGS, CANBUS.main_bus)
+    msgs = OMODA_PT_PARSER_MSGS if CP.carFingerprint == CAR.CHERY_OMODA_5 else PT_PARSER_MSGS
+    return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)
 
   @staticmethod
   def get_cam_can_parser(CP):
-    return CANParser(DBC[CP.carFingerprint]["pt"], CAM_PARSER_MSGS, CANBUS.cam_bus)
+    msgs = OMODA_CAM_PARSER_MSGS if CP.carFingerprint == CAR.CHERY_OMODA_5 else CAM_PARSER_MSGS
+    return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.cam_bus)

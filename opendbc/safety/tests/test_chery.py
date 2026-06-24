@@ -12,10 +12,11 @@ class TestCherySafety(unittest.TestCase):
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
   # LANE_KEEP, LKAS_INFO(0), LKAS_INFO(2), HUD, EPS(2), PCM(0), PCM(2).
   TX_MSGS = [[0x345, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
+  SAFETY_PARAM = 0
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
-    self.safety.set_safety_hooks(CarParams.SafetyModel.chery, 1)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.chery, self.SAFETY_PARAM)
     self.safety.init_tests()
     self.packer = CANPackerSafety("chery_general_pt")
 
@@ -25,10 +26,10 @@ class TestCherySafety(unittest.TestCase):
   def _tx(self, msg):
     return self.safety.safety_tx_hook(msg)
 
-  def _hud(self, cruise_state: int):
+  def _hud(self, cruise_state: int, bus: int = 2):
     return self.packer.make_can_msg_safety(
       "HUD",
-      2,
+      bus,
       {
         "AEB": 0,
         "CANCEL_CRUISE_UNCERTAIN": 0,
@@ -191,6 +192,21 @@ class TestCherySafety(unittest.TestCase):
                        msg=f"PT 0x{addr:x} should be blocked PT->cam when engaged")
     self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4),
                      msg="STEER_RELATED must always forward")
+
+
+class TestCheryOmodaSafety(TestCherySafety):
+  SAFETY_PARAM = 1
+
+  def test_controls_allowed_follows_hud_cruise_state(self):
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._hud(1, 0))
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._hud(3, 0))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._hud(3, 2))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._hud(1, 0))
+    self.assertFalse(self.safety.get_controls_allowed())
 
 
 if __name__ == "__main__":

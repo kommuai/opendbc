@@ -9,6 +9,7 @@
 #define CHERY_LKAS_INFO    0x394U
 #define CHERY_HUD          0x387U
 #define CHERY_PCM_BUTTONS  0x360U
+#define CHERY_OMODA_SAFETY_PARAM  1U
 // PT-side messages that carry driver-torque / steering-input info. We block them
 // from forwarding to the camera bus *while controls_allowed* (cruise engaged) and
 // feed the camera our own spoofed copies instead, so the hands-on-wheel detector
@@ -19,13 +20,16 @@
 // True when FL/FR wheel speeds are near zero; used to pre-arm PT->cam torque blocks
 // while parked (matches CarController cam_spoof at standstill).
 static bool chery_vehicle_stopped = true;
+static bool chery_omoda_safety = false;
 
 static void chery_rx_hook(const CANPacket_t *msg) {
-  // HUD CRUISE_STATE on camera leg (panda bus 2): DBC CM "3 is ENABLE" — same as CarState.cruiseState.enabled.
-  if ((msg->addr == CHERY_HUD) && (msg->bus == 2U) && (GET_LEN(msg) >= 5U)) {
-    const uint8_t cruise_state = (uint8_t)((msg->data[4] >> 2) & 0x3U);
-    const bool cruise_engaged = (cruise_state == 3U);
-    pcm_cruise_check(cruise_engaged);
+  if ((msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
+    const bool hud_bus_ok = (msg->bus == 2U) || (chery_omoda_safety && (msg->bus == 0U));
+    if (hud_bus_ok) {
+      const uint8_t cruise_state = (uint8_t)((msg->data[4] >> 2) & 0x3U);
+      const bool cruise_engaged = (cruise_state == 3U);
+      pcm_cruise_check(cruise_engaged);
+    }
   }
 
   // WHEEL_FL 7|16@0+ and WHEEL_FR 23|16@0+, scale 0.01 kph — same threshold as CarState standstill.
@@ -41,8 +45,12 @@ static bool chery_cam_torque_spoof_active(void) {
 }
 
 static safety_config chery_init(uint16_t param) {
-  static RxCheck chery_rx_checks[] = {
+  static RxCheck chery_rx_checks_j7[] = {
     {.msg = {{CHERY_HUD, 2U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    {.msg = {{CHERY_WHEELSPEED_2, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+  };
+  static RxCheck chery_rx_checks_omoda[] = {
+    {.msg = {{CHERY_HUD, 0U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{CHERY_WHEELSPEED_2, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static const CanMsg CHERY_TX_MSGS[] = {
@@ -54,9 +62,12 @@ static safety_config chery_init(uint16_t param) {
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
   };
-  SAFETY_UNUSED(param);
   controls_allowed = false;
-  return BUILD_SAFETY_CFG(chery_rx_checks, CHERY_TX_MSGS);
+  chery_omoda_safety = (param == CHERY_OMODA_SAFETY_PARAM);
+  if (chery_omoda_safety) {
+    return BUILD_SAFETY_CFG(chery_rx_checks_omoda, CHERY_TX_MSGS);
+  }
+  return BUILD_SAFETY_CFG(chery_rx_checks_j7, CHERY_TX_MSGS);
 }
 
 static bool chery_tx_hook(const CANPacket_t *msg) {
