@@ -101,3 +101,8 @@ def create_fake_318(packer, esc_msg: dict, faketorque: float, lkas_reqprepare: b
   data = packer.make_can_msg("ACC_EPS_STATE", CANBUS.cam_bus, values)[1]
   values["CheckSum"] = mpc_lka_checksum(0xAF, data)
   return packer.make_can_msg("ACC_EPS_STATE", CANBUS.cam_bus, values)
+
+
+def send_resume_button(packer):
+  values = {"BTN_AccUpDown_Cmd": 3}
+  return packer.make_can_msg("PCM_BUTTONS", CANBUS.main_bus, values)

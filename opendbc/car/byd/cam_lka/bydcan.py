@@ -133,6 +133,17 @@ def send_buttons(packer, state, cancel, bus):
   return packer.make_can_msg("PCM_BUTTONS", bus, values)
 
 
+def send_resume_button(packer, bus):
+  values = {
+    "SET_BTN": 0,
+    "RES_BTN": 1,
+    "SET_ME_1_1": 1,
+    "SET_ME_1_2": 1,
+    "ACC_ON_BTN": 0,
+  }
+  return packer.make_can_msg("PCM_BUTTONS", bus, values)
+
+
 # Module-level state for realistic torque ramp-up simulation
 _torque_spoof_state = {
   "current_torque_offset": 0.0,

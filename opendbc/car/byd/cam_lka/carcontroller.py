@@ -9,7 +9,9 @@ from opendbc.car.byd.cam_lka.bydcan import (
   create_lkas_hud,
   create_steering_torque_spoof_camera,
   send_buttons,
+  send_resume_button,
 )
+from opendbc.car.byd.sng_helper import SngHelper
 from opendbc.car.byd.values import DBC, CAR, ACCEL_MULT, CANBUS, BYD_ATTO_STYLE_PLATFORMS, BYD_OP_LONG_PLATFORMS
 from opendbc.car.byd.values import CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
@@ -21,7 +23,6 @@ MAX_STEER_ANGLE_OFFSET_DEG = 10
 # Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
 STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
 LKA_COOLDOWN_MIN_FRAMES = 30
-BUTTON_KEEPALIVE_FRAMES = 100
 SPOOF_DURATION_FRAMES = 50
 SPOOF_CYCLE_FRAMES = 150
 
@@ -46,6 +47,8 @@ class CarController(CarControllerBase):
     self.prev_res_press = False
     self.lka_latched = False
     self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in BYD_ATTO_STYLE_PLATFORMS else CANBUS.main_bus
+
+    self.sng = SngHelper.create(CP)
 
   def _update_lka_latch_state(self, CS):
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SHARK, CAR.BYD_SEALION7):
@@ -158,9 +161,8 @@ class CarController(CarControllerBase):
         long_active = CC.enabled and not CS.out.gasPressed
         brake_hold = CS.out.standstill and actuators.accel < 0
         can_sends.append(create_accel_command(self.packer, actuators.accel, long_active, self.accel_mult, brake_hold))
-      else:
-        if CS.out.standstill and CC.enabled and (self.frame % BUTTON_KEEPALIVE_FRAMES == 0):
-          can_sends.append(send_buttons(self.packer, 1, 0, self.button_send_bus))
+
+    SngHelper.try_append_resume(self.sng, self.frame, CC, CS, CS.res_btn, can_sends, lambda: send_resume_button(self.packer, self.button_send_bus))
 
     if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       cycle_position = self.frame % SPOOF_CYCLE_FRAMES

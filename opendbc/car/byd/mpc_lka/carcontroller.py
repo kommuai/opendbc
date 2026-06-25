@@ -1,7 +1,8 @@
 import numpy as np
 
 from opendbc.can.packer import CANPacker
-from opendbc.car.byd.mpc_lka.bydcan import create_fake_318, create_steering_control
+from opendbc.car.byd.mpc_lka.bydcan import create_fake_318, create_steering_control, send_resume_button
+from opendbc.car.byd.sng_helper import SngHelper
 from opendbc.car.byd.values import DBC, MpcLkaCarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_driver_steer_torque_limits
@@ -27,6 +28,8 @@ class CarController(CarControllerBase):
     self.steer_rate_lim_active = False
     self.steer_rate_lim = 1.0
     self.first_start = True
+
+    self.sng = SngHelper.create(CP)
 
   def update(self, CC, CS, now_nanos):
     del now_nanos
@@ -123,6 +126,8 @@ class CarController(CarControllerBase):
         True,
         self.eps_fake318_counter,
       ))
+
+    SngHelper.try_append_resume(self.sng, self.frame, CC, CS, CS.btn_acc_set_reset == 3, can_sends, lambda: send_resume_button(self.packer))
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.torque = self.apply_torque_last / self.params.STEER_MAX
