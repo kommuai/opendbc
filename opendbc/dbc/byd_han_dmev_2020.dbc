@@ -70,6 +70,13 @@ BO_ 301 BCM: 8 XXX
  SG_ BrakeLight : 8|1@0+ (1,0) [0|1] "" XXX
  SG_ FrontRightPassengerSeatBelt : 55|1@0+ (1,0) [0|1] "" XXX
 
+BO_ 660 METER_CLUSTER: 8 XXX
+ SG_ SEATBELT_DRIVER : 17|1@0+ (1,0) [0|1] "" XXX
+ SG_ BACK_RIGHT_DOOR : 7|1@0+ (1,0) [0|1] "" XXX
+ SG_ FRONT_LEFT_DOOR : 3|1@0+ (1,0) [0|1] "" XXX
+ SG_ FRONT_RIGHT_DOOR : 1|1@1+ (1,0) [0|511] "" XXX
+ SG_ BACK_LEFT_DOOR : 5|1@1+ (1,0) [0|511] "" XXX
+
 BO_ 307 STALKS: 8 XXX
  SG_ FrontFogLight : 0|1@0+ (1,0) [0|1] "" XXX
  SG_ LightsOn : 1|1@1+ (1,0) [0|1] "" XXX

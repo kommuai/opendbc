@@ -5,7 +5,7 @@ from opendbc.can import CANDefine, CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
-from opendbc.car.byd.values import DBC, CANBUS, CAR, BydFlags, LKASConfig
+from opendbc.car.byd.values import DBC, CANBUS, CAR, BydFlags, HUD_MULTIPLIER, LKASConfig
 
 ButtonType = car.CarState.ButtonEvent.Type
 
@@ -63,7 +63,7 @@ class CarState(CarStateBase):
       cp.vl["WHEEL_SPEED"]["WHEELSPEED_BL"],
       cp.vl["WHEEL_SPEED"]["WHEELSPEED_BR"],
     )
-    ret.vEgoCluster = ret.vEgo
+    ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
     ret.standstill = ret.vEgoRaw < 0.01
 
     can_gear = int(cp.vl["DRIVE_STATE"]["Gear"])
@@ -95,7 +95,7 @@ class CarState(CarStateBase):
       cp.vl["BCM"]["RearLeftDoor"],
       cp.vl["BCM"]["RearRightDoor"],
     ])
-    ret.seatbeltUnlatched = cp.vl["BCM"]["DriverSeatBeltFasten"] != 1
+    ret.seatbeltUnlatched = cp.vl["METER_CLUSTER"]["SEATBELT_DRIVER"] == 0
 
     ret.cruiseState.available = lkas_main_sw_on and lkas_config_is_acc_on and lkas_hud_acc_on1
     ret.cruiseState.enabled = self.acc_state in (3, 5)
@@ -142,6 +142,7 @@ class CarState(CarStateBase):
       ("DRIVE_STATE", 50),
       ("STALKS", 20),
       ("BCM", 20),
+      ("METER_CLUSTER", 20),
       ("PCM_BUTTONS", 20),
     ]
 
