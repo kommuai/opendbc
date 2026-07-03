@@ -4,7 +4,12 @@ from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.chery.carcontroller import CarController
 from opendbc.car.chery.carstate import CarState
 from opendbc.car.chery.radar_interface import RadarInterface
-from opendbc.car.chery.values import CAR
+from opendbc.car.chery.values import (
+  CAR,
+  CHERY_OMODA_NO_TORQUE_SPOOF_PARAM,
+  CHERY_OMODA_SAFETY_PARAM,
+  OMODA_DISABLE_TORQUE_SPOOF,
+)
 
 
 class CarInterface(CarInterfaceBase):
@@ -27,5 +32,7 @@ class CarInterface(CarInterfaceBase):
     ret.radarUnavailable = True
     ret.enableBsm = True
     if candidate == CAR.CHERY_OMODA_5:
-      ret.safetyConfigs[0].safetyParam = 1
+      ret.safetyConfigs[0].safetyParam = CHERY_OMODA_SAFETY_PARAM
+      if OMODA_DISABLE_TORQUE_SPOOF:
+        ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
     return ret

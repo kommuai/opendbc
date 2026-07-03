@@ -209,5 +209,36 @@ class TestCheryOmodaSafety(TestCherySafety):
     self.assertFalse(self.safety.get_controls_allowed())
 
 
+class TestCheryOmodaNoTorqueSpoofSafety(TestCheryOmodaSafety):
+  SAFETY_PARAM = 3
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x387))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
+
+  def test_fwd_blocks_pt_torque_when_engaged(self):
+    self.test_fwd_allows_pt_torque_when_spoof_disabled()
+
+  def test_fwd_allows_pt_torque_when_spoof_disabled(self):
+    self._rx(self._wheel_speed(0.0, 0.0))
+    self.safety.set_controls_allowed(False)
+    for addr in (0x394, 0x1D3):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd to cam when spoof disabled")
+
+    self._rx(self._wheel_speed(30.0, 30.0))
+    self.safety.set_controls_allowed(True)
+    for addr in (0x394, 0x1D3):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd to cam when spoof disabled")
+
+  def test_fwd_allows_cam_lkas_to_pt_when_spoof_disabled(self):
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x387))
+
+
 if __name__ == "__main__":
   unittest.main()

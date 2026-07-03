@@ -9,7 +9,8 @@
 #define CHERY_LKAS_INFO    0x394U
 #define CHERY_HUD          0x387U
 #define CHERY_PCM_BUTTONS  0x360U
-#define CHERY_OMODA_SAFETY_PARAM  1U
+#define CHERY_OMODA_SAFETY_PARAM          1U
+#define CHERY_OMODA_NO_TORQUE_SPOOF_PARAM 2U
 // PT-side messages that carry driver-torque / steering-input info. We block them
 // from forwarding to the camera bus *while controls_allowed* (cruise engaged) and
 // feed the camera our own spoofed copies instead, so the hands-on-wheel detector
@@ -21,6 +22,7 @@
 // while parked (matches CarController cam_spoof at standstill).
 static bool chery_vehicle_stopped = true;
 static bool chery_omoda_safety = false;
+static bool chery_omoda_no_torque_spoof = false;
 
 static void chery_rx_hook(const CANPacket_t *msg) {
   if ((msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
@@ -63,7 +65,8 @@ static safety_config chery_init(uint16_t param) {
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
   };
   controls_allowed = false;
-  chery_omoda_safety = (param == CHERY_OMODA_SAFETY_PARAM);
+  chery_omoda_safety = (param & CHERY_OMODA_SAFETY_PARAM) != 0U;
+  chery_omoda_no_torque_spoof = (param & CHERY_OMODA_NO_TORQUE_SPOOF_PARAM) != 0U;
   if (chery_omoda_safety) {
     return BUILD_SAFETY_CFG(chery_rx_checks_omoda, CHERY_TX_MSGS);
   }
@@ -80,9 +83,16 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   // left to forward — the cluster uses it for the LKA-engaged indicator and
   // blocking the whole frame caused a meter error in testing.
   if (bus_num == 2) {
-    return (addr == (int)CHERY_LANE_KEEP) ||
-           (addr == (int)CHERY_LKAS_INFO) ||
-           (addr == (int)CHERY_HUD);
+    if (addr == (int)CHERY_LANE_KEEP) {
+      return true;
+    }
+    if ((addr == (int)CHERY_HUD) && !chery_omoda_safety) {
+      return true;
+    }
+    if ((addr == (int)CHERY_LKAS_INFO) && !chery_omoda_no_torque_spoof) {
+      return true;
+    }
+    return false;
   }
   // PT -> cam blocking gates our bus-2 torque spoof so the cam sees our copy:
   //   EPS (0x1D3):      blocked whenever spoof loop is active (cruise engaged OR
@@ -92,11 +102,13 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   //                     cam still needs the native frame.
   //   STEER_RELATED (0xC4): never blocked — cam's calibration watchdog cancels
   //                     LKAS without it.
+  // When chery_omoda_no_torque_spoof is set, leave native PT->cam torque frames
+  // alone so the meter still sees stock EPS/LKAS while Python spoof is disabled.
   if (bus_num == 0) {
-    if ((addr == (int)CHERY_EPS) && chery_cam_torque_spoof_active()) {
+    if ((addr == (int)CHERY_EPS) && chery_cam_torque_spoof_active() && !chery_omoda_no_torque_spoof) {
       return true;
     }
-    if ((addr == (int)CHERY_LKAS_INFO) && controls_allowed) {
+    if ((addr == (int)CHERY_LKAS_INFO) && controls_allowed && !chery_omoda_no_torque_spoof) {
       return true;
     }
   }

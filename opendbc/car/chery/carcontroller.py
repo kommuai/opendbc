@@ -6,6 +6,7 @@ from opendbc.car.chery import cherycan
 from opendbc.car.chery.values import (
   AUTORESUME_BURST_FRAMES,
   AUTORESUME_CYCLE_S,
+  CAR,
   CarControllerParams,
   DBC,
   EPS_SPOOF_STEP,
@@ -15,6 +16,9 @@ from opendbc.car.chery.values import (
   HUD_STEP,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
+  OMODA_DISABLE_HUD_OVERRIDE,
+  OMODA_DISABLE_TORQUE_SPOOF,
+  OMODA_PCM_DISABLE_RES_CYCLE_S,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
@@ -29,6 +33,13 @@ class CarController(CarControllerBase):
     self.packer = CANPacker(DBC[CP.carFingerprint]["pt"])
     self.last_apply_angle: float | None = None
     self.prev_brake_pressed = False
+    self.prev_cruise_enabled = False
+    self.prev_cruise_state = 3
+    self.omoda_pcm_disable_pending = False
+    self.omoda_pcm_disable_recovery = False  # Omoda: pcmDisable at standstill → RES until cruise on
+    self.omoda_pcm_disable_idle_seen = False  # saw CRUISE_STATE=IDLE before first RES
+    self.omoda_pcm_disable_burst_left = 0
+    self.omoda_pcm_disable_last_burst_frame = -10_000
 
     # ACC arming + auto-resume from standstill state.
     self.acc_armed = False
@@ -52,22 +63,83 @@ class CarController(CarControllerBase):
     return self.last_apply_angle
 
   def _update_acc_armed(self, CS):
-    """Arm when ACC is actively engaged while moving; disarm on explicit driver intent."""
-    if CS.out.cruiseState.enabled and not CS.out.standstill:
+    """Arm when stock ACC is on; disarm on explicit driver intent."""
+    omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
+
+    if CS.out.cruiseState.enabled:
       self.acc_armed = True
+
+    if omoda:
+      if self.prev_cruise_state == 3 and CS.cruise_state == 1 and CS.out.standstill:
+        self.omoda_pcm_disable_recovery = True
+        self.omoda_pcm_disable_pending = False
+        self._omoda_pcm_disable_recovery_started()
+      if self.prev_cruise_enabled and not CS.out.cruiseState.enabled:
+        self.omoda_pcm_disable_pending = True
+        if CS.out.standstill:
+          self.omoda_pcm_disable_recovery = True
+          self.omoda_pcm_disable_pending = False
+          self._omoda_pcm_disable_recovery_started()
+      if CS.out.cruiseState.enabled:
+        self.omoda_pcm_disable_pending = False
+        self.omoda_pcm_disable_recovery = False
+        self.omoda_pcm_disable_idle_seen = False
+        self.omoda_pcm_disable_burst_left = 0
+      elif self.omoda_pcm_disable_pending and CS.out.standstill:
+        self.omoda_pcm_disable_recovery = True
+        self.omoda_pcm_disable_pending = False
+        self._omoda_pcm_disable_recovery_started()
 
     brake_edge = CS.out.brakePressed and not self.prev_brake_pressed
     icc_press = any(be.pressed and be.type == ButtonType.altButton2 for be in CS.out.buttonEvents)
     if brake_edge or icc_press:
       self.acc_armed = False
+      if omoda:
+        self.omoda_pcm_disable_pending = False
+        self.omoda_pcm_disable_recovery = False
+        self.omoda_pcm_disable_idle_seen = False
+        self.omoda_pcm_disable_burst_left = 0
     self.prev_brake_pressed = CS.out.brakePressed
+    self.prev_cruise_enabled = CS.out.cruiseState.enabled
+    self.prev_cruise_state = CS.cruise_state
+
+  def _omoda_pcm_disable_recovery_started(self):
+    # Allow first RES as soon as stock PCM reports CRUISE_STATE=IDLE at standstill.
+    self.omoda_pcm_disable_idle_seen = False
+    self.omoda_pcm_disable_last_burst_frame = self.frame - int(OMODA_PCM_DISABLE_RES_CYCLE_S / DT_CTRL)
+    self.omoda_pcm_disable_burst_left = 0
 
   def _auto_resume(self, CS, can_sends):
-    """Alternate RES / SET bursts while standing still and armed.
+    """Periodic RES/SET at standstill. Omoda: RES-only repeat after pcmDisable until cruise on."""
+    omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
+    omoda_recovery = (
+      omoda and self.omoda_pcm_disable_recovery
+      and not CS.out.cruiseState.enabled and CS.out.standstill
+    )
 
-    burst_idx persists across transient standstill exits; only a hard disarm
-    (brake/ICC, via acc_armed) rolls the index back to RES.
-    """
+    if omoda_recovery:
+      if CS.out.brakePressed:
+        return
+      # Wait for stock PCM to drop to IDLE (~1s after stop); then keep RES until ENABLE (3).
+      if CS.cruise_state == 1:
+        self.omoda_pcm_disable_idle_seen = True
+      if not self.omoda_pcm_disable_idle_seen or CS.cruise_state == 3:
+        return
+      elapsed = (self.frame - self.omoda_pcm_disable_last_burst_frame) * DT_CTRL
+      if self.omoda_pcm_disable_burst_left == 0 and elapsed >= OMODA_PCM_DISABLE_RES_CYCLE_S:
+        self.omoda_pcm_disable_burst_left = AUTORESUME_BURST_FRAMES
+        self.omoda_pcm_disable_last_burst_frame = self.frame
+      if self.omoda_pcm_disable_burst_left > 0 and self.frame % 2 == 0:
+        ctr = (CS.pcm_button_counter + 1) % 16
+        can_sends.append(cherycan.create_pcm_button(self.packer, ctr, 0, "RES_BUTTON"))
+        can_sends.append(cherycan.create_pcm_button(self.packer, ctr, 2, "RES_BUTTON"))
+        self.omoda_pcm_disable_burst_left -= 1
+      return
+
+    # Omoda never uses the Jaecoo RES/SET standstill alternation — only pcmDisable recovery above.
+    if omoda:
+      return
+
     hard_disarm = self.CP.openpilotLongitudinalControl or not self.acc_armed
     if hard_disarm or not CS.out.standstill or CS.out.brakePressed:
       self.autoresume_burst_left = 0
@@ -95,6 +167,8 @@ class CarController(CarControllerBase):
     Pre-arms the camera path at standstill so you can engage ACC/LKAS in the
     driveway and see HOW / LKAS-fault on the meter without another drive.
     """
+    if self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF:
+      return False
     return CS.out.standstill or CS.out.cruiseState.enabled
 
   def update(self, CC, CS, now_nanos):
@@ -118,14 +192,17 @@ class CarController(CarControllerBase):
       # Bus-2 mirror only when cruise is engaged. At standstill (cruise off) we let
       # panda forward the native LKAS_INFO PT->cam — injecting a stale spoof there
       # makes the cam see MAIN_TORQUE>0 with LKAS inactive, which the meter flags.
-      can_sends.extend(cherycan.create_lkas_info_torque_spoof(
-        self.packer, steer_req, steer_req,
-        steer_related=CS.lkas_info_steer_related,
-        apply_spoof_offset=not driver_over,
-        inject_on_cam=CS.out.cruiseState.enabled,
-      ))
+      if not (self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF):
+        can_sends.extend(cherycan.create_lkas_info_torque_spoof(
+          self.packer, steer_req, steer_req,
+          steer_related=CS.lkas_info_steer_related,
+          apply_spoof_offset=not driver_over,
+          inject_on_cam=CS.out.cruiseState.enabled,
+        ))
 
-    if self.frame % HUD_STEP == 0:
+    if self.frame % HUD_STEP == 0 and not (
+        self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_HUD_OVERRIDE
+    ):
       can_sends.append(cherycan.create_hud_override(self.packer, CS.cam_hud, self.hud_counter))
       self.hud_counter = (self.hud_counter + 1) % 16
 

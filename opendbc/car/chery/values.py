@@ -39,6 +39,7 @@ STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)
 # stock RES bumps set-speed by +1 km/h, so SET cancels that drift.
 AUTORESUME_CYCLE_S = 1.2
 AUTORESUME_BURST_FRAMES = 4
+OMODA_PCM_DISABLE_RES_CYCLE_S = 3.5
 
 
 # --- CarState ---
@@ -64,6 +65,16 @@ OMODA_PT_PARSER_MSGS = [
   ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
   ("OMODA_TRANSMISSION", 100), ("OMODA_BRAKE", 50), ("HUD", 20),
 ]
+
+# Omoda 5: 0x2E9 byte 2 is multiplexed — raw 1..5 are message variants, not pedal.
+OMODA_BRAKE_PRESSURE_RAW_MAX = 0x35
+OMODA_BRAKE_PRESSURE_RAW_MIN = 5
+
+# Omoda 5: torque spoof + HUD override temporarily off (meter errors when enabled).
+OMODA_DISABLE_TORQUE_SPOOF = True
+OMODA_DISABLE_HUD_OVERRIDE = True
+CHERY_OMODA_SAFETY_PARAM = 1
+CHERY_OMODA_NO_TORQUE_SPOOF_PARAM = 2
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
 

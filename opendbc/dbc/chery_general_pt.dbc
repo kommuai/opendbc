@@ -50,6 +50,12 @@ BO_ 269 TRANSMISSION: 8 XXX
 BO_ 745 OMODA_BRAKE: 8 XXX
  SG_ BRAKE_PRESSURE : 16|8@1+ (0.0188679,0) [0|53] "" XXX
 
+BO_ 259 OMODA_BRAKE_PEDAL: 8 XXX
+ SG_ BRAKE_PRESSED : 0|8@1+ (1,0) [0|255] "" XXX
+
+CM_ BO_ 745 "Chery Omoda 5 driver brake on 0x2E9 byte 2. Raw 0=off, 6..0x35=pedal; 1..5 are multiplex variants.";
+CM_ SG_ 745 BRAKE_PRESSURE "Omoda 5: payload byte 2, raw 0..0x35 scaled to 0..1; ignore raw>0x35.";
+
 BO_ 768 OMODA_TRANSMISSION: 8 XXX
  SG_ GEAR : 0|4@1+ (1,0) [0|15] "" XXX
 

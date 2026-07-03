@@ -10,6 +10,8 @@ from opendbc.car.chery.values import (
   DBC,
   FOLLOW_RAW_TO_PERSONALITY,
   GEAR_MAP,
+  OMODA_BRAKE_PRESSURE_RAW_MAX,
+  OMODA_BRAKE_PRESSURE_RAW_MIN,
   OMODA_CAM_PARSER_MSGS,
   OMODA_GEAR_MAP,
   OMODA_PT_PARSER_MSGS,
@@ -43,6 +45,7 @@ class CarState(CarStateBase):
     self.eps_steering_angle = 0.0
     self.eps_driver_torque = 0
     self.eps_counter = 0
+    self.cruise_state = 1  # HUD CRUISE_STATE: 3=ENABLE 2=READY 1=IDLE
 
   def update(self, can_parsers):
     cp, cam = can_parsers[Bus.pt], can_parsers[Bus.cam]
@@ -72,9 +75,13 @@ class CarState(CarStateBase):
 
     ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     if omoda:
-      brake = float(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"])
-      ret.brake = brake if brake <= 1.0 else 0.0
-      ret.brakePressed = ret.brake > 0.01
+      raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)
+      if raw <= OMODA_BRAKE_PRESSURE_RAW_MAX:
+        ret.brake = raw / OMODA_BRAKE_PRESSURE_RAW_MAX
+        ret.brakePressed = raw > OMODA_BRAKE_PRESSURE_RAW_MIN
+      else:
+        ret.brake = 0.0
+        ret.brakePressed = False
       ret.gearShifter = self.parse_gear_shifter(OMODA_GEAR_MAP.get(int(cp.vl["OMODA_TRANSMISSION"]["GEAR"])))
     else:
       ret.brake = cp.vl["BRAKE_PEDAL"]["BRAKE_PRESSURE"]
@@ -100,8 +107,9 @@ class CarState(CarStateBase):
     ret.stockFcw = bool(hud["PCW"])
 
     set_kph = float(hud["SET_SPEED"])
+    self.cruise_state = int(hud["CRUISE_STATE"])
     ret.cruiseState.available = True
-    ret.cruiseState.enabled = int(hud["CRUISE_STATE"]) == 3
+    ret.cruiseState.enabled = self.cruise_state == 3
     ret.cruiseState.speed = ret.cruiseState.speedCluster = set_kph * CV.KPH_TO_MS if set_kph > 0 else 0.0
     ret.cruiseState.standstill = ret.standstill and ret.cruiseState.enabled
     ret.cruiseState.nonAdaptive = False
