@@ -66,7 +66,9 @@ class CarController(CarControllerBase):
     """Arm when stock ACC is on; disarm on explicit driver intent."""
     omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
 
-    if CS.out.cruiseState.enabled:
+    # Omoda arms even at standstill (pcmDisable recovery relies on it). Jaecoo/Tiggo keep
+    # the original "arm only while moving" behavior to avoid standstill button injection.
+    if CS.out.cruiseState.enabled and (omoda or not CS.out.standstill):
       self.acc_armed = True
 
     if omoda:
