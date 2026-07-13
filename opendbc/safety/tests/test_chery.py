@@ -240,5 +240,40 @@ class TestCheryOmodaNoTorqueSpoofSafety(TestCheryOmodaSafety):
     self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x387))
 
 
+class TestCheryIcaurSafety(TestCherySafety):
+  """iCaur 03: Jaecoo-style fwd hook; standstill from ICAUR_WHEELSPEED_A (0x222)."""
+
+  SAFETY_PARAM = 4
+
+  def _icaur_wheel_speed(self, fl_raw: int, fr_raw: int):
+    return self.packer.make_can_msg_safety(
+      "ICAUR_WHEELSPEED_A", 0,
+      {
+        "WHEEL_FL": fl_raw * 0.412 + 3.84,
+        "WHEEL_FR": fr_raw * 0.412 + 3.84,
+      },
+    )
+
+  def test_fwd_blocks_pt_torque_when_engaged(self):
+    self._rx(self._icaur_wheel_speed(30, 30))
+    self.safety.set_controls_allowed(False)
+    for addr in (0x394, 0x1D3, 0x0C4):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd to cam when moving and disengaged")
+
+    self._rx(self._icaur_wheel_speed(0, 0))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(0, 0x1D3),
+                     msg="EPS should be blocked PT->cam when stopped")
+    self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x394))
+    self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4))
+
+    self._rx(self._icaur_wheel_speed(30, 30))
+    self.safety.set_controls_allowed(True)
+    for addr in (0x394, 0x1D3):
+      self.assertEqual(-1, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should be blocked PT->cam when engaged")
+    self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4))
+
+
 if __name__ == "__main__":
   unittest.main()

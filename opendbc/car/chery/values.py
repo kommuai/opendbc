@@ -57,6 +57,19 @@ PT_PARSER_MSGS = [
   ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
 ]
 CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
+ICAUR_PT_PARSER_MSGS = [
+  ("ICAUR_WHEELSPEED_A", 50), ("ICAUR_WHEELSPEED_B", 50),
+  ("ICAUR_BRAKE", 50), ("ICAUR_GAS", 50), ("ICAUR_STEER", 100),
+  ("STEER_RELATED", 100), ("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20), ("STEER_STATUS", 20),
+]
+# iCaur03 provisional pedal decode (motion-correlated; may be ACC-influenced):
+# - BRAKE: 0x245 byte6
+# - GAS:   0x231 byte4
+ICAUR_BRAKE_RAW_MAX = 78.0
+ICAUR_BRAKE_PRESSED_RAW = 45.0
+ICAUR_GAS_RAW_MIN = 100.0
+ICAUR_GAS_RAW_MAX = 110.0
+ICAUR_GAS_PRESSED_RAW = 104.0
 OMODA_PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
   ("STALK", 50), ("PCM_BUTTONS", 20),
@@ -75,6 +88,8 @@ OMODA_DISABLE_TORQUE_SPOOF = True
 OMODA_DISABLE_HUD_OVERRIDE = True
 CHERY_OMODA_SAFETY_PARAM = 1
 CHERY_OMODA_NO_TORQUE_SPOOF_PARAM = 2
+# iCaur 03: Jaecoo-style PT/cam fwd + standstill on 0x222 (not 0x313).
+CHERY_ICAUR_SAFETY_PARAM = 4
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
 
@@ -163,6 +178,23 @@ class CAR(Platforms):
       max_steering_angle="TBD",
     )],
     CarSpecs(mass=1420.0, wheelbase=2.63, steerRatio=16.0),
+    dbc_dict("chery_general_pt", None),
+  )
+  CHERY_ICAUR_03 = PlatformConfig(
+    [CarDocs(
+      "iCaur 03 2024-26", "ALL",
+      car_parts=CUSTOM_CAR_PARTS(),
+      footnotes=[Footnote.J7_NOTE],
+      variant="All",
+      kommu_supported=True,
+      acc_low_speed=True,
+      acc_speed_range="0 - 150",
+      acc_stop_and_go=True,
+      lkc_torque="TBD",
+      lkc_speed_range="0 - 150",
+      max_steering_angle="TBD",
+    )],
+    CarSpecs(mass=1760.0, wheelbase=2.71, steerRatio=16.0),  # steerRatio matches Jaecoo J7  # steerRatio matches Jaecoo J7
     dbc_dict("chery_general_pt", None),
   )
 

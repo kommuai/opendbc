@@ -10,6 +10,12 @@ from opendbc.car.chery.values import (
   DBC,
   FOLLOW_RAW_TO_PERSONALITY,
   GEAR_MAP,
+  ICAUR_BRAKE_PRESSED_RAW,
+  ICAUR_BRAKE_RAW_MAX,
+  ICAUR_GAS_PRESSED_RAW,
+  ICAUR_GAS_RAW_MAX,
+  ICAUR_GAS_RAW_MIN,
+  ICAUR_PT_PARSER_MSGS,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
   OMODA_CAM_PARSER_MSGS,
@@ -52,28 +58,57 @@ class CarState(CarStateBase):
     ret = car.CarState.new_message()
     ret.personality = -1
     omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
+    icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
 
     # --- Wheels / pedals / gear ---
-    self.parse_wheel_speeds(
-      ret, cp.vl["WHEELSPEED_2"]["WHEEL_FL"], cp.vl["WHEELSPEED_2"]["WHEEL_FR"],
-      cp.vl["WHEELSPEED_1"]["WHEEL_BL"], cp.vl["WHEELSPEED_1"]["WHEEL_BR"],
-    )
+    if icaur:
+      ws_a = cp.vl["ICAUR_WHEELSPEED_A"]
+      ws_b = cp.vl["ICAUR_WHEELSPEED_B"]
+      self.parse_wheel_speeds(
+        ret,
+        ws_a["WHEEL_FL"], ws_a["WHEEL_FR"],
+        ws_b["WHEEL_BL"], ws_b["WHEEL_BR"],
+      )
+    else:
+      self.parse_wheel_speeds(
+        ret, cp.vl["WHEELSPEED_2"]["WHEEL_FL"], cp.vl["WHEELSPEED_2"]["WHEEL_FR"],
+        cp.vl["WHEELSPEED_1"]["WHEEL_BL"], cp.vl["WHEELSPEED_1"]["WHEEL_BR"],
+      )
     ret.vEgoCluster = ret.vEgo
     ret.standstill = ret.vEgoRaw < 0.01
 
-    eps = cp.vl["EPS"]
-    ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
-    ret.steeringTorque = eps["DRIVER_TORQUE"]
-    self.eps_steering_angle = float(eps["STEERING_ANGLE"])
-    self.eps_driver_torque = int(eps["DRIVER_TORQUE"])
-    self.eps_counter = int(eps["COUNTER"])
-    # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
-    steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
-    self.prev_angle = ret.steeringAngleDeg
-    ret.steeringTorqueEps = ret.steeringTorque * steer_dir
-    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
+    if icaur:
+      brake_raw = float(cp.vl["ICAUR_BRAKE"]["BRAKE_PRESSURE"])
+      gas_raw = float(cp.vl["ICAUR_GAS"]["GAS_PEDAL_PRESSURE"])
+      steer = cp.vl["ICAUR_STEER"]
+      ret.steeringAngleDeg = float(steer["STEERING_ANGLE"])
+      # Driver torque / override not decoded yet — hardcoded until bus-0 RE validates a signal.
+      ret.steeringTorque = 0.0
+      ret.steeringTorqueEps = 0.0
+      ret.steeringPressed = False
+      ret.brakePressed = brake_raw >= ICAUR_BRAKE_PRESSED_RAW
+      ret.brake = max(0.0, min(brake_raw / ICAUR_BRAKE_RAW_MAX, 1.0)) if ret.brakePressed else 0.0
+      gas_den = max(ICAUR_GAS_RAW_MAX - ICAUR_GAS_RAW_MIN, 1.0)
+      ret.gasPressed = gas_raw >= ICAUR_GAS_PRESSED_RAW
+      ret.gas = max(0.0, min((gas_raw - ICAUR_GAS_RAW_MIN) / gas_den, 1.0)) if ret.gasPressed else 0.0
+      ret.gearShifter = car.CarState.GearShifter.drive
+      self.eps_steering_angle = ret.steeringAngleDeg
+      self.eps_driver_torque = 0  # hardcoded — no validated driver-torque signal yet
+      self.eps_counter = int(steer["COUNTER"])
+    else:
+      eps = cp.vl["EPS"]
+      ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
+      ret.steeringTorque = eps["DRIVER_TORQUE"]
+      self.eps_steering_angle = float(eps["STEERING_ANGLE"])
+      self.eps_driver_torque = int(eps["DRIVER_TORQUE"])
+      self.eps_counter = int(eps["COUNTER"])
+      # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
+      steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
+      self.prev_angle = ret.steeringAngleDeg
+      ret.steeringTorqueEps = ret.steeringTorque * steer_dir
+      ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
 
-    ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
+      ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     if omoda:
       raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)
       if raw <= OMODA_BRAKE_PRESSURE_RAW_MAX:
@@ -83,21 +118,29 @@ class CarState(CarStateBase):
         ret.brake = 0.0
         ret.brakePressed = False
       ret.gearShifter = self.parse_gear_shifter(OMODA_GEAR_MAP.get(int(cp.vl["OMODA_TRANSMISSION"]["GEAR"])))
-    else:
+    elif not icaur:
       ret.brake = cp.vl["BRAKE_PEDAL"]["BRAKE_PRESSURE"]
       ret.brakePressed = ret.brake > 0.01
       ret.gearShifter = self.parse_gear_shifter(GEAR_MAP.get(int(cp.vl["TRANSMISSION"]["GEAR"])))
 
     # --- Body / stalk ---
-    stalk = cp.vl["STALK"]
-    ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_stalk(
-      3, stalk["LEFT_BLINKER"], stalk["RIGHT_BLINKER"],
-    )
-    ret.doorOpen = bool(int(stalk["PAYLOAD391_B3"]) & 1)
-    ret.genericToggle = bool(stalk["GENERIC_TOGGLE"])
-    ret.seatbeltUnlatched = bool(
-      cp.vl["SEATBELT_287"]["DRIVER_UNBUCKLED"] or cp.vl["SEATBELT_430"]["DRIVER_UNBUCKLED"]
-    )
+    if icaur:
+      # Hardcoded until iCaur BCM/stalk CAN is reverse-engineered.
+      ret.leftBlinker = False
+      ret.rightBlinker = False
+      ret.doorOpen = False
+      ret.genericToggle = False
+      ret.seatbeltUnlatched = False
+    else:
+      stalk = cp.vl["STALK"]
+      ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_stalk(
+        3, stalk["LEFT_BLINKER"], stalk["RIGHT_BLINKER"],
+      )
+      ret.doorOpen = bool(int(stalk["PAYLOAD391_B3"]) & 1)
+      ret.genericToggle = bool(stalk["GENERIC_TOGGLE"])
+      ret.seatbeltUnlatched = bool(
+        cp.vl["SEATBELT_287"]["DRIVER_UNBUCKLED"] or cp.vl["SEATBELT_430"]["DRIVER_UNBUCKLED"]
+      )
     ret.espDisabled = False
 
     # --- Cruise / HUD ---
@@ -119,18 +162,21 @@ class CarState(CarStateBase):
     ret.personality = max(0, min(personality, 2)) if personality != -1 else -1
 
     # --- PCM buttons ---
-    pcm = cp.vl["PCM_BUTTONS"]
-    self.pcm_button_counter = int(pcm["COUNTER"])
-    icc, cruise_btn = bool(pcm["ICC_TOGGLE"]), bool(pcm["CRUISE_BUTTON"])
-    ret.buttonEvents = (
-      create_button_events(icc, self.prev_icc, {1: ButtonType.altButton2}) +
-      create_button_events(cruise_btn, self.prev_cruise, {1: ButtonType.mainCruise})
-    )
-    self.prev_icc, self.prev_cruise = icc, cruise_btn
+    if icaur:
+      self.pcm_button_counter = 0
+      ret.buttonEvents = []
+    else:
+      pcm = cp.vl["PCM_BUTTONS"]
+      self.pcm_button_counter = int(pcm["COUNTER"])
+      icc, cruise_btn = bool(pcm["ICC_TOGGLE"]), bool(pcm["CRUISE_BUTTON"])
+      ret.buttonEvents = (
+        create_button_events(icc, self.prev_icc, {1: ButtonType.altButton2}) +
+        create_button_events(cruise_btn, self.prev_cruise, {1: ButtonType.mainCruise})
+      )
+      self.prev_icc, self.prev_cruise = icc, cruise_btn
 
     # --- ADAS / LKAS state used by CarController ---
-    lkas = cp.vl["LKAS_INFO"]
-    self.lkas_info_steer_related = float(lkas["STEER_RELATED"])
+    self.lkas_info_steer_related = 0.0 if icaur else float(cp.vl["LKAS_INFO"]["STEER_RELATED"])
     sr_raw = int(cp.vl["STEER_RELATED"]["STEERING_ANGLE_NOT_CALIBRATED"])
     self.steer_related_intervention = sr_raw >= STEER_RELATED_INTERVENTION_RAW_MIN
 
@@ -142,7 +188,12 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can_parser(CP):
-    msgs = OMODA_PT_PARSER_MSGS if CP.carFingerprint == CAR.CHERY_OMODA_5 else PT_PARSER_MSGS
+    if CP.carFingerprint == CAR.CHERY_OMODA_5:
+      msgs = OMODA_PT_PARSER_MSGS
+    elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
+      msgs = ICAUR_PT_PARSER_MSGS
+    else:
+      msgs = PT_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)
 
   @staticmethod

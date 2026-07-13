@@ -59,6 +59,7 @@ non_tested_cars = [
   CHERY.CHERY_JAECOO_J7_PHEV,
   CHERY.CHERY_TIGGO_8_PRO,
   CHERY.CHERY_OMODA_5,
+  CHERY.CHERY_ICAUR_03,
 
   # Geely (bootstrap fingerprint; replace with full bus-0 capture before on-road)
   GEELY.GEELY_GALAXY_E5,

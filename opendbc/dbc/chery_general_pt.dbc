@@ -209,6 +209,25 @@ BO_ 1203 BSM_RIGHT: 8 XXX
  SG_ RIGHT_FAR_APPROACHING : 2|1@0+ (1,0) [0|1] "" XXX
  SG_ RIGHT_APPROACHING : 14|1@0+ (1,0) [0|1] "" XXX
 
+BO_ 546 ICAUR_WHEELSPEED_A: 8 XXX
+ SG_ WHEEL_FL : 7|8@0+ (0.412,3.84) [0|255] "m/s" XXX
+ SG_ WHEEL_FR : 23|8@0+ (0.412,3.84) [0|255] "m/s" XXX
+
+BO_ 547 ICAUR_WHEELSPEED_B: 8 XXX
+ SG_ WHEEL_BL : 7|8@0+ (0.412,3.84) [0|255] "m/s" XXX
+ SG_ WHEEL_BR : 23|8@0+ (0.412,3.84) [0|255] "m/s" XXX
+
+BO_ 581 ICAUR_BRAKE: 8 XXX
+ SG_ BRAKE_PRESSURE : 55|8@0+ (1,0) [0|255] "" XXX
+
+BO_ 561 ICAUR_GAS: 8 XXX
+ SG_ GAS_PEDAL_PRESSURE : 39|8@0+ (1,0) [0|255] "" XXX
+
+BO_ 325 ICAUR_STEER: 8 XXX
+ SG_ STEERING_ANGLE : 7|14@0+ (0.1,-780.1) [0|16383] "" XXX
+ SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
+ SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
+
 
 CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 768 GEAR "Omoda 5: 0x300 byte0 bits 0-3. 0xB=D 0xC=N 0xD=R 0xE=P.";
@@ -236,6 +255,11 @@ CM_ SG_ 864 RES_BUTTON "RES / resume (byte3 bit6, mask 0x40); 3-5 frames per tap
 CM_ SG_ 775 LKAS_FAULT "Camera-broadcast LKAS fault flag (byte0 bit6). Set when EPS rejects LKAS, e.g. driver torque overpowers (route 2026-05-20--05-56-41 t=454.06: 0x80->0x40 the instant LKAS_ENABLE in 0x394 drops).";
 CM_ SG_ 775 LKAS_AVAILABLE "Camera LKAS-OK flag (byte0 bit7); inverse of LKAS_FAULT.";
 CM_ SG_ 864 CHECKSUM_BUTTONS "Byte 0; Chrysler-style CRC over bytes 1..5 (Jaecoo J7 route 2026-05-14--07-49-04).";
+CM_ BO_ 546 "iCaur 03 wheel speed A (0x222). Scale/offset fit vs gpsLocation on routes 2026-07-08--03-16-48 + 2026-07-07--08-47-29: speed_mps ~= 0.412*raw + 3.84. Bytes 0/2 track together (vehicle-speed duplicate, not independent wheels).";
+CM_ BO_ 547 "iCaur 03 wheel speed B (0x223). Same encoding as 0x222; bytes 0/2 duplicate vehicle speed.";
+CM_ BO_ 581 "iCaur 03 provisional brake (0x245 byte6). Motion-correlated; may be ACC-influenced. Wired with conservative pressed threshold.";
+CM_ BO_ 561 "iCaur 03 provisional gas (0x231 byte4). Motion-correlated; may be ACC-influenced. Wired with conservative pressed threshold.";
+CM_ BO_ 325 "iCaur 03 steering angle (0x145 bus0 @100Hz). Jaecoo EPS-style 14-bit encode on bytes 0-1; ~-30 deg offset at straight-ahead in logs.";
 
 VAL_ 768 GEAR 11 "D" 12 "N" 13 "R" 14 "P";
 VAL_ 903 FOLLOW_DISTANCE 0 "UNKNOWN" 1 "1_BAR" 2 "2_BAR" 3 "3_BAR" 4 "4_BAR" 5 "5_BAR" 6 "UNKNOWN" 7 "UNKNOWN";

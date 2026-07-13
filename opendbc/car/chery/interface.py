@@ -6,6 +6,7 @@ from opendbc.car.chery.carstate import CarState
 from opendbc.car.chery.radar_interface import RadarInterface
 from opendbc.car.chery.values import (
   CAR,
+  CHERY_ICAUR_SAFETY_PARAM,
   CHERY_OMODA_NO_TORQUE_SPOOF_PARAM,
   CHERY_OMODA_SAFETY_PARAM,
   OMODA_DISABLE_TORQUE_SPOOF,
@@ -35,4 +36,6 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[0].safetyParam = CHERY_OMODA_SAFETY_PARAM
       if OMODA_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+    elif candidate == CAR.CHERY_ICAUR_03:
+      ret.safetyConfigs[0].safetyParam = CHERY_ICAUR_SAFETY_PARAM
     return ret
