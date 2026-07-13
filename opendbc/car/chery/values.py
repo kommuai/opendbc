@@ -57,11 +57,15 @@ PT_PARSER_MSGS = [
   ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
 ]
 CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
+# iCaur PT: only bus-0 signals CarState reads. Do NOT require HUD/LANE_KEEP/STEER_STATUS
+# on PT — chery_fwd_hook blocks cam->PT for HUD/LANE_KEEP (Jaecoo-style), so those would
+# timeout until (and unless) CarController TX fills them. Cam ADAS stays on ICAUR_CAM.
 ICAUR_PT_PARSER_MSGS = [
   ("ICAUR_WHEELSPEED_A", 50), ("ICAUR_WHEELSPEED_B", 50),
   ("ICAUR_BRAKE", 50), ("ICAUR_GAS", 50), ("ICAUR_STEER", 100),
-  ("STEER_RELATED", 100), ("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20), ("STEER_STATUS", 20),
+  ("STEER_RELATED", 100),
 ]
+ICAUR_CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 # iCaur03 provisional pedal decode (motion-correlated; may be ACC-influenced):
 # - BRAKE: 0x245 byte6
 # - GAS:   0x231 byte4
@@ -89,7 +93,9 @@ OMODA_DISABLE_HUD_OVERRIDE = True
 CHERY_OMODA_SAFETY_PARAM = 1
 CHERY_OMODA_NO_TORQUE_SPOOF_PARAM = 2
 # iCaur 03: Jaecoo-style PT/cam fwd + standstill on 0x222 (not 0x313).
+# No EPS 0x1D3 / LKAS_INFO 0x394 on this bus — disable torque spoof (same bit as Omoda).
 CHERY_ICAUR_SAFETY_PARAM = 4
+ICAUR_DISABLE_TORQUE_SPOOF = True
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
 

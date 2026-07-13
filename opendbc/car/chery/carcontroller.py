@@ -14,6 +14,7 @@ from opendbc.car.chery.values import (
   EPS_TAP_PERIOD_FRAMES,
   EPS_TAP_TORQUE,
   HUD_STEP,
+  ICAUR_DISABLE_TORQUE_SPOOF,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
   OMODA_DISABLE_HUD_OVERRIDE,
@@ -163,13 +164,20 @@ class CarController(CarControllerBase):
       if self.autoresume_burst_left == 0:
         self.autoresume_burst_idx += 1
 
+  def _torque_spoof_disabled(self) -> bool:
+    fp = self.CP.carFingerprint
+    return (
+      (fp == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF) or
+      (fp == CAR.CHERY_ICAUR_03 and ICAUR_DISABLE_TORQUE_SPOOF)
+    )
+
   def _cam_torque_spoof_active(self, CS) -> bool:
     """Feed bus-2 torque spoofs while parked or while cruise is on.
 
     Pre-arms the camera path at standstill so you can engage ACC/LKAS in the
     driveway and see HOW / LKAS-fault on the meter without another drive.
     """
-    if self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF:
+    if self._torque_spoof_disabled():
       return False
     return CS.out.standstill or CS.out.cruiseState.enabled
 
@@ -194,7 +202,7 @@ class CarController(CarControllerBase):
       # Bus-2 mirror only when cruise is engaged. At standstill (cruise off) we let
       # panda forward the native LKAS_INFO PT->cam — injecting a stale spoof there
       # makes the cam see MAIN_TORQUE>0 with LKAS inactive, which the meter flags.
-      if not (self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF):
+      if not self._torque_spoof_disabled():
         can_sends.extend(cherycan.create_lkas_info_torque_spoof(
           self.packer, steer_req, steer_req,
           steer_related=CS.lkas_info_steer_related,

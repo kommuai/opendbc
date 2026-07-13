@@ -12,6 +12,7 @@ from opendbc.car.chery.values import (
   GEAR_MAP,
   ICAUR_BRAKE_PRESSED_RAW,
   ICAUR_BRAKE_RAW_MAX,
+  ICAUR_CAM_PARSER_MSGS,
   ICAUR_GAS_PRESSED_RAW,
   ICAUR_GAS_RAW_MAX,
   ICAUR_GAS_RAW_MIN,
@@ -198,5 +199,10 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_cam_can_parser(CP):
-    msgs = OMODA_CAM_PARSER_MSGS if CP.carFingerprint == CAR.CHERY_OMODA_5 else CAM_PARSER_MSGS
+    if CP.carFingerprint == CAR.CHERY_OMODA_5:
+      msgs = OMODA_CAM_PARSER_MSGS
+    elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
+      msgs = ICAUR_CAM_PARSER_MSGS
+    else:
+      msgs = CAM_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.cam_bus)
