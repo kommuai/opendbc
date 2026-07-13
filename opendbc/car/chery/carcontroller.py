@@ -140,7 +140,8 @@ class CarController(CarControllerBase):
       return
 
     # Omoda never uses the Jaecoo RES/SET standstill alternation — only pcmDisable recovery above.
-    if omoda:
+    # iCaur has no PCM_BUTTONS (0x360) on the bus — do not inject Jaecoo button frames.
+    if omoda or self.CP.carFingerprint == CAR.CHERY_ICAUR_03:
       return
 
     hard_disarm = self.CP.openpilotLongitudinalControl or not self.acc_armed

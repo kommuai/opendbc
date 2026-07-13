@@ -14,8 +14,6 @@ from opendbc.car.chery.values import (
   ICAUR_BRAKE_RAW_MAX,
   ICAUR_CAM_PARSER_MSGS,
   ICAUR_GAS_PRESSED_RAW,
-  ICAUR_GAS_RAW_MAX,
-  ICAUR_GAS_RAW_MIN,
   ICAUR_PT_PARSER_MSGS,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
@@ -65,10 +63,12 @@ class CarState(CarStateBase):
     if icaur:
       ws_a = cp.vl["ICAUR_WHEELSPEED_A"]
       ws_b = cp.vl["ICAUR_WHEELSPEED_B"]
+      # DBC signals are already m/s — do not apply KPH_TO_MS.
       self.parse_wheel_speeds(
         ret,
         ws_a["WHEEL_FL"], ws_a["WHEEL_FR"],
         ws_b["WHEEL_BL"], ws_b["WHEEL_BR"],
+        unit=1.0,
       )
     else:
       self.parse_wheel_speeds(
@@ -89,9 +89,8 @@ class CarState(CarStateBase):
       ret.steeringPressed = False
       ret.brakePressed = brake_raw >= ICAUR_BRAKE_PRESSED_RAW
       ret.brake = max(0.0, min(brake_raw / ICAUR_BRAKE_RAW_MAX, 1.0)) if ret.brakePressed else 0.0
-      gas_den = max(ICAUR_GAS_RAW_MAX - ICAUR_GAS_RAW_MIN, 1.0)
       ret.gasPressed = gas_raw >= ICAUR_GAS_PRESSED_RAW
-      ret.gas = max(0.0, min((gas_raw - ICAUR_GAS_RAW_MIN) / gas_den, 1.0)) if ret.gasPressed else 0.0
+      # CarState.gas was removed (gasDEPRECATED); only gasPressed is published.
       ret.gearShifter = car.CarState.GearShifter.drive
       self.eps_steering_angle = ret.steeringAngleDeg
       self.eps_driver_torque = 0  # hardcoded — no validated driver-torque signal yet

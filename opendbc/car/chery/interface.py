@@ -41,4 +41,6 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[0].safetyParam = CHERY_ICAUR_SAFETY_PARAM
       if ICAUR_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+      # No BSM signals reverse-engineered yet.
+      ret.enableBsm = False
     return ret
