@@ -249,8 +249,8 @@ class TestCheryIcaurSafety(TestCherySafety):
     return self.packer.make_can_msg_safety(
       "ICAUR_WHEELSPEED_A", 0,
       {
-        "WHEEL_FL": fl_raw * 0.412 + 3.84,
-        "WHEEL_FR": fr_raw * 0.412 + 3.84,
+        "WHEEL_FL": fl_raw,
+        "WHEEL_FR": fr_raw,
       },
     )
 
