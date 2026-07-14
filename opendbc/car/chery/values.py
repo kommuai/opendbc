@@ -48,6 +48,9 @@ OMODA_GEAR_MAP = {0xB: "D", 0xC: "N", 0xD: "R", 0xE: "P"}
 # HUD FOLLOW_DISTANCE: raw 1 = 1-bar (closest) … raw 5 = 5-bar (farthest); 0/6/7 unknown.
 FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}  # 0 aggressive / 1 standard / 2 relaxed
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
+# Jaecoo only: STEER_RELATED status when raw>=36000 (decoded ≈342.7° with (0.1,-3257.3)).
+# iCaur must not use this — 0xC4 STEERING_ANGLE is real road angle there.
+STEER_RELATED_INTERVENTION_DEG_MIN = 36000 * 0.1 - 3257.3
 
 PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
@@ -62,18 +65,15 @@ CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 # timeout until (and unless) CarController TX fills them. Cam ADAS stays on ICAUR_CAM.
 ICAUR_PT_PARSER_MSGS = [
   ("ICAUR_WHEELSPEED_A", 50), ("ICAUR_WHEELSPEED_B", 50),
-  ("ICAUR_BRAKE", 50), ("ICAUR_GAS", 50), ("ICAUR_STEER", 100),
+  ("ICAUR_BRAKE", 50), ("ICAUR_GAS", 50),
   ("STEER_RELATED", 100),
 ]
 ICAUR_CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
-# iCaur03 provisional pedal decode (motion-correlated; may be ACC-influenced):
-# - BRAKE: 0x245 byte6
-# - GAS:   0x231 byte4
-ICAUR_BRAKE_RAW_MAX = 78.0
-ICAUR_BRAKE_PRESSED_RAW = 45.0
-ICAUR_GAS_RAW_MIN = 100.0
-ICAUR_GAS_RAW_MAX = 110.0
-ICAUR_GAS_PRESSED_RAW = 104.0
+# iCaur03 pedal decode:
+# - BRAKE: 0x132 start bit 31 (8-bit); DBC scale 0.01 → raw 100 = 1.0
+# - GAS:   0x14A start bit 23 (12-bit); DBC (0.001,-2) → (raw-2000)/1000; idle 2000→0, 3000→1
+ICAUR_BRAKE_PRESSED = 0.05  # scaled 0..1
+ICAUR_GAS_PRESSED = 0.05
 OMODA_PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
   ("STALK", 50), ("PCM_BUTTONS", 20),

@@ -255,7 +255,8 @@ class TestCheryIcaurSafety(TestCherySafety):
     )
 
   def test_fwd_blocks_pt_torque_when_engaged(self):
-    self._rx(self._icaur_wheel_speed(30, 30))
+    # 13-bit raw: 960 ↔ former 8-bit byte0=30 (high 8 bits); must leave byte0 >= 15.
+    self._rx(self._icaur_wheel_speed(960, 960))
     self.safety.set_controls_allowed(False)
     for addr in (0x394, 0x1D3, 0x0C4):
       self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
@@ -267,7 +268,7 @@ class TestCheryIcaurSafety(TestCherySafety):
     self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x394))
     self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4))
 
-    self._rx(self._icaur_wheel_speed(30, 30))
+    self._rx(self._icaur_wheel_speed(960, 960))
     self.safety.set_controls_allowed(True)
     for addr in (0x394, 0x1D3):
       self.assertEqual(-1, self.safety.safety_fwd_hook(0, addr),

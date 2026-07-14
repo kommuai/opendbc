@@ -10,10 +10,9 @@ from opendbc.car.chery.values import (
   DBC,
   FOLLOW_RAW_TO_PERSONALITY,
   GEAR_MAP,
-  ICAUR_BRAKE_PRESSED_RAW,
-  ICAUR_BRAKE_RAW_MAX,
+  ICAUR_BRAKE_PRESSED,
   ICAUR_CAM_PARSER_MSGS,
-  ICAUR_GAS_PRESSED_RAW,
+  ICAUR_GAS_PRESSED,
   ICAUR_PT_PARSER_MSGS,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
@@ -21,7 +20,7 @@ from opendbc.car.chery.values import (
   OMODA_GEAR_MAP,
   OMODA_PT_PARSER_MSGS,
   PT_PARSER_MSGS,
-  STEER_RELATED_INTERVENTION_RAW_MIN,
+  STEER_RELATED_INTERVENTION_DEG_MIN,
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -79,21 +78,24 @@ class CarState(CarStateBase):
     ret.standstill = ret.vEgoRaw < 0.01
 
     if icaur:
-      brake_raw = float(cp.vl["ICAUR_BRAKE"]["BRAKE_PRESSURE"])
-      gas_raw = float(cp.vl["ICAUR_GAS"]["GAS_PEDAL_PRESSURE"])
-      steer = cp.vl["ICAUR_STEER"]
-      ret.steeringAngleDeg = float(steer["STEERING_ANGLE"])
-      # Driver torque / override not decoded yet — hardcoded until bus-0 RE validates a signal.
-      ret.steeringTorque = 0.0
-      ret.steeringTorqueEps = 0.0
-      ret.steeringPressed = False
-      ret.brakePressed = brake_raw >= ICAUR_BRAKE_PRESSED_RAW
-      ret.brake = max(0.0, min(brake_raw / ICAUR_BRAKE_RAW_MAX, 1.0)) if ret.brakePressed else 0.0
-      ret.gasPressed = gas_raw >= ICAUR_GAS_PRESSED_RAW
+      brake = max(0.0, min(float(cp.vl["ICAUR_BRAKE"]["BRAKE_PRESSURE"]), 1.0))
+      gas = max(0.0, min(float(cp.vl["ICAUR_GAS"]["GAS_PEDAL_PRESSURE"]), 1.0))
+      # Angle + driver torque both on STEER_RELATED (0xC4).
+      steer = cp.vl["STEER_RELATED"]
+      ret.steeringAngleDeg = max(-450.0, min(450.0, float(steer["STEERING_ANGLE"])))
+      ret.steeringTorque = float(steer["DRIVER_TORQUE"])
+      # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
+      steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
+      self.prev_angle = ret.steeringAngleDeg
+      ret.steeringTorqueEps = ret.steeringTorque * steer_dir
+      ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) >= 10, 5)
+      ret.brakePressed = brake >= ICAUR_BRAKE_PRESSED
+      ret.brake = brake if ret.brakePressed else 0.0
+      ret.gasPressed = gas >= ICAUR_GAS_PRESSED
       # CarState.gas was removed (gasDEPRECATED); only gasPressed is published.
       ret.gearShifter = car.CarState.GearShifter.drive
       self.eps_steering_angle = ret.steeringAngleDeg
-      self.eps_driver_torque = 0  # hardcoded — no validated driver-torque signal yet
+      self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
       self.eps_counter = int(steer["COUNTER"])
     else:
       eps = cp.vl["EPS"]
@@ -177,8 +179,12 @@ class CarState(CarStateBase):
 
     # --- ADAS / LKAS state used by CarController ---
     self.lkas_info_steer_related = 0.0 if icaur else float(cp.vl["LKAS_INFO"]["STEER_RELATED"])
-    sr_raw = int(cp.vl["STEER_RELATED"]["STEERING_ANGLE_NOT_CALIBRATED"])
-    self.steer_related_intervention = sr_raw >= STEER_RELATED_INTERVENTION_RAW_MIN
+    # Jaecoo: STEER_RELATED angle raw>=36000 is a status code (decoded ≈342.7°), not road angle.
+    # iCaur: same bits are real degrees — rely on DRIVER_TORQUE via steeringPressed instead.
+    self.steer_related_intervention = (
+      False if icaur else
+      float(cp.vl["STEER_RELATED"]["STEERING_ANGLE"]) >= STEER_RELATED_INTERVENTION_DEG_MIN
+    )
 
     return ret
 

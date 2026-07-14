@@ -41,8 +41,9 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[0].safetyParam = CHERY_ICAUR_SAFETY_PARAM
       if ICAUR_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
-      # GPS-fit on 2026-07-13--04-13-59: DBC raw count (scale 1) × factor 0.55 m/s (was 0.412*0.832 ≈ 0.59× GPS).
-      ret.wheelSpeedFactor = 0.55
+      # GPS origin-fit on 2026-07-13--04-13-59: 13-bit DBC raw (scale 1) × ~0.01756 ≈ gpsLocation.speed
+      # (supersedes 8-bit×0.55; 0.55/32=0.0171875 was a close prior guess).
+      ret.wheelSpeedFactor = 0.01756
       # No BSM signals reverse-engineered yet.
       ret.enableBsm = False
     return ret

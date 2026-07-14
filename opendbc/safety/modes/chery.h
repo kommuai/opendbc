@@ -44,11 +44,11 @@ static void chery_rx_hook(const CANPacket_t *msg) {
     chery_vehicle_stopped = (fl < 100U) && (fr < 100U);  // < 1 kph
   }
 
-  // iCaur: ICAUR_WHEELSPEED_A 0x222 — 8-bit FL/FR bytes (rest raw=0 when parked).
-  if (chery_icaur_safety && (msg->addr == CHERY_ICAUR_WHEELSPEED_A) && (msg->bus == 0U) && (GET_LEN(msg) >= 3U)) {
-    const uint8_t fl = msg->data[0];
-    const uint8_t fr = msg->data[2];
-    chery_vehicle_stopped = (fl < 15U) && (fr < 15U);
+  // iCaur: ICAUR_WHEELSPEED_A 0x222 — 13-bit motorola FL/FR (byteN + top5 of byteN+1).
+  if (chery_icaur_safety && (msg->addr == CHERY_ICAUR_WHEELSPEED_A) && (msg->bus == 0U) && (GET_LEN(msg) >= 4U)) {
+    const uint16_t fl = ((uint16_t)msg->data[0] << 5U) | ((uint16_t)msg->data[1] >> 3U);
+    const uint16_t fr = ((uint16_t)msg->data[2] << 5U) | ((uint16_t)msg->data[3] >> 3U);
+    chery_vehicle_stopped = (fl < 480U) && (fr < 480U);  // ~ old 8-bit byte < 15
   }
 }
 
