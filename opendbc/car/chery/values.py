@@ -45,12 +45,17 @@ OMODA_PCM_DISABLE_RES_CYCLE_S = 3.5
 # --- CarState ---
 GEAR_MAP = {1: "P", 2: "R", 3: "N", 4: "D"}
 OMODA_GEAR_MAP = {0xB: "D", 0xC: "N", 0xD: "R", 0xE: "P"}
+# iCaur 0x315 gear nibble: P=11 D=1 N=10 R=9
+ICAUR_GEAR_MAP = {11: "P", 1: "D", 10: "N", 9: "R"}
+# iCaur 0x245 blinker nibble
+ICAUR_BLINKER_LEFT = (4, 6)
+ICAUR_BLINKER_RIGHT = (8, 9)
 # HUD FOLLOW_DISTANCE: raw 1 = 1-bar (closest) … raw 5 = 5-bar (farthest); 0/6/7 unknown.
 FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}  # 0 aggressive / 1 standard / 2 relaxed
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
-# Jaecoo only: STEER_RELATED status when raw>=36000 (decoded ≈342.7° with (0.1,-3257.3)).
+# Jaecoo only: STEER_RELATED status when raw>=36000 (decoded with STEERING_ANGLE factor/offset).
 # iCaur must not use this — 0xC4 STEERING_ANGLE is real road angle there.
-STEER_RELATED_INTERVENTION_DEG_MIN = 36000 * 0.1 - 3257.3
+STEER_RELATED_INTERVENTION_DEG_MIN = 36000 * 0.06 - 1966
 
 PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
@@ -67,6 +72,7 @@ ICAUR_PT_PARSER_MSGS = [
   ("ICAUR_WHEELSPEED_A", 50), ("ICAUR_WHEELSPEED_B", 50),
   ("ICAUR_BRAKE", 50), ("ICAUR_GAS", 50),
   ("STEER_RELATED", 100),
+  ("ICAUR_STALK", 50), ("ICAUR_TRANSMISSION", 100),
 ]
 ICAUR_CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 # iCaur03 pedal decode:

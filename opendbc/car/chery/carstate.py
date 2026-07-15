@@ -10,9 +10,12 @@ from opendbc.car.chery.values import (
   DBC,
   FOLLOW_RAW_TO_PERSONALITY,
   GEAR_MAP,
+  ICAUR_BLINKER_LEFT,
+  ICAUR_BLINKER_RIGHT,
   ICAUR_BRAKE_PRESSED,
   ICAUR_CAM_PARSER_MSGS,
   ICAUR_GAS_PRESSED,
+  ICAUR_GEAR_MAP,
   ICAUR_PT_PARSER_MSGS,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
@@ -93,7 +96,9 @@ class CarState(CarStateBase):
       ret.brake = brake if ret.brakePressed else 0.0
       ret.gasPressed = gas >= ICAUR_GAS_PRESSED
       # CarState.gas was removed (gasDEPRECATED); only gasPressed is published.
-      ret.gearShifter = car.CarState.GearShifter.drive
+      ret.gearShifter = self.parse_gear_shifter(
+        ICAUR_GEAR_MAP.get(int(cp.vl["ICAUR_TRANSMISSION"]["GEAR"]))
+      )
       self.eps_steering_angle = ret.steeringAngleDeg
       self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
       self.eps_counter = int(steer["COUNTER"])
@@ -127,9 +132,11 @@ class CarState(CarStateBase):
 
     # --- Body / stalk ---
     if icaur:
-      # Hardcoded until iCaur BCM/stalk CAN is reverse-engineered.
-      ret.leftBlinker = False
-      ret.rightBlinker = False
+      blink = int(cp.vl["ICAUR_STALK"]["BLINKER"])
+      ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_stalk(
+        3, blink in ICAUR_BLINKER_LEFT, blink in ICAUR_BLINKER_RIGHT,
+      )
+      # Door / seatbelt / generic toggle not reverse-engineered yet.
       ret.doorOpen = False
       ret.genericToggle = False
       ret.seatbeltUnlatched = False

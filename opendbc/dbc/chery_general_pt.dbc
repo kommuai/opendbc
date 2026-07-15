@@ -36,7 +36,7 @@ BS_:
 BU_: EON XXX INTERCEPTOR ANY ACTUATOR SAFETY
 
 BO_ 196 STEER_RELATED: 8 XXX
- SG_ STEERING_ANGLE : 7|16@0+ (0.1,-3257.3) [-450|450] "deg" XXX
+ SG_ STEERING_ANGLE : 7|16@0+ (0.06,-1966) [-450|450] "deg" XXX
  SG_ DRIVER_TORQUE : 23|8@0+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 47|4@0+ (1,0) [0|15] "" XXX
  SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
@@ -224,6 +224,12 @@ BO_ 306 ICAUR_BRAKE: 8 XXX
 BO_ 330 ICAUR_GAS: 8 XXX
  SG_ GAS_PEDAL_PRESSURE : 23|12@0+ (0.001,-2) [0|1] "" XXX
 
+BO_ 581 ICAUR_STALK: 8 XXX
+ SG_ BLINKER : 11|4@0+ (1,0) [0|15] "" XXX
+
+BO_ 789 ICAUR_TRANSMISSION: 8 XXX
+ SG_ GEAR : 11|4@0+ (1,0) [0|15] "" XXX
+
 
 CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 768 GEAR "Omoda 5: 0x300 byte0 bits 0-3. 0xB=D 0xC=N 0xD=R 0xE=P.";
@@ -243,7 +249,7 @@ CM_ BO_ 1042 "BCM frame 0x412; trailing bytes roll (counter) in capture.";
 CM_ BO_ 1125 "BCM frame 0x465; single sample in door-close capture — label for follow-up.";
 CM_ SG_ 903 CRUISE_STATE "3 is ENABLE, 2 is READY, 1 is IDLE";
 CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at straight-ahead vs -773.";
-CM_ SG_ 196 STEERING_ANGLE "0xC4 bytes0-1 motorola 16-bit. iCaur03: road-wheel angle, scale 0.1 deg offset -3257.3 (standstill raw 32573→0). Jaecoo: same bits formerly STEERING_ANGLE_NOT_CALIBRATED (raw>=36000 ≈ phys>=342.7 = intervention).";
+CM_ SG_ 196 STEERING_ANGLE "0xC4 bytes0-1 motorola 16-bit. iCaur03: road-wheel angle factor 0.06 offset -1966. Jaecoo: same bits formerly STEERING_ANGLE_NOT_CALIBRATED (raw>=36000 ≈ phys 196 deg with this scale = intervention).";
 CM_ SG_ 196 DRIVER_TORQUE "iCaur03: 0xC4 start bit 23, 8-bit unsigned driver torque (byte2). Scale 1.";
 CM_ BO_ 196 "Chery 0xC4 STEER_RELATED: iCaur angle+torque; Jaecoo also uses this ID.";
 CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";
@@ -257,8 +263,14 @@ CM_ BO_ 546 "iCaur 03 wheel speed A (0x222). 13-bit motorola (byte0 + top 5 of b
 CM_ BO_ 547 "iCaur 03 wheel speed B (0x223). Same 13-bit encoding as 0x222; byte pairs duplicate vehicle speed.";
 CM_ BO_ 306 "iCaur 03 brake pressure (0x132 start bit 31, 8-bit motorola). DBC scale 0.01 so raw 100 → 1.0; CarState uses 0..1.";
 CM_ BO_ 330 "iCaur 03 gas pedal (0x14A start bit 23, 12-bit motorola). phys=(raw-2000)/1000 so idle raw 2000→0 and raw 3000→1.0.";
+CM_ BO_ 581 "iCaur 03 stalk/blinker (0x245 start bit 11, 4-bit). Left=4|6, right=8|9.";
+CM_ SG_ 581 BLINKER "iCaur03: left when 4 or 6; right when 8 or 9.";
+CM_ BO_ 789 "iCaur 03 transmission (0x315 start bit 11, 4-bit gear).";
+CM_ SG_ 789 GEAR "iCaur03: P=11 D=1 N=10 R=9.";
 
 VAL_ 768 GEAR 11 "D" 12 "N" 13 "R" 14 "P";
+VAL_ 581 BLINKER 4 "LEFT" 6 "LEFT" 8 "RIGHT" 9 "RIGHT";
+VAL_ 789 GEAR 1 "D" 9 "R" 10 "N" 11 "P";
 VAL_ 903 FOLLOW_DISTANCE 0 "UNKNOWN" 1 "1_BAR" 2 "2_BAR" 3 "3_BAR" 4 "4_BAR" 5 "5_BAR" 6 "UNKNOWN" 7 "UNKNOWN";
 VAL_ 903 HANDS_ON_WHEEL_STEER 0 "NORMAL" 1 "ACC_CANCELLED_INDICATOR";
 VAL_ 933 HANDS_ON_WHEEL_WARN 0 "NO_WARNING" 1 "WARNING";
