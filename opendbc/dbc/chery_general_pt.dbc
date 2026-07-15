@@ -36,7 +36,7 @@ BS_:
 BU_: EON XXX INTERCEPTOR ANY ACTUATOR SAFETY
 
 BO_ 196 STEER_RELATED: 8 XXX
- SG_ STEERING_ANGLE : 7|16@0+ (0.06,-1966) [-450|450] "deg" XXX
+ SG_ STEERING_ANGLE : 7|16@0+ (0.06,-1985) [-450|450] "deg" XXX
  SG_ DRIVER_TORQUE : 23|8@0+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 47|4@0+ (1,0) [0|15] "" XXX
  SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
@@ -249,7 +249,7 @@ CM_ BO_ 1042 "BCM frame 0x412; trailing bytes roll (counter) in capture.";
 CM_ BO_ 1125 "BCM frame 0x465; single sample in door-close capture — label for follow-up.";
 CM_ SG_ 903 CRUISE_STATE "3 is ENABLE, 2 is READY, 1 is IDLE";
 CM_ SG_ 467 STEERING_ANGLE "Jaecoo J7: offset -780.1 removes ~7.1 deg bias at straight-ahead vs -773.";
-CM_ SG_ 196 STEERING_ANGLE "0xC4 bytes0-1 motorola 16-bit. iCaur03: road-wheel angle factor 0.06 offset -1966. Jaecoo: same bits formerly STEERING_ANGLE_NOT_CALIBRATED (raw>=36000 ≈ phys 196 deg with this scale = intervention).";
+CM_ SG_ 196 STEERING_ANGLE "0xC4 bytes0-1 motorola 16-bit. iCaur03: road-wheel angle factor 0.06 offset -1985 (retuned from -1966 using straightish median bias ~19° on route 2026-07-15--03-08-40 so paramsd |angleOffset|<10). Jaecoo: same bits formerly STEERING_ANGLE_NOT_CALIBRATED (raw>=36000 ≈ phys 175 deg with this scale = intervention).";
 CM_ SG_ 196 DRIVER_TORQUE "iCaur03: 0xC4 start bit 23, 8-bit unsigned driver torque (byte2). Scale 1.";
 CM_ BO_ 196 "Chery 0xC4 STEER_RELATED: iCaur angle+torque; Jaecoo also uses this ID.";
 CM_ SG_ 837 STEER_CMD_ANGLE "Match EPS STEERING_ANGLE scale/offset for LANE_KEEP TX.";

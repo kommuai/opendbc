@@ -104,7 +104,9 @@ static bool chery_fwd_hook(int bus_num, int addr) {
     if (addr == (int)CHERY_LANE_KEEP) {
       return true;
     }
-    if ((addr == (int)CHERY_HUD) && !chery_omoda_safety) {
+    // Jaecoo: block cam HUD so CarController can re-emit a cleaned copy on PT.
+    // Omoda/iCaur: leave native HUD (meter errors / no override TX).
+    if ((addr == (int)CHERY_HUD) && !chery_omoda_safety && !chery_icaur_safety) {
       return true;
     }
     if ((addr == (int)CHERY_LKAS_INFO) && !chery_omoda_no_torque_spoof) {

@@ -28,7 +28,7 @@ from opendbc.car.chery.values import (
 
 ButtonType = car.CarState.ButtonEvent.Type
 
-# Camera HUD fields mirrored on bus 0 by CarController (HANDS_ON_WHEEL_STEER forced to 0).
+# Camera HUD fields used for cruise/ADAS state (and Jaecoo HUD override TX when enabled).
 _CAM_HUD_FIELDS = (
   "AEB", "CANCEL_CRUISE_UNCERTAIN", "GAS_RESUME_UNCERTAIN", "FOLLOW_DISTANCE",
   "NEW_SIGNAL_1", "PCW", "CRUISE_STATE", "GAS_OVERRIDE", "AEB_RELATED", "SET_SPEED",

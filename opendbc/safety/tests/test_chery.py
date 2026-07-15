@@ -241,7 +241,7 @@ class TestCheryOmodaNoTorqueSpoofSafety(TestCheryOmodaSafety):
 
 
 class TestCheryIcaurSafety(TestCherySafety):
-  """iCaur 03: Jaecoo-style fwd hook; standstill from ICAUR_WHEELSPEED_A (0x222)."""
+  """iCaur 03: standstill from 0x222; HUD forwards like Omoda (no override)."""
 
   SAFETY_PARAM = 4
 
@@ -253,6 +253,15 @@ class TestCheryIcaurSafety(TestCherySafety):
         "WHEEL_FR": fr_raw,
       },
     )
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    # LANE_KEEP still blocked/replaced; HUD + LKAS_INFO (with torque spoof on in this
+    # test param) follow Jaecoo torque path for LKAS, but HUD must forward (Omoda-style).
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x394))  # param 4: spoof enabled
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387),
+                     msg="iCaur must forward cam HUD to PT (no HUD override)")
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
 
   def test_fwd_blocks_pt_torque_when_engaged(self):
     # 13-bit raw: 960 ↔ former 8-bit byte0=30 (high 8 bits); must leave byte0 >= 15.
@@ -274,6 +283,25 @@ class TestCheryIcaurSafety(TestCherySafety):
       self.assertEqual(-1, self.safety.safety_fwd_hook(0, addr),
                        msg=f"PT 0x{addr:x} should be blocked PT->cam when engaged")
     self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4))
+
+
+class TestCheryIcaurNoTorqueSpoofSafety(TestCheryIcaurSafety):
+  """Matches production iCaur safetyParam (ICAUR | NO_TORQUE_SPOOF)."""
+
+  SAFETY_PARAM = 4 | 2  # CHERY_ICAUR_SAFETY_PARAM | CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
+
+  def test_fwd_blocks_pt_torque_when_engaged(self):
+    self._rx(self._icaur_wheel_speed(0, 0))
+    self.safety.set_controls_allowed(True)
+    for addr in (0x394, 0x1D3, 0x0C4):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd when torque spoof disabled")
 
 
 if __name__ == "__main__":

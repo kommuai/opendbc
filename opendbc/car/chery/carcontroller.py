@@ -20,6 +20,7 @@ from opendbc.car.chery.values import (
   OMODA_DISABLE_HUD_OVERRIDE,
   OMODA_DISABLE_TORQUE_SPOOF,
   OMODA_PCM_DISABLE_RES_CYCLE_S,
+  ICAUR_DISABLE_HUD_OVERRIDE,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
@@ -212,7 +213,8 @@ class CarController(CarControllerBase):
         ))
 
     if self.frame % HUD_STEP == 0 and not (
-        self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_HUD_OVERRIDE
+        (self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_HUD_OVERRIDE) or
+        (self.CP.carFingerprint == CAR.CHERY_ICAUR_03 and ICAUR_DISABLE_HUD_OVERRIDE)
     ):
       can_sends.append(cherycan.create_hud_override(self.packer, CS.cam_hud, self.hud_counter))
       self.hud_counter = (self.hud_counter + 1) % 16
