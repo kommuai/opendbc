@@ -20,6 +20,7 @@ STEER_DT = 0.02
 MAX_STEER_ANGLE_OFFSET_DEG = 10
 # Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
 STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
+SEAL6_OVERRIDE_TORQUE_EPS = 15
 LKA_COOLDOWN_MIN_FRAMES = 30
 BUTTON_KEEPALIVE_FRAMES = 100
 SPOOF_DURATION_FRAMES = 50
@@ -79,7 +80,10 @@ class CarController(CarControllerBase):
       if CS.lka_on:
         self.lka_cooldown += 1
         self.lka_active = True
-      if not CS.lka_on and CS.lkas_rdy_btn:
+      elif self.CP.carFingerprint == CAR.BYD_SEAL6:
+        self.lka_active = False
+        self.lka_cooldown = 0
+      if self.CP.carFingerprint == CAR.BYD_ATTO3 and not CS.lka_on and CS.lkas_rdy_btn:
         self.lka_active = False
         self.lka_cooldown = 0
 
@@ -120,17 +124,24 @@ class CarController(CarControllerBase):
     self._update_lka_latch_state(CS)
 
     lat_active = (self.lka_cooldown > LKA_COOLDOWN_MIN_FRAMES) and enabled and self.lka_active and not CS.out.standstill
+    steer_req = lat_active
+    if self.CP.carFingerprint == CAR.BYD_SEAL6 and abs(CS.out.steeringTorqueEps) > SEAL6_OVERRIDE_TORQUE_EPS:
+      steer_req = False
 
     apply_angle = CS.out.steeringAngleDeg
     hand_on_wheel_warning = False
     if (self.frame % 2) == 0:
       apply_angle, steer_angle_limited = self._compute_apply_angle(CS, actuators, lat_active)
+      if not steer_req:
+        apply_angle = CS.out.steeringAngleDeg
+        self.last_apply_angle = apply_angle
+        steer_angle_limited = False
       hand_on_wheel_warning = bool(lat_active and steer_angle_limited)
       can_sends.append(
         create_can_steer_command(
           self.packer,
           apply_angle,
-          lat_active,
+          steer_req if self.CP.carFingerprint == CAR.BYD_SEAL6 else lat_active,
           CS.out.standstill,
           CS.lkas_healthy,
           CS.lkas_rdy_btn or CS.out.brakePressed,
@@ -162,7 +173,7 @@ class CarController(CarControllerBase):
         if CS.out.standstill and CC.enabled and (self.frame % BUTTON_KEEPALIVE_FRAMES == 0):
           can_sends.append(send_buttons(self.packer, 1, 0, self.button_send_bus))
 
-    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
+    if self.CP.carFingerprint in (CAR.BYD_M6, CAR.BYD_SEAL, CAR.BYD_SEAL6, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       cycle_position = self.frame % SPOOF_CYCLE_FRAMES
       spoof_active = cycle_position < SPOOF_DURATION_FRAMES
 

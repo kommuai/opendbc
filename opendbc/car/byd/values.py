@@ -135,6 +135,18 @@ class CAR(Platforms):
     )],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
   )
+  BYD_SEAL6 = CamLkaPlatformConfig(
+    [BYDCarDocs(
+      "BYD Seal 6 2025-26",
+      "ALL",
+      footnotes=[Footnote.LKC_ACC_INTELLIGENT],
+      variant="All",
+      kommu_supported=True,
+      **BYD_SUPPORT_COMMON_FIELDS,
+    )],
+    CarSpecs(mass=1665.0, wheelbase=2.79, steerRatio=16.0),
+    dbc_dict=dbc_dict("byd_general_pt", "byd_radar_seal6_fd"),
+  )
   BYD_SHARK = CamLkaPlatformConfig(
     [BYDCarDocs(
       "BYD Shark 2024-26",
@@ -152,6 +164,7 @@ PLATFORM_CAM_LKA = (
   CAR.BYD_M6,
   CAR.BYD_SEAL,
   CAR.BYD_SEALION7,
+  CAR.BYD_SEAL6,
   CAR.BYD_SHARK,
 )
 
@@ -163,11 +176,13 @@ PLATFORM_MPC_LKA = (
 BYD_ATTO_STYLE_PLATFORMS = (
   CAR.BYD_ATTO3,
   CAR.BYD_M6,
+  CAR.BYD_SEAL6,
 )
 
 BYD_OP_LONG_PLATFORMS = (
   CAR.BYD_ATTO3,
   CAR.BYD_M6,
+  CAR.BYD_SEAL6,
 )
 
 DBC = CAR.create_dbc_map()
@@ -178,6 +193,7 @@ ACCEL_MULT = defaultdict(
     CAR.BYD_M6: 26,
     CAR.BYD_SEAL: 1,
     CAR.BYD_SEALION7: 1,
+    CAR.BYD_SEAL6: 26,
     CAR.BYD_SHARK: 1,
   },
 )

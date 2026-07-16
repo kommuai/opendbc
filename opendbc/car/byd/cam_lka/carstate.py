@@ -84,14 +84,18 @@ class CarState(CarStateBase):
 
     can_gear = int(cp.vl["DRIVE_STATE"]["GEAR"])
 
-    ret.doorOpen = any([
-      cp.vl["METER_CLUSTER"]["BACK_LEFT_DOOR"],
-      cp.vl["METER_CLUSTER"]["FRONT_LEFT_DOOR"],
-      cp.vl["METER_CLUSTER"]["BACK_RIGHT_DOOR"],
-      cp.vl["METER_CLUSTER"]["FRONT_RIGHT_DOOR"],
-    ])
+    if self.CP.carFingerprint == CAR.BYD_SEAL6:
+      ret.doorOpen = False
+      ret.seatbeltUnlatched = False
+    else:
+      ret.doorOpen = any([
+        cp.vl["METER_CLUSTER"]["BACK_LEFT_DOOR"],
+        cp.vl["METER_CLUSTER"]["FRONT_LEFT_DOOR"],
+        cp.vl["METER_CLUSTER"]["BACK_RIGHT_DOOR"],
+        cp.vl["METER_CLUSTER"]["FRONT_RIGHT_DOOR"],
+      ])
+      ret.seatbeltUnlatched = cp.vl["METER_CLUSTER"]["SEATBELT_DRIVER"] == 0
 
-    ret.seatbeltUnlatched = cp.vl["METER_CLUSTER"]["SEATBELT_DRIVER"] == 0
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
 
     if ret.doorOpen or ret.seatbeltUnlatched or ret.brakeHoldActive:
@@ -114,6 +118,8 @@ class CarState(CarStateBase):
     hud_acc_on1 = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"])
     hud_acc_ctrl = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"])
     ret.cruiseState.available = hud_acc_on1 or hud_acc_ctrl
+    if self.CP.carFingerprint == CAR.BYD_SEAL6:
+      ret.cruiseState.available |= bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON2"])
 
     prev_distance_val = self.distance_val
     self.distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long else 1
@@ -153,7 +159,7 @@ class CarState(CarStateBase):
     if hud_clears_latch or ret.brakePressed or acc_cmd_clears_latch:
       self.is_cruise_latch = False
 
-    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK, CAR.BYD_M6):
+    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SEAL6, CAR.BYD_SHARK, CAR.BYD_M6):
       cruise_state = parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"]
       ret.cruiseState.enabled = cruise_state in (3, 5, 6, 7)
     else:
@@ -184,7 +190,6 @@ class CarState(CarStateBase):
     signals = [
       ("DRIVE_STATE", 50),
       ("PEDAL", 50),
-      ("METER_CLUSTER", 20),
       ("STEER_MODULE_2", 100),
       ("STEERING_TORQUE", 50),
       ("STALKS", math.nan),
@@ -192,6 +197,9 @@ class CarState(CarStateBase):
       ("PCM_BUTTONS", math.nan),
       ("WHEEL_SPEED", 50),
     ]
+
+    if CP.carFingerprint != CAR.BYD_SEAL6:
+      signals.insert(2, ("METER_CLUSTER", 20))
 
     if CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       signals.append(("ACC_CMD", 50))

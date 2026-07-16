@@ -7,11 +7,15 @@ from opendbc.car import Bus
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import RadarInterfaceBase
 from opendbc.car.structs import RadarData
-from opendbc.car.byd.values import CANBUS, DBC
+from opendbc.car.byd.values import CANBUS, DBC, CAR
 
 RADAR_START_ADDR = 0x280
 RADAR_MSG_COUNT = 10
+SEAL6_RADAR_START_ADDR = 0x670
+SEAL6_RADAR_MSG_COUNT = 16
 RADAR_FREQ_HZ = 20
+BUMPER_OFFSET_M = 4.0
+SEAL6_INVALID_LONG_DIST = 0.5
 
 # --- Temporal filtering / hysteresis ---
 # Aggressive persistence to prevent track churn and Kalman filter resets
@@ -40,8 +44,12 @@ def _create_radar_can_parser(CP):
   if Bus.radar not in dbc:
     return None
 
-  messages = [(f"RADAR_TRACK_{addr:02d}", RADAR_FREQ_HZ)
-              for addr in range(RADAR_MSG_COUNT)]
+  if CP.carFingerprint == CAR.BYD_SEAL6:
+    msg_count = SEAL6_RADAR_MSG_COUNT
+  else:
+    msg_count = RADAR_MSG_COUNT
+
+  messages = [(f"RADAR_TRACK_{i:02d}", RADAR_FREQ_HZ) for i in range(msg_count)]
   return CANParser(dbc[Bus.radar], messages, CANBUS.radar_bus)
 
 
@@ -51,14 +59,18 @@ class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
     super().__init__(CP)
 
+    self.seal6_radar = CP.carFingerprint == CAR.BYD_SEAL6
+    self.radar_msg_count = SEAL6_RADAR_MSG_COUNT if self.seal6_radar else RADAR_MSG_COUNT
+    radar_start = SEAL6_RADAR_START_ADDR if self.seal6_radar else RADAR_START_ADDR
+
     self.updated_messages = set()
-    self.trigger_msg = RADAR_START_ADDR + RADAR_MSG_COUNT - 1
+    self.trigger_msg = radar_start + self.radar_msg_count - 1
 
     self.track_id = 0
     self.slot_track_id = {}     # slot -> stable trackId
 
-    self.valid_cnt = {i: 0 for i in range(RADAR_MSG_COUNT)}
-    self.miss_cnt = {i: 0 for i in range(RADAR_MSG_COUNT)}
+    self.valid_cnt = {i: 0 for i in range(self.radar_msg_count)}
+    self.miss_cnt = {i: 0 for i in range(self.radar_msg_count)}
 
     self.rcp = None if CP.radarUnavailable else _create_radar_can_parser(CP)
 
@@ -83,6 +95,28 @@ class RadarInterface(RadarInterfaceBase):
     rr = float(vl["WHEELSPEED_BR"])
     v_ego = (fl + fr + rl + rr) / 4.0 * CV.KPH_TO_MS * self.CP.wheelSpeedFactor
     return v_ego, 0.0
+
+  def _read_track(self, msg, v_ego, a_ego):
+    if self.seal6_radar:
+      long_dist = float(msg.get("LONG_DIST", 0.0))
+      meas_ok = SEAL6_INVALID_LONG_DIST < long_dist <= (DREL_MAX + BUMPER_OFFSET_M)
+      conf = 0.95 if meas_ok else 0.0
+      lat_dist = float(msg.get("LAT_DIST", 0.0))
+      vlead = float(msg.get("VLEAD_KPH", 0.0)) * CV.KPH_TO_MS
+      alead = 0.0
+    else:
+      long_dist = float(msg.get("LONG_DIST", 255.0))
+      meas_ok = long_dist < 255.0
+      conf = float(msg.get("CONFIDENCE", 0.0))
+      lat_dist = float(msg.get("LAT_DIST", 0.0))
+      vlead = float(msg.get("VLEAD", 0.0))
+      alead = float(msg.get("ALEAD", 0.0))
+
+    dRel = long_dist - BUMPER_OFFSET_M
+    yRel = lat_dist
+    vRel = vlead - v_ego
+    aRel = alead - a_ego
+    return conf, meas_ok, dRel, yRel, vRel, aRel
 
   def update(self, can_strings):
     if self.rcp is None:
@@ -183,35 +217,28 @@ class RadarInterface(RadarInterfaceBase):
     if not self.rcp.can_valid:
       ret.errors.canError = True
 
-    for slot in range(RADAR_MSG_COUNT):
+    for slot in range(self.radar_msg_count):
       msg = self.rcp.vl[f"RADAR_TRACK_{slot:02d}"]
 
-      conf = float(msg.get("CONFIDENCE", 0.0))
-      long_dist = float(msg.get("LONG_DIST", 255.0))
-      lat_dist = float(msg.get("LAT_DIST", 0.0))
-      vlead = float(msg.get("VLEAD", 0.0))
-      alead = float(msg.get("ALEAD", 0.0))
+      conf, meas_ok, dRel, yRel, vRel, aRel = self._read_track(msg, v_ego, a_ego)
 
-      meas_ok = long_dist < 255.0
-
-      # --- convert to openpilot frame (intentional + correct per your note) ---
-      dRel = long_dist - 4.0
-      yRel = lat_dist
-      vRel = vlead - v_ego
-      aRel = alead - a_ego
-
-      # Balanced filtering: YREL_ABS_MAX set to 1.5m
-      # This filters out obvious side-lane vehicles while allowing legitimate vehicles
-      # Additional check: For vehicles further than 30m, require stricter lateral filtering
       yrel_max = YREL_ABS_MAX if dRel <= 30.0 else YREL_ABS_MAX * 0.7  # Stricter for far vehicles (1.05m)
 
-      plausible = (
-        meas_ok and
-        (DREL_MIN <= dRel <= DREL_MAX) and
-        (abs(yRel) <= yrel_max) and
-        (abs(vRel) <= VREL_ABS_MAX) and
-        (abs(aRel) <= AREL_ABS_MAX)
-      )
+      if self.seal6_radar:
+        plausible = (
+          meas_ok and
+          (DREL_MIN <= dRel <= DREL_MAX) and
+          (abs(yRel) <= yrel_max) and
+          (abs(vRel) <= VREL_ABS_MAX)
+        )
+      else:
+        plausible = (
+          meas_ok and
+          (DREL_MIN <= dRel <= DREL_MAX) and
+          (abs(yRel) <= yrel_max) and
+          (abs(vRel) <= VREL_ABS_MAX) and
+          (abs(aRel) <= AREL_ABS_MAX)
+        )
 
       # Require higher confidence for vehicles near the edge (even if within threshold)
       # This adds extra filtering for vehicles that are close to the lateral limit

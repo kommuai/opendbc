@@ -56,11 +56,15 @@ class CarInterface(CarInterfaceBase):
       ret.radarUnavailable = True
       ret.wheelSpeedFactor = 0.66  # Song Plus wheel speed calibration (1.0 was ~40-50% high vs GPS)
       ret.minSteerSpeed = 0.0
-    elif candidate in (CAR.BYD_ATTO3, CAR.BYD_M6):
+    elif candidate in (CAR.BYD_ATTO3, CAR.BYD_M6, CAR.BYD_SEAL6):
       ret.steerControlType = car.CarParams.SteerControlType.angle
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-      if candidate == CAR.BYD_M6:
+      if candidate in (CAR.BYD_M6, CAR.BYD_SEAL6):
         ret.safetyConfigs[0].safetyParam = 3
+      if candidate == CAR.BYD_SEAL6:
+        ret.pcmCruise = True
+        ret.wheelSpeedFactor = 0.6336
+        ret.enableBsm = False
     elif candidate in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       ret.steerControlType = car.CarParams.SteerControlType.angle
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
