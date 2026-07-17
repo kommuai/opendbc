@@ -14,6 +14,7 @@ static bool byd_alt_engage = false;
 static bool byd_steering_torque_spoof = false;
 static bool byd_mpc_lka_engage = false;
 static bool byd_relax_controls = false;
+static bool byd_stock_long = false;
 
 static void byd_rx_hook(const CANPacket_t *msg) {
   int bus = (int)msg->bus;
@@ -145,6 +146,10 @@ static bool byd_tx_hook(const CANPacket_t *msg) {
   }
 
   if (addr == (int)BYD_ACC_CMD) {
+    // Stock-long platforms forward camera ACC_CMD and must not TX it.
+    if (byd_stock_long) {
+      return false;
+    }
     // ACCEL_CMD raw byte; DBC physical = raw - 100. Stock logs use down to ~-80 (raw 20).
     static const LongitudinalLimits BYD_LONG_LIMITS = {
       .max_accel = 135,
@@ -174,7 +179,8 @@ static bool byd_fwd_hook(int bus_num, int addr) {
   } else if (bus_num == 2) {
     bool is_lkas_msg = (addr == 0x1E2) || (addr == 0x316);
     bool is_acc_msg = (addr == (int)BYD_ACC_CMD);
-    block = is_lkas_msg || is_acc_msg;
+    // Stock long: forward camera ACC_CMD. OP long: block it so we can TX our own.
+    block = is_lkas_msg || (is_acc_msg && !byd_stock_long);
   } else {
     /* no action */
   }
@@ -220,6 +226,20 @@ static safety_config byd_init(uint16_t param) {
   } else if (param == 3U) {
     byd_alt_engage = true;
     byd_steering_torque_spoof = true;
+  } else if (param == 5U) {
+    // Seal 6 stock longitudinal: same lateral/engage path as param 3, but forward
+    // camera ACC_CMD and omit it from the TX allow-list so OP cannot conflict.
+    static const CanMsg BYD_TX_MSGS_STOCK_LONG[] = {
+      {0x1E2, 0, 8, .check_relay = true},   // STEERING_MODULE_ADAS
+      {0x316, 0, 8, .check_relay = true},   // LKAS_HUD_ADAS
+      {0x3B0, 0, 8, .check_relay = false},  // PCM_BUTTONS
+      {0x3B0, 2, 8, .check_relay = false},
+      {0x1FC, 2, 8, .check_relay = false},  // STEERING_TORQUE
+    };
+    byd_alt_engage = true;
+    byd_steering_torque_spoof = true;
+    byd_stock_long = true;
+    cfg = BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS_STOCK_LONG);
   } else if (param == 4U) {
     static const CanMsg BYD_MPC_LKA_TX_MSGS[] = {
       {0x316, 0, 8, .check_relay = true},   // ACC_MPC_STATE -> EPS
