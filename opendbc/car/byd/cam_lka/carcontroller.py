@@ -21,11 +21,16 @@ MAX_STEER_ANGLE_OFFSET_DEG = 10
 # Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
 STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
 # Seal 6 angle path: hard-drop STEER_REQ on driver override (no soft yield).
-# Enter: |Eps| hard, or lighter |Eps| + |Main| assist. Exit: |Eps| only (Main stays
-# high while EPS fights). Soft reacquire fade stays off.
+# Enter: speed-scaled |Eps| hard, or lighter |Eps| + |Main| assist. Exit: |Eps| only
+# (Main stays high while EPS fights). Soft reacquire fade stays off.
 SEAL6_DRIVER_OVERRIDE_ENABLED = True
-SEAL6_OVERRIDE_ENTER_EPS = 8
-SEAL6_OVERRIDE_ENTER_EPS_SOFT = 5
+# Base enter at low speed; DRIVER_EPS_TORQUE under-reports at highway (logs 2026-07-17).
+SEAL6_OVERRIDE_ENTER_EPS_LOW = 8
+SEAL6_OVERRIDE_ENTER_EPS_HIGH = 4
+SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH = 30.0
+SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH = 55.0
+SEAL6_OVERRIDE_ENTER_EPS_SOFT_LOW = 5
+SEAL6_OVERRIDE_ENTER_EPS_SOFT_HIGH = 3
 SEAL6_OVERRIDE_ENTER_MAIN = 25
 SEAL6_OVERRIDE_EXIT_EPS = 3
 SEAL6_OVERRIDE_EXIT_FRAMES = 20  # 0.2s at 100Hz CC
@@ -33,6 +38,36 @@ SEAL6_OVERRIDE_EXIT_FRAMES = 20  # 0.2s at 100Hz CC
 SEAL6_REACQUIRE_FRAMES = 0
 SEAL6_REACQUIRE_START_FRAC = 0.35
 LKA_COOLDOWN_MIN_FRAMES = 30
+
+
+def _seal6_speed_lerp(v_ego: float, low_kph: float, high_kph: float, low_val: float, high_val: float) -> float:
+  v_kph = max(0.0, v_ego * 3.6)
+  if v_kph <= low_kph:
+    return low_val
+  if v_kph >= high_kph:
+    return high_val
+  t = (v_kph - low_kph) / (high_kph - low_kph)
+  return low_val + t * (high_val - low_val)
+
+
+def seal6_override_enter_thresholds(v_ego: float) -> tuple[float, float]:
+  enter_eps = _seal6_speed_lerp(
+    v_ego,
+    SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH,
+    SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH,
+    SEAL6_OVERRIDE_ENTER_EPS_LOW,
+    SEAL6_OVERRIDE_ENTER_EPS_HIGH,
+  )
+  enter_eps_soft = _seal6_speed_lerp(
+    v_ego,
+    SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH,
+    SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH,
+    SEAL6_OVERRIDE_ENTER_EPS_SOFT_LOW,
+    SEAL6_OVERRIDE_ENTER_EPS_SOFT_HIGH,
+  )
+  return enter_eps, enter_eps_soft
+
+
 BUTTON_KEEPALIVE_FRAMES = 100
 SPOOF_DURATION_FRAMES = 50
 SPOOF_CYCLE_FRAMES = 150
@@ -156,9 +191,10 @@ class CarController(CarControllerBase):
     if self.CP.carFingerprint == CAR.BYD_SEAL6 and SEAL6_DRIVER_OVERRIDE_ENABLED:
       driver_eps = abs(CS.out.steeringTorqueEps)
       driver_main = abs(CS.out.steeringTorque)
+      enter_eps, enter_eps_soft = seal6_override_enter_thresholds(CS.out.vEgo)
       override_enter = (
-        driver_eps >= SEAL6_OVERRIDE_ENTER_EPS or
-        (driver_eps >= SEAL6_OVERRIDE_ENTER_EPS_SOFT and driver_main >= SEAL6_OVERRIDE_ENTER_MAIN)
+        driver_eps >= enter_eps or
+        (driver_eps >= enter_eps_soft and driver_main >= SEAL6_OVERRIDE_ENTER_MAIN)
       )
       if not lat_active:
         self.seal6_steer_override = False
