@@ -182,6 +182,7 @@ BYD_ATTO_STYLE_PLATFORMS = (
 BYD_OP_LONG_PLATFORMS = (
   CAR.BYD_ATTO3,
   CAR.BYD_M6,
+  CAR.BYD_SEAL6,
 )
 
 DBC = CAR.create_dbc_map()
@@ -192,6 +193,7 @@ ACCEL_MULT = defaultdict(
     CAR.BYD_M6: 26,
     CAR.BYD_SEAL: 1,
     CAR.BYD_SEALION7: 1,
+    CAR.BYD_SEAL6: 26,
     CAR.BYD_SHARK: 1,
   },
 )

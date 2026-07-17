@@ -59,12 +59,9 @@ class CarInterface(CarInterfaceBase):
     elif candidate in (CAR.BYD_ATTO3, CAR.BYD_M6, CAR.BYD_SEAL6):
       ret.steerControlType = car.CarParams.SteerControlType.angle
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-      if candidate == CAR.BYD_M6:
+      if candidate in (CAR.BYD_M6, CAR.BYD_SEAL6):
         ret.safetyConfigs[0].safetyParam = 3
       if candidate == CAR.BYD_SEAL6:
-        # Stock ACC: forward cam ACC_CMD; do not TX 0x32E (safetyParam 5).
-        ret.safetyConfigs[0].safetyParam = 5
-        ret.openpilotLongitudinalControl = False
         ret.pcmCruise = True
         ret.wheelSpeedFactor = 0.6336
         ret.enableBsm = False

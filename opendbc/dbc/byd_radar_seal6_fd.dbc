@@ -4,6 +4,11 @@ VERSION ""
 # Reverse-engineered from stock logs (2026-07-16--06-20-47).
 # 16 object frames per cycle: 0x670..0x67f (64 bytes each), trigger on 0x67f.
 # Header/status: 0x64e (8B), 0x66f (16B) — not required for track parsing.
+#
+# VLEAD_KPH @ bit 112: DO NOT USE for control. Route 2026-07-17--01-30-08 shows
+# ~71% of "valid" tracks stuck at raw 11775 (~117.8 kph) and many at ~2560 (~25.6 kph)
+# sentinels. Treating these as absolute speed caused phantom braking. openpilot derives
+# vRel from LONG_DIST rate instead (see radar_interface.py).
 
 NS_ :
     NS_DESC_

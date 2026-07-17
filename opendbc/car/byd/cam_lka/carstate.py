@@ -44,9 +44,6 @@ class CarState(CarStateBase):
       self.op_long = True
       return cp_cam
     self.op_long = False
-    # Seal 6 stock ACC HUD/state is on the camera bus (same layout as OP-long platforms).
-    if self.CP.carFingerprint == CAR.BYD_SEAL6:
-      return cp_cam
     return cp
 
   def update(self, can_parsers):
@@ -221,9 +218,6 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in BYD_OP_LONG_PLATFORMS:
       signals.append(("ACC_CMD", 50))
-      signals.append(("ACC_HUD_ADAS", 50))
-    elif CP.carFingerprint == CAR.BYD_SEAL6:
-      # Stock long: read cruise HUD from cam; do not require ACC_CMD (stock owns it).
       signals.append(("ACC_HUD_ADAS", 50))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.cam_bus)

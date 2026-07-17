@@ -19,6 +19,12 @@ SEAL6_INVALID_LONG_DIST = 0.5
 # Seal 6 empty slots often decode as LONG_DIST ~185–636 m; keep only near/mid range.
 SEAL6_DREL_MAX = 120.0
 SEAL6_YREL_ABS_MAX = 1.2
+# VLEAD_KPH @ bit 112 is NOT real speed: stock logs show ~71% stuck at ~117.8 kph and
+# ~3% at ~25.6 kph sentinels (route 2026-07-17--01-30-08). Using it as absolute speed
+# created fake vRel≈-13 and phantom brakes. Derive vRel from LONG_DIST rate instead.
+SEAL6_VREL_LP_ALPHA = 0.35
+SEAL6_RANGE_RATE_DT = 1.0 / RADAR_FREQ_HZ
+SEAL6_VREL_RESET_JUMP = 25.0  # m/s; slot reuse / teleport
 
 # --- Temporal filtering / hysteresis ---
 # Aggressive persistence to prevent track churn and Kalman filter resets
@@ -88,6 +94,10 @@ class RadarInterface(RadarInterfaceBase):
     self.track_history: dict[int, tuple[float, float, float, int]] = {}
     self.MAX_HISTORY_FRAMES = 10  # Keep history for up to 10 frames after track disappears
 
+    # Seal6: per-slot range history for vRel (VLEAD_KPH is unusable)
+    self.seal6_prev_drel: dict[int, float] = {}
+    self.seal6_vrel_filt: dict[int, float] = {}
+
   def _ego_speed_accel(self) -> tuple[float, float]:
     if self.speed_cp is None:
       return 0.0, 0.0
@@ -99,7 +109,25 @@ class RadarInterface(RadarInterfaceBase):
     v_ego = (fl + fr + rl + rr) / 4.0 * CV.KPH_TO_MS * self.CP.wheelSpeedFactor
     return v_ego, 0.0
 
-  def _read_track(self, msg, v_ego, a_ego):
+  def _seal6_vrel_from_range(self, slot: int, dRel: float) -> float:
+    """Estimate vRel from dRel finite difference; ignore unusable VLEAD_KPH sentinels."""
+    prev = self.seal6_prev_drel.get(slot)
+    self.seal6_prev_drel[slot] = dRel
+    if prev is None:
+      self.seal6_vrel_filt[slot] = 0.0
+      return 0.0
+
+    raw = (dRel - prev) / SEAL6_RANGE_RATE_DT
+    if abs(raw) > SEAL6_VREL_RESET_JUMP:
+      self.seal6_vrel_filt[slot] = 0.0
+      return 0.0
+
+    prev_filt = self.seal6_vrel_filt.get(slot, raw)
+    filt = SEAL6_VREL_LP_ALPHA * raw + (1.0 - SEAL6_VREL_LP_ALPHA) * prev_filt
+    self.seal6_vrel_filt[slot] = filt
+    return float(filt)
+
+  def _read_track(self, msg, v_ego, a_ego, slot: int | None = None):
     if self.seal6_radar:
       long_dist = float(msg.get("LONG_DIST", 0.0))
       track_id = int(msg.get("TRACK_ID", 0))
@@ -110,15 +138,22 @@ class RadarInterface(RadarInterfaceBase):
       )
       conf = 0.95 if meas_ok else 0.0
       lat_dist = float(msg.get("LAT_DIST", 0.0))
-      vlead = float(msg.get("VLEAD_KPH", 0.0)) * CV.KPH_TO_MS
-      alead = 0.0
-    else:
-      long_dist = float(msg.get("LONG_DIST", 255.0))
-      meas_ok = long_dist < 255.0
-      conf = float(msg.get("CONFIDENCE", 0.0))
-      lat_dist = float(msg.get("LAT_DIST", 0.0))
-      vlead = float(msg.get("VLEAD", 0.0))
-      alead = float(msg.get("ALEAD", 0.0))
+      dRel = long_dist - BUMPER_OFFSET_M
+      yRel = lat_dist
+      # Do not use VLEAD_KPH — stock DBC field is sentinel garbage (see SEAL6_* comments).
+      if slot is not None and meas_ok:
+        vRel = self._seal6_vrel_from_range(slot, dRel)
+      else:
+        vRel = 0.0
+      aRel = 0.0
+      return conf, meas_ok, dRel, yRel, vRel, aRel
+
+    long_dist = float(msg.get("LONG_DIST", 255.0))
+    meas_ok = long_dist < 255.0
+    conf = float(msg.get("CONFIDENCE", 0.0))
+    lat_dist = float(msg.get("LAT_DIST", 0.0))
+    vlead = float(msg.get("VLEAD", 0.0))
+    alead = float(msg.get("ALEAD", 0.0))
 
     dRel = long_dist - BUMPER_OFFSET_M
     yRel = lat_dist
@@ -217,6 +252,8 @@ class RadarInterface(RadarInterfaceBase):
 
     self.valid_cnt[slot] = 0
     self.miss_cnt[slot] = 0
+    self.seal6_prev_drel.pop(slot, None)
+    self.seal6_vrel_filt.pop(slot, None)
     # Keep slot_track_id to allow matching when track reappears
     # Don't delete it here - let it persist for potential rematching
 
@@ -228,7 +265,7 @@ class RadarInterface(RadarInterfaceBase):
     for slot in range(self.radar_msg_count):
       msg = self.rcp.vl[f"RADAR_TRACK_{slot:02d}"]
 
-      conf, meas_ok, dRel, yRel, vRel, aRel = self._read_track(msg, v_ego, a_ego)
+      conf, meas_ok, dRel, yRel, vRel, aRel = self._read_track(msg, v_ego, a_ego, slot)
 
       if self.seal6_radar:
         drel_max = SEAL6_DREL_MAX

@@ -20,13 +20,16 @@ STEER_DT = 0.02
 MAX_STEER_ANGLE_OFFSET_DEG = 10
 # Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
 STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
-# Seal 6 angle path: EPS owns torque, so "soft yield" (STEER_REQ=1 + measured angle) still fights
-# the driver. Drop STEER_REQ on enter, and hold release with hysteresis — otherwise eps falls as
-# soon as the wheel frees and we re-grab within ~100ms (route 2026-07-16--14-47-55).
-SEAL6_OVERRIDE_ENTER_EPS = 10
-SEAL6_OVERRIDE_EXIT_EPS = 4
-SEAL6_OVERRIDE_EXIT_FRAMES = 15  # 0.15s at 100Hz CC
-# Reacquire fade temporarily disabled (was soft post-override blend).
+# Seal 6 angle path: hard-drop STEER_REQ on driver override (no soft yield).
+# Enter: |Eps| hard, or lighter |Eps| + |Main| assist. Exit: |Eps| only (Main stays
+# high while EPS fights). Soft reacquire fade stays off.
+SEAL6_DRIVER_OVERRIDE_ENABLED = True
+SEAL6_OVERRIDE_ENTER_EPS = 8
+SEAL6_OVERRIDE_ENTER_EPS_SOFT = 5
+SEAL6_OVERRIDE_ENTER_MAIN = 25
+SEAL6_OVERRIDE_EXIT_EPS = 3
+SEAL6_OVERRIDE_EXIT_FRAMES = 20  # 0.2s at 100Hz CC
+# Soft yield / reacquire fade disabled.
 SEAL6_REACQUIRE_FRAMES = 0
 SEAL6_REACQUIRE_START_FRAC = 0.35
 LKA_COOLDOWN_MIN_FRAMES = 30
@@ -150,13 +153,19 @@ class CarController(CarControllerBase):
 
     lat_active = (self.lka_cooldown > LKA_COOLDOWN_MIN_FRAMES) and enabled and self.lka_active and not CS.out.standstill
     steer_req = lat_active
-    if self.CP.carFingerprint == CAR.BYD_SEAL6:
+    if self.CP.carFingerprint == CAR.BYD_SEAL6 and SEAL6_DRIVER_OVERRIDE_ENABLED:
       driver_eps = abs(CS.out.steeringTorqueEps)
+      driver_main = abs(CS.out.steeringTorque)
+      override_enter = (
+        driver_eps >= SEAL6_OVERRIDE_ENTER_EPS or
+        (driver_eps >= SEAL6_OVERRIDE_ENTER_EPS_SOFT and driver_main >= SEAL6_OVERRIDE_ENTER_MAIN)
+      )
       if not lat_active:
         self.seal6_steer_override = False
         self.seal6_override_clear = 0
         self.seal6_reacquire = 0
       elif self.seal6_steer_override:
+        # Exit on Eps only — Main is not used (stays elevated while EPS fights).
         if driver_eps <= SEAL6_OVERRIDE_EXIT_EPS:
           self.seal6_override_clear += 1
           if self.seal6_override_clear >= SEAL6_OVERRIDE_EXIT_FRAMES:
@@ -166,7 +175,7 @@ class CarController(CarControllerBase):
             self.last_apply_angle = CS.out.steeringAngleDeg
         else:
           self.seal6_override_clear = 0
-      elif driver_eps >= SEAL6_OVERRIDE_ENTER_EPS:
+      elif override_enter:
         self.seal6_steer_override = True
         self.seal6_override_clear = 0
         self.seal6_reacquire = 0
@@ -174,6 +183,10 @@ class CarController(CarControllerBase):
         steer_req = False
       elif self.seal6_reacquire > 0:
         self.seal6_reacquire -= 1
+    elif self.CP.carFingerprint == CAR.BYD_SEAL6:
+      self.seal6_steer_override = False
+      self.seal6_override_clear = 0
+      self.seal6_reacquire = 0
 
     apply_angle = CS.out.steeringAngleDeg
     hand_on_wheel_warning = False
