@@ -193,13 +193,15 @@ class CarState(CarStateBase):
       ("STEER_MODULE_2", 100),
       ("STEERING_TORQUE", 50),
       ("STALKS", math.nan),
-      ("BSM", 20),
       ("PCM_BUTTONS", math.nan),
       ("WHEEL_SPEED", 50),
     ]
 
     if CP.carFingerprint != CAR.BYD_SEAL6:
       signals.insert(2, ("METER_CLUSTER", 20))
+
+    if CP.enableBsm:
+      signals.append(("BSM", 20))
 
     if CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
       signals.append(("ACC_CMD", 50))

@@ -16,6 +16,9 @@ SEAL6_RADAR_MSG_COUNT = 16
 RADAR_FREQ_HZ = 20
 BUMPER_OFFSET_M = 4.0
 SEAL6_INVALID_LONG_DIST = 0.5
+# Seal 6 empty slots often decode as LONG_DIST ~185–636 m; keep only near/mid range.
+SEAL6_DREL_MAX = 120.0
+SEAL6_YREL_ABS_MAX = 1.2
 
 # --- Temporal filtering / hysteresis ---
 # Aggressive persistence to prevent track churn and Kalman filter resets
@@ -99,7 +102,12 @@ class RadarInterface(RadarInterfaceBase):
   def _read_track(self, msg, v_ego, a_ego):
     if self.seal6_radar:
       long_dist = float(msg.get("LONG_DIST", 0.0))
-      meas_ok = SEAL6_INVALID_LONG_DIST < long_dist <= (DREL_MAX + BUMPER_OFFSET_M)
+      track_id = int(msg.get("TRACK_ID", 0))
+      # Empty/ghost slots: LONG_DIST out of range, or TRACK_ID=0 with no real object.
+      meas_ok = (
+        track_id > 0 and
+        SEAL6_INVALID_LONG_DIST < long_dist <= (SEAL6_DREL_MAX + BUMPER_OFFSET_M)
+      )
       conf = 0.95 if meas_ok else 0.0
       lat_dist = float(msg.get("LAT_DIST", 0.0))
       vlead = float(msg.get("VLEAD_KPH", 0.0)) * CV.KPH_TO_MS
@@ -222,19 +230,25 @@ class RadarInterface(RadarInterfaceBase):
 
       conf, meas_ok, dRel, yRel, vRel, aRel = self._read_track(msg, v_ego, a_ego)
 
-      yrel_max = YREL_ABS_MAX if dRel <= 30.0 else YREL_ABS_MAX * 0.7  # Stricter for far vehicles (1.05m)
+      if self.seal6_radar:
+        drel_max = SEAL6_DREL_MAX
+        yrel_base = SEAL6_YREL_ABS_MAX
+      else:
+        drel_max = DREL_MAX
+        yrel_base = YREL_ABS_MAX
+      yrel_max = yrel_base if dRel <= 30.0 else yrel_base * 0.7
 
       if self.seal6_radar:
         plausible = (
           meas_ok and
-          (DREL_MIN <= dRel <= DREL_MAX) and
+          (DREL_MIN <= dRel <= drel_max) and
           (abs(yRel) <= yrel_max) and
           (abs(vRel) <= VREL_ABS_MAX)
         )
       else:
         plausible = (
           meas_ok and
-          (DREL_MIN <= dRel <= DREL_MAX) and
+          (DREL_MIN <= dRel <= drel_max) and
           (abs(yRel) <= yrel_max) and
           (abs(vRel) <= VREL_ABS_MAX) and
           (abs(aRel) <= AREL_ABS_MAX)
@@ -274,6 +288,9 @@ class RadarInterface(RadarInterfaceBase):
 
       # Don't publish if track is moving away
       publish = (self.valid_cnt[slot] >= VALID_CNT_ON) and not track_moving_away
+      # Seal 6: never overwrite a validated track with out-of-range ghost LONG_DIST.
+      if self.seal6_radar:
+        publish = publish and good
 
       # Keep tracks alive longer - publish them even when they briefly fail filtering
       # This prevents Kalman filter resets in radard.py
