@@ -2,6 +2,8 @@
 # BYD front radar: same framing pattern as toyota/honda/gm (single update(), CANParser, trigger frame).
 # Unlike those stacks, BYD DBC exposes VLEAD as absolute lead speed; radard expects RadarPoint.vRel
 # relative to ego, so we parse WHEEL_SPEED on the PT bus (same wheel scaling as CarState) for v_ego.
+from collections import deque
+
 from opendbc.can import CANParser
 from opendbc.car import Bus
 from opendbc.car.common.conversions import Conversions as CV
@@ -16,15 +18,34 @@ SEAL6_RADAR_MSG_COUNT = 16
 RADAR_FREQ_HZ = 20
 BUMPER_OFFSET_M = 4.0
 SEAL6_INVALID_LONG_DIST = 0.5
-# Seal 6 empty slots often decode as LONG_DIST ~185–636 m; keep only near/mid range.
-SEAL6_DREL_MAX = 120.0
+# Max publish range (dRel). Was 120m; stock radar decodes real in-lane leads to ~105m on highway logs.
+SEAL6_DREL_MAX = 160.0
+# Empty slots decode as LONG_DIST ~183–636 m — hard reject at/above this raw distance.
+SEAL6_GHOST_LONG_DIST_MIN = 175.0
+# ~144m cluster correlates with vision ~20m (route 2026-07-17--01-30-08); not real far leads.
+SEAL6_SENTINEL_LONG_MIN = 138.0
+SEAL6_SENTINEL_LONG_MAX = 153.0
 SEAL6_YREL_ABS_MAX = 1.2
+# Stricter gates above this dRel to limit phantom far tracks while extending range.
+SEAL6_FAR_DREL_M = 100.0
+SEAL6_FAR_YREL_ABS_MAX = 0.85
+SEAL6_FAR_VALID_CNT_ON = 8
 # VLEAD_KPH @ bit 112 is NOT real speed: stock logs show ~71% stuck at ~117.8 kph and
 # ~3% at ~25.6 kph sentinels (route 2026-07-17--01-30-08). Using it as absolute speed
 # created fake vRel≈-13 and phantom brakes. Derive vRel from LONG_DIST rate instead.
 SEAL6_VREL_LP_ALPHA = 0.35
 SEAL6_RANGE_RATE_DT = 1.0 / RADAR_FREQ_HZ
 SEAL6_VREL_RESET_JUMP = 25.0  # m/s; slot reuse / teleport
+# Low-speed stop-and-go: radard may prefer a radar-only frozen lead over a moving vision lead.
+# Without vision here, reject stale stationary ghosts (frozen dRel + vRel≈0) and range snaps.
+SEAL6_LOW_SPEED_V_EGO_MAX = 4.0   # match radard V_EGO_STATIONARY
+SEAL6_LOW_SPEED_FROZEN_EPS = 0.08
+SEAL6_LOW_SPEED_FROZEN_FRAMES = 8   # 0.4s @ 20Hz
+SEAL6_LOW_SPEED_EGO_CREEP = 0.05    # m/s; any rollout, not just highway creep
+SEAL6_LOW_SPEED_VREL_STATIONARY = 0.5
+SEAL6_LOW_SPEED_SNAP_M = 1.25       # m; single-frame range jump with no vRel
+SEAL6_LOW_SPEED_CLOSE_DREL = 25.0
+SEAL6_LOW_SPEED_CLOSE_VALID_CNT = 10  # 0.5s @ 20Hz before publishing close tracks
 
 # --- Temporal filtering / hysteresis ---
 # Aggressive persistence to prevent track churn and Kalman filter resets
@@ -97,6 +118,7 @@ class RadarInterface(RadarInterfaceBase):
     # Seal6: per-slot range history for vRel (VLEAD_KPH is unusable)
     self.seal6_prev_drel: dict[int, float] = {}
     self.seal6_vrel_filt: dict[int, float] = {}
+    self.seal6_drel_ring: dict[int, deque[float]] = {}
 
   def _ego_speed_accel(self) -> tuple[float, float]:
     if self.speed_cp is None:
@@ -108,6 +130,15 @@ class RadarInterface(RadarInterfaceBase):
     rr = float(vl["WHEELSPEED_BR"])
     v_ego = (fl + fr + rl + rr) / 4.0 * CV.KPH_TO_MS * self.CP.wheelSpeedFactor
     return v_ego, 0.0
+
+  def _seal6_long_dist_plausible(self, long_dist: float) -> bool:
+    if long_dist <= SEAL6_INVALID_LONG_DIST:
+      return False
+    if long_dist >= SEAL6_GHOST_LONG_DIST_MIN:
+      return False
+    if SEAL6_SENTINEL_LONG_MIN <= long_dist <= SEAL6_SENTINEL_LONG_MAX:
+      return False
+    return long_dist <= (SEAL6_DREL_MAX + BUMPER_OFFSET_M)
 
   def _seal6_vrel_from_range(self, slot: int, dRel: float) -> float:
     """Estimate vRel from dRel finite difference; ignore unusable VLEAD_KPH sentinels."""
@@ -127,15 +158,32 @@ class RadarInterface(RadarInterfaceBase):
     self.seal6_vrel_filt[slot] = filt
     return float(filt)
 
+  def _seal6_low_speed_untrusted(self, slot: int, dRel: float, yRel: float, vRel: float, v_ego: float, prev_drel: float | None) -> bool:
+    """Seal6 stop-and-go: drop radar tracks vision would reject (frozen stationary / range snap)."""
+    if v_ego >= SEAL6_LOW_SPEED_V_EGO_MAX:
+      return False
+    if abs(yRel) > 0.5 or not (DREL_MIN <= dRel <= SEAL6_LOW_SPEED_CLOSE_DREL):
+      return False
+
+    if prev_drel is not None:
+      if abs(dRel - prev_drel) > SEAL6_LOW_SPEED_SNAP_M and abs(vRel) < 1.0:
+        return True
+
+    ring = self.seal6_drel_ring.setdefault(slot, deque(maxlen=SEAL6_LOW_SPEED_FROZEN_FRAMES))
+    ring.append(dRel)
+    if len(ring) >= SEAL6_LOW_SPEED_FROZEN_FRAMES:
+      frozen = max(ring) - min(ring) < SEAL6_LOW_SPEED_FROZEN_EPS
+      if frozen and abs(vRel) < SEAL6_LOW_SPEED_VREL_STATIONARY and v_ego > SEAL6_LOW_SPEED_EGO_CREEP:
+        return True
+
+    return False
+
   def _read_track(self, msg, v_ego, a_ego, slot: int | None = None):
     if self.seal6_radar:
       long_dist = float(msg.get("LONG_DIST", 0.0))
       track_id = int(msg.get("TRACK_ID", 0))
-      # Empty/ghost slots: LONG_DIST out of range, or TRACK_ID=0 with no real object.
-      meas_ok = (
-        track_id > 0 and
-        SEAL6_INVALID_LONG_DIST < long_dist <= (SEAL6_DREL_MAX + BUMPER_OFFSET_M)
-      )
+      # Empty/ghost slots: invalid LONG_DIST, known sentinel bands, or TRACK_ID=0.
+      meas_ok = track_id > 0 and self._seal6_long_dist_plausible(long_dist)
       conf = 0.95 if meas_ok else 0.0
       lat_dist = float(msg.get("LAT_DIST", 0.0))
       dRel = long_dist - BUMPER_OFFSET_M
@@ -254,6 +302,7 @@ class RadarInterface(RadarInterfaceBase):
     self.miss_cnt[slot] = 0
     self.seal6_prev_drel.pop(slot, None)
     self.seal6_vrel_filt.pop(slot, None)
+    self.seal6_drel_ring.pop(slot, None)
     # Keep slot_track_id to allow matching when track reappears
     # Don't delete it here - let it persist for potential rematching
 
@@ -264,16 +313,34 @@ class RadarInterface(RadarInterfaceBase):
 
     for slot in range(self.radar_msg_count):
       msg = self.rcp.vl[f"RADAR_TRACK_{slot:02d}"]
+      prev_drel = self.seal6_prev_drel.get(slot) if self.seal6_radar else None
 
       conf, meas_ok, dRel, yRel, vRel, aRel = self._read_track(msg, v_ego, a_ego, slot)
+
+      low_speed_untrusted = False
+      if self.seal6_radar and meas_ok:
+        low_speed_untrusted = self._seal6_low_speed_untrusted(slot, dRel, yRel, vRel, v_ego, prev_drel)
+        if low_speed_untrusted:
+          meas_ok = False
+          conf = 0.0
+          self._kill_slot(slot)
+          continue
 
       if self.seal6_radar:
         drel_max = SEAL6_DREL_MAX
         yrel_base = SEAL6_YREL_ABS_MAX
+        if dRel > SEAL6_FAR_DREL_M:
+          yrel_base = min(yrel_base, SEAL6_FAR_YREL_ABS_MAX)
       else:
         drel_max = DREL_MAX
         yrel_base = YREL_ABS_MAX
       yrel_max = yrel_base if dRel <= 30.0 else yrel_base * 0.7
+
+      valid_cnt_on = VALID_CNT_ON
+      if self.seal6_radar and dRel > SEAL6_FAR_DREL_M:
+        valid_cnt_on = SEAL6_FAR_VALID_CNT_ON
+      elif self.seal6_radar and v_ego < SEAL6_LOW_SPEED_V_EGO_MAX and abs(yRel) <= 0.5 and dRel <= SEAL6_LOW_SPEED_CLOSE_DREL:
+        valid_cnt_on = max(valid_cnt_on, SEAL6_LOW_SPEED_CLOSE_VALID_CNT)
 
       if self.seal6_radar:
         plausible = (
@@ -319,12 +386,12 @@ class RadarInterface(RadarInterfaceBase):
         elif meas_ok and dRel > pt.dRel + 3.0 and vRel > 2.0:  # Moved >3m forward and moving away >2m/s
           track_moving_away = True
         # Track was previously good but now clearly side-lane (moved beyond threshold)
-        elif abs(yRel) > yrel_max and self.valid_cnt[slot] >= VALID_CNT_ON:
+        elif abs(yRel) > yrel_max and self.valid_cnt[slot] >= valid_cnt_on:
           # Was a valid track but now moved to side-lane - delete immediately
           track_moving_away = True
 
       # Don't publish if track is moving away
-      publish = (self.valid_cnt[slot] >= VALID_CNT_ON) and not track_moving_away
+      publish = (self.valid_cnt[slot] >= valid_cnt_on) and not track_moving_away
       # Seal 6: never overwrite a validated track with out-of-range ghost LONG_DIST.
       if self.seal6_radar:
         publish = publish and good

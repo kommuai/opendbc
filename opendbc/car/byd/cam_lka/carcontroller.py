@@ -20,52 +20,14 @@ STEER_DT = 0.02
 MAX_STEER_ANGLE_OFFSET_DEG = 10
 # Degrees: warn on HUD when command hits angle safety envelope (meas offset or global max).
 STEER_ANGLE_LIMIT_WARN_EPS_DEG = 0.08
-# Seal 6 angle path: hard-drop STEER_REQ on driver override (no soft yield).
-# Enter: speed-scaled |Eps| hard, or lighter |Eps| + |Main| assist. Exit: |Eps| only
-# (Main stays high while EPS fights). Soft reacquire fade stays off.
+# Seal 6 angle path: hard-drop STEER_REQ on driver override (MAIN_TORQUE only).
+# Thresholds from Seal6 logs: straight LKA (no driver) p95=7.6 Nm, p50=0.7 Nm.
 SEAL6_DRIVER_OVERRIDE_ENABLED = True
-# Base enter at low speed; DRIVER_EPS_TORQUE under-reports at highway (logs 2026-07-17).
-SEAL6_OVERRIDE_ENTER_EPS_LOW = 8
-SEAL6_OVERRIDE_ENTER_EPS_HIGH = 4
-SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH = 30.0
-SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH = 55.0
-SEAL6_OVERRIDE_ENTER_EPS_SOFT_LOW = 5
-SEAL6_OVERRIDE_ENTER_EPS_SOFT_HIGH = 3
-SEAL6_OVERRIDE_ENTER_MAIN = 25
-SEAL6_OVERRIDE_EXIT_EPS = 3
-SEAL6_OVERRIDE_EXIT_FRAMES = 20  # 0.2s at 100Hz CC
-# Soft yield / reacquire fade disabled.
-SEAL6_REACQUIRE_FRAMES = 0
-SEAL6_REACQUIRE_START_FRAC = 0.35
+SEAL6_OVERRIDE_ENTER_NM = 25
+SEAL6_OVERRIDE_EXIT_NM = 4
+SEAL6_OVERRIDE_ENTER_FRAMES = 5   # 50ms at 100Hz CC; drop LKA torque glitches
+SEAL6_OVERRIDE_EXIT_FRAMES = 20   # 0.2s at 100Hz CC
 LKA_COOLDOWN_MIN_FRAMES = 30
-
-
-def _seal6_speed_lerp(v_ego: float, low_kph: float, high_kph: float, low_val: float, high_val: float) -> float:
-  v_kph = max(0.0, v_ego * 3.6)
-  if v_kph <= low_kph:
-    return low_val
-  if v_kph >= high_kph:
-    return high_val
-  t = (v_kph - low_kph) / (high_kph - low_kph)
-  return low_val + t * (high_val - low_val)
-
-
-def seal6_override_enter_thresholds(v_ego: float) -> tuple[float, float]:
-  enter_eps = _seal6_speed_lerp(
-    v_ego,
-    SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH,
-    SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH,
-    SEAL6_OVERRIDE_ENTER_EPS_LOW,
-    SEAL6_OVERRIDE_ENTER_EPS_HIGH,
-  )
-  enter_eps_soft = _seal6_speed_lerp(
-    v_ego,
-    SEAL6_OVERRIDE_ENTER_SPEED_LOW_KPH,
-    SEAL6_OVERRIDE_ENTER_SPEED_HIGH_KPH,
-    SEAL6_OVERRIDE_ENTER_EPS_SOFT_LOW,
-    SEAL6_OVERRIDE_ENTER_EPS_SOFT_HIGH,
-  )
-  return enter_eps, enter_eps_soft
 
 
 BUTTON_KEEPALIVE_FRAMES = 100
@@ -95,7 +57,7 @@ class CarController(CarControllerBase):
     self.button_send_bus = CANBUS.cam_bus if CP.carFingerprint in BYD_ATTO_STYLE_PLATFORMS else CANBUS.main_bus
     self.seal6_steer_override = False
     self.seal6_override_clear = 0
-    self.seal6_reacquire = 0
+    self.seal6_override_enter = 0
 
   def _update_lka_latch_state(self, CS):
     if self.CP.carFingerprint == CAR.BYD_SEAL6:
@@ -142,13 +104,6 @@ class CarController(CarControllerBase):
         self.lka_active = False
         self.lka_cooldown = 0
 
-  def _seal6_max_angle_offset(self):
-    if self.CP.carFingerprint != CAR.BYD_SEAL6 or self.seal6_reacquire <= 0:
-      return MAX_STEER_ANGLE_OFFSET_DEG
-    fade = 1.0 - (self.seal6_reacquire / float(SEAL6_REACQUIRE_FRAMES))
-    frac = SEAL6_REACQUIRE_START_FRAC + (1.0 - SEAL6_REACQUIRE_START_FRAC) * max(0.0, min(1.0, fade))
-    return MAX_STEER_ANGLE_OFFSET_DEG * frac
-
   def _compute_apply_angle(self, CS, actuators, lat_active):
     meas_deg = CS.out.steeringAngleDeg
     if not lat_active:
@@ -164,9 +119,8 @@ class CarController(CarControllerBase):
       lat_active,
       limits,
     )
-    max_off = self._seal6_max_angle_offset()
-    lo = meas_deg - max_off
-    hi = meas_deg + max_off
+    lo = meas_deg - MAX_STEER_ANGLE_OFFSET_DEG
+    hi = meas_deg + MAX_STEER_ANGLE_OFFSET_DEG
     apply_angle = float(np.clip(after_std, lo, hi))
     self.last_apply_angle = apply_angle
 
@@ -189,40 +143,35 @@ class CarController(CarControllerBase):
     lat_active = (self.lka_cooldown > LKA_COOLDOWN_MIN_FRAMES) and enabled and self.lka_active and not CS.out.standstill
     steer_req = lat_active
     if self.CP.carFingerprint == CAR.BYD_SEAL6 and SEAL6_DRIVER_OVERRIDE_ENABLED:
-      driver_eps = abs(CS.out.steeringTorqueEps)
-      driver_main = abs(CS.out.steeringTorque)
-      enter_eps, enter_eps_soft = seal6_override_enter_thresholds(CS.out.vEgo)
-      override_enter = (
-        driver_eps >= enter_eps or
-        (driver_eps >= enter_eps_soft and driver_main >= SEAL6_OVERRIDE_ENTER_MAIN)
-      )
+      driver_torque = abs(CS.out.steeringTorque)
       if not lat_active:
         self.seal6_steer_override = False
         self.seal6_override_clear = 0
-        self.seal6_reacquire = 0
+        self.seal6_override_enter = 0
       elif self.seal6_steer_override:
-        # Exit on Eps only — Main is not used (stays elevated while EPS fights).
-        if driver_eps <= SEAL6_OVERRIDE_EXIT_EPS:
+        if driver_torque <= SEAL6_OVERRIDE_EXIT_NM:
           self.seal6_override_clear += 1
           if self.seal6_override_clear >= SEAL6_OVERRIDE_EXIT_FRAMES:
             self.seal6_steer_override = False
             self.seal6_override_clear = 0
-            self.seal6_reacquire = SEAL6_REACQUIRE_FRAMES
+            self.seal6_override_enter = 0
             self.last_apply_angle = CS.out.steeringAngleDeg
         else:
           self.seal6_override_clear = 0
-      elif override_enter:
-        self.seal6_steer_override = True
-        self.seal6_override_clear = 0
-        self.seal6_reacquire = 0
+      elif driver_torque >= SEAL6_OVERRIDE_ENTER_NM:
+        self.seal6_override_enter += 1
+        if self.seal6_override_enter >= SEAL6_OVERRIDE_ENTER_FRAMES:
+          self.seal6_steer_override = True
+          self.seal6_override_clear = 0
+          self.seal6_override_enter = 0
+      else:
+        self.seal6_override_enter = 0
       if self.seal6_steer_override:
         steer_req = False
-      elif self.seal6_reacquire > 0:
-        self.seal6_reacquire -= 1
     elif self.CP.carFingerprint == CAR.BYD_SEAL6:
       self.seal6_steer_override = False
       self.seal6_override_clear = 0
-      self.seal6_reacquire = 0
+      self.seal6_override_enter = 0
 
     apply_angle = CS.out.steeringAngleDeg
     hand_on_wheel_warning = False

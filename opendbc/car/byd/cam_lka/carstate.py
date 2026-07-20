@@ -84,17 +84,13 @@ class CarState(CarStateBase):
 
     can_gear = int(cp.vl["DRIVE_STATE"]["GEAR"])
 
-    if self.CP.carFingerprint == CAR.BYD_SEAL6:
-      ret.doorOpen = False
-      ret.seatbeltUnlatched = False
-    else:
-      ret.doorOpen = any([
-        cp.vl["METER_CLUSTER"]["BACK_LEFT_DOOR"],
-        cp.vl["METER_CLUSTER"]["FRONT_LEFT_DOOR"],
-        cp.vl["METER_CLUSTER"]["BACK_RIGHT_DOOR"],
-        cp.vl["METER_CLUSTER"]["FRONT_RIGHT_DOOR"],
-      ])
-      ret.seatbeltUnlatched = cp.vl["METER_CLUSTER"]["SEATBELT_DRIVER"] == 0
+    ret.doorOpen = any([
+      cp.vl["METER_CLUSTER"]["BACK_LEFT_DOOR"],
+      cp.vl["METER_CLUSTER"]["FRONT_LEFT_DOOR"],
+      cp.vl["METER_CLUSTER"]["BACK_RIGHT_DOOR"],
+      cp.vl["METER_CLUSTER"]["FRONT_RIGHT_DOOR"],
+    ])
+    ret.seatbeltUnlatched = cp.vl["METER_CLUSTER"]["SEATBELT_DRIVER"] == 0
 
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
 
@@ -190,15 +186,13 @@ class CarState(CarStateBase):
     signals = [
       ("DRIVE_STATE", 50),
       ("PEDAL", 50),
+      ("METER_CLUSTER", 20),
       ("STEER_MODULE_2", 100),
       ("STEERING_TORQUE", 50),
       ("STALKS", math.nan),
       ("PCM_BUTTONS", math.nan),
       ("WHEEL_SPEED", 50),
     ]
-
-    if CP.carFingerprint != CAR.BYD_SEAL6:
-      signals.insert(2, ("METER_CLUSTER", 20))
 
     if CP.enableBsm:
       signals.append(("BSM", 20))

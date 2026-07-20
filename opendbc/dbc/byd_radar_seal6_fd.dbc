@@ -9,6 +9,11 @@ VERSION ""
 # ~71% of "valid" tracks stuck at raw 11775 (~117.8 kph) and many at ~2560 (~25.6 kph)
 # sentinels. Treating these as absolute speed caused phantom braking. openpilot derives
 # vRel from LONG_DIST rate instead (see radar_interface.py).
+#
+# Range filtering (radar_interface.py):
+# - Publish dRel up to 160m with stricter lateral/persistence above 100m.
+# - Reject empty-slot sentinels: LONG_DIST >= 175m (~183–636m cluster).
+# - Reject ~144m ghost band (LONG_DIST 138–153m) — correlates with near vision, not far leads.
 
 NS_ :
     NS_DESC_
