@@ -18,34 +18,18 @@ SEAL6_RADAR_MSG_COUNT = 16
 RADAR_FREQ_HZ = 20
 BUMPER_OFFSET_M = 4.0
 SEAL6_INVALID_LONG_DIST = 0.5
-# Max publish range (dRel). Continuity-validated real tracks die ~65–70m LONG_DIST in
-# Seal6 rlogs; 200m allows rare farther leads but only outside sentinel bands below.
-SEAL6_DREL_MAX = 200.0
-# Empty/far garbage cluster (~210–655m). Raised with DREL_MAX; band rejects cover 175–195.
-SEAL6_GHOST_LONG_DIST_MIN = 210.0
-# Known sentinel LONG_DIST bands from Seal6 rlogs (not continuous real tracks).
-SEAL6_SENTINEL_LONG_BANDS = (
-  (138.0, 153.0),  # ~144m ghost; correlates with near vision, not far leads
-  (175.0, 195.0),  # empty-slot cluster opened when DREL_MAX > 160
-)
+# Max publish range (dRel). Was 120m; stock radar decodes real in-lane leads to ~105m on highway logs.
+SEAL6_DREL_MAX = 160.0
+# Empty slots decode as LONG_DIST ~183–636 m — hard reject at/above this raw distance.
+SEAL6_GHOST_LONG_DIST_MIN = 175.0
+# ~144m cluster correlates with vision ~20m (route 2026-07-17--01-30-08); not real far leads.
+SEAL6_SENTINEL_LONG_MIN = 138.0
+SEAL6_SENTINEL_LONG_MAX = 153.0
 SEAL6_YREL_ABS_MAX = 1.2
 # Stricter gates above this dRel to limit phantom far tracks while extending range.
 SEAL6_FAR_DREL_M = 100.0
 SEAL6_FAR_YREL_ABS_MAX = 0.85
 SEAL6_FAR_VALID_CNT_ON = 8
-SEAL6_VERY_FAR_DREL_M = 140.0
-SEAL6_VERY_FAR_YREL_ABS_MAX = 0.65
-SEAL6_VERY_FAR_VALID_CNT_ON = 16
-# New tracks may not first publish beyond this dRel unless closing (see far-birth exception).
-# Sentinels often appear already far with vRel≈0; real stopped leads you approach have vRel≈-v_ego.
-SEAL6_NO_BIRTH_ABOVE_M = 100.0
-SEAL6_FAR_BIRTH_V_EGO_MIN = 8.0          # m/s; only allow far birth while actually approaching
-SEAL6_FAR_BIRTH_VREL_MIN_FACTOR = 0.35   # require vRel < -factor * v_ego (closing)
-SEAL6_FAR_BIRTH_VREL_MAX_FACTOR = 1.4    # reject absurd closing faster than ~1.4 * v_ego
-SEAL6_FAR_BIRTH_VALID_CNT = 20           # longer persist before first publish for far births
-# Far stationary ghosts: frozen dRel + ~0 vRel at highway range.
-SEAL6_FAR_FROZEN_VREL = 0.5
-SEAL6_FAR_FROZEN_FRAMES = 10  # 0.5s @ 20Hz
 # VLEAD_KPH @ bit 112 is NOT real speed: stock logs show ~71% stuck at ~117.8 kph and
 # ~3% at ~25.6 kph sentinels (route 2026-07-17--01-30-08). Using it as absolute speed
 # created fake vRel≈-13 and phantom brakes. Derive vRel from LONG_DIST rate instead.
@@ -135,7 +119,6 @@ class RadarInterface(RadarInterfaceBase):
     self.seal6_prev_drel: dict[int, float] = {}
     self.seal6_vrel_filt: dict[int, float] = {}
     self.seal6_drel_ring: dict[int, deque[float]] = {}
-    self.seal6_far_frozen_cnt: dict[int, int] = {}
 
   def _ego_speed_accel(self) -> tuple[float, float]:
     if self.speed_cp is None:
@@ -153,36 +136,9 @@ class RadarInterface(RadarInterfaceBase):
       return False
     if long_dist >= SEAL6_GHOST_LONG_DIST_MIN:
       return False
-    for lo, hi in SEAL6_SENTINEL_LONG_BANDS:
-      if lo <= long_dist <= hi:
-        return False
+    if SEAL6_SENTINEL_LONG_MIN <= long_dist <= SEAL6_SENTINEL_LONG_MAX:
+      return False
     return long_dist <= (SEAL6_DREL_MAX + BUMPER_OFFSET_M)
-
-  def _seal6_far_frozen_untrusted(self, slot: int, dRel: float, vRel: float) -> bool:
-    """Drop sticky far stationary ghosts (common sentinel behavior above ~100m)."""
-    if dRel <= SEAL6_FAR_DREL_M:
-      self.seal6_far_frozen_cnt[slot] = 0
-      return False
-    if abs(vRel) < SEAL6_FAR_FROZEN_VREL:
-      self.seal6_far_frozen_cnt[slot] = self.seal6_far_frozen_cnt.get(slot, 0) + 1
-    else:
-      self.seal6_far_frozen_cnt[slot] = 0
-    return self.seal6_far_frozen_cnt.get(slot, 0) >= SEAL6_FAR_FROZEN_FRAMES
-
-  def _seal6_far_closing_ok(self, dRel: float, vRel: float, v_ego: float, prev_drel: float | None) -> bool:
-    """Allow first publish above NO_BIRTH when range-rate looks like approaching a real lead.
-
-    Vision is often weak on far stopped cars; radar can fill in if the track is closing at a
-    plausible fraction of ego speed (ghosts in sentinel/far bands stay near vRel≈0).
-    """
-    if v_ego < SEAL6_FAR_BIRTH_V_EGO_MIN:
-      return False
-    if prev_drel is None or dRel >= prev_drel:
-      return False
-    # Closing toward ego: negative vRel, bounded around -v_ego.
-    if not (-SEAL6_FAR_BIRTH_VREL_MAX_FACTOR * v_ego < vRel < -SEAL6_FAR_BIRTH_VREL_MIN_FACTOR * v_ego):
-      return False
-    return True
 
   def _seal6_vrel_from_range(self, slot: int, dRel: float) -> float:
     """Estimate vRel from dRel finite difference; ignore unusable VLEAD_KPH sentinels."""
@@ -347,7 +303,6 @@ class RadarInterface(RadarInterfaceBase):
     self.seal6_prev_drel.pop(slot, None)
     self.seal6_vrel_filt.pop(slot, None)
     self.seal6_drel_ring.pop(slot, None)
-    self.seal6_far_frozen_cnt.pop(slot, None)
     # Keep slot_track_id to allow matching when track reappears
     # Don't delete it here - let it persist for potential rematching
 
@@ -365,7 +320,7 @@ class RadarInterface(RadarInterfaceBase):
       low_speed_untrusted = False
       if self.seal6_radar and meas_ok:
         low_speed_untrusted = self._seal6_low_speed_untrusted(slot, dRel, yRel, vRel, v_ego, prev_drel)
-        if low_speed_untrusted or self._seal6_far_frozen_untrusted(slot, dRel, vRel):
+        if low_speed_untrusted:
           meas_ok = False
           conf = 0.0
           self._kill_slot(slot)
@@ -374,9 +329,7 @@ class RadarInterface(RadarInterfaceBase):
       if self.seal6_radar:
         drel_max = SEAL6_DREL_MAX
         yrel_base = SEAL6_YREL_ABS_MAX
-        if dRel > SEAL6_VERY_FAR_DREL_M:
-          yrel_base = min(yrel_base, SEAL6_VERY_FAR_YREL_ABS_MAX)
-        elif dRel > SEAL6_FAR_DREL_M:
+        if dRel > SEAL6_FAR_DREL_M:
           yrel_base = min(yrel_base, SEAL6_FAR_YREL_ABS_MAX)
       else:
         drel_max = DREL_MAX
@@ -384,15 +337,10 @@ class RadarInterface(RadarInterfaceBase):
       yrel_max = yrel_base if dRel <= 30.0 else yrel_base * 0.7
 
       valid_cnt_on = VALID_CNT_ON
-      far_birth = self.seal6_radar and slot not in self.pts and dRel > SEAL6_NO_BIRTH_ABOVE_M
-      if self.seal6_radar and dRel > SEAL6_VERY_FAR_DREL_M:
-        valid_cnt_on = SEAL6_VERY_FAR_VALID_CNT_ON
-      elif self.seal6_radar and dRel > SEAL6_FAR_DREL_M:
+      if self.seal6_radar and dRel > SEAL6_FAR_DREL_M:
         valid_cnt_on = SEAL6_FAR_VALID_CNT_ON
       elif self.seal6_radar and v_ego < SEAL6_LOW_SPEED_V_EGO_MAX and abs(yRel) <= 0.5 and dRel <= SEAL6_LOW_SPEED_CLOSE_DREL:
         valid_cnt_on = max(valid_cnt_on, SEAL6_LOW_SPEED_CLOSE_VALID_CNT)
-      if far_birth:
-        valid_cnt_on = max(valid_cnt_on, SEAL6_FAR_BIRTH_VALID_CNT)
 
       if self.seal6_radar:
         plausible = (
@@ -401,11 +349,6 @@ class RadarInterface(RadarInterfaceBase):
           (abs(yRel) <= yrel_max) and
           (abs(vRel) <= VREL_ABS_MAX)
         )
-        # Sentinels often appear already far with vRel≈0. Allow first publish only when
-        # range-rate looks like a real closer (e.g. approaching a stopped car beyond vision).
-        if plausible and far_birth:
-          if not self._seal6_far_closing_ok(dRel, vRel, v_ego, prev_drel):
-            plausible = False
       else:
         plausible = (
           meas_ok and

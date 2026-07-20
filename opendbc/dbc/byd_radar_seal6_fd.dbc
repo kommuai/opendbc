@@ -11,11 +11,9 @@ VERSION ""
 # vRel from LONG_DIST rate instead (see radar_interface.py).
 #
 # Range filtering (radar_interface.py):
-# - Publish dRel up to 200m; continuity-validated real tracks die ~65–70m LONG_DIST.
-# - Reject sentinel bands: LONG_DIST 138–153m and 175–195m.
-# - Reject empty-slot garbage: LONG_DIST >= 210m.
-# - No new track birth above 100m dRel unless closing (vRel≈-v_ego) with longer persist;
-#   stricter yRel/persistence above 100/140m; drop frozen far tracks (|vRel|≈0).
+# - Publish dRel up to 160m with stricter lateral/persistence above 100m.
+# - Reject empty-slot sentinels: LONG_DIST >= 175m (~183–636m cluster).
+# - Reject ~144m ghost band (LONG_DIST 138–153m) — correlates with near vision, not far leads.
 
 NS_ :
     NS_DESC_
