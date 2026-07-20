@@ -55,7 +55,7 @@ FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}  # 0 aggressive / 1 s
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
 # Jaecoo only: STEER_RELATED status when raw>=36000 (decoded with STEERING_ANGLE factor/offset).
 # iCaur must not use this — 0xC4 STEERING_ANGLE is real road angle there.
-STEER_RELATED_INTERVENTION_DEG_MIN = 36000 * 0.06 - 1985
+STEER_RELATED_INTERVENTION_DEG_MIN = 36000 * 0.06 - 1966
 
 PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
@@ -103,6 +103,15 @@ CHERY_OMODA_NO_TORQUE_SPOOF_PARAM = 2
 CHERY_ICAUR_SAFETY_PARAM = 4
 ICAUR_DISABLE_TORQUE_SPOOF = True
 ICAUR_DISABLE_HUD_OVERRIDE = True
+# iCaur Seal-style latched steer override (DRIVER_TORQUE / steeringTorque, raw units).
+# Enter: moving mean |T|≈3.19 (6 routes, 2026-07-20 mine, not engage-validated) + margin 2 → 5.
+# Exit: same ratio as Seal6 HEAD (exit/enter = 4/25) → round(5*4/25)=1.
+# Frames: Seal6 HEAD 5 enter / 20 exit @ 100 Hz CC. Caveat: corpus had 0 enabled frames.
+ICAUR_DRIVER_OVERRIDE_ENABLED = True
+ICAUR_OVERRIDE_ENTER = 5
+ICAUR_OVERRIDE_EXIT = 1
+ICAUR_OVERRIDE_ENTER_FRAMES = 5
+ICAUR_OVERRIDE_EXIT_FRAMES = 20
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
 

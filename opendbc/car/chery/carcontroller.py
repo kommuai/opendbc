@@ -15,6 +15,11 @@ from opendbc.car.chery.values import (
   EPS_TAP_TORQUE,
   HUD_STEP,
   ICAUR_DISABLE_TORQUE_SPOOF,
+  ICAUR_DRIVER_OVERRIDE_ENABLED,
+  ICAUR_OVERRIDE_ENTER,
+  ICAUR_OVERRIDE_ENTER_FRAMES,
+  ICAUR_OVERRIDE_EXIT,
+  ICAUR_OVERRIDE_EXIT_FRAMES,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
   OMODA_DISABLE_HUD_OVERRIDE,
@@ -52,6 +57,45 @@ class CarController(CarControllerBase):
     self.eps_spoof_counter = 0
     self.eps_spoof_armed = False  # latched on first cam-spoof frame to sync with PT counter
     self.eps_tap_active_for = 0   # frames remaining on the current HOW-suppression tap
+    # iCaur Seal-style steer override latch
+    self.icaur_steer_override = False
+    self.icaur_override_enter = 0
+    self.icaur_override_clear = 0
+
+  def _update_icaur_steer_override(self, CS, lat_active: bool) -> bool:
+    """Seal6-style hard-drop latch on |DRIVER_TORQUE|. Returns True while overriding."""
+    if not ICAUR_DRIVER_OVERRIDE_ENABLED:
+      self.icaur_steer_override = False
+      self.icaur_override_enter = 0
+      self.icaur_override_clear = 0
+      return False
+
+    driver_torque = abs(CS.out.steeringTorque)
+    if not lat_active:
+      self.icaur_steer_override = False
+      self.icaur_override_enter = 0
+      self.icaur_override_clear = 0
+      return False
+
+    if self.icaur_steer_override:
+      if driver_torque <= ICAUR_OVERRIDE_EXIT:
+        self.icaur_override_clear += 1
+        if self.icaur_override_clear >= ICAUR_OVERRIDE_EXIT_FRAMES:
+          self.icaur_steer_override = False
+          self.icaur_override_clear = 0
+          self.icaur_override_enter = 0
+          self.last_apply_angle = CS.out.steeringAngleDeg
+      else:
+        self.icaur_override_clear = 0
+    elif driver_torque >= ICAUR_OVERRIDE_ENTER:
+      self.icaur_override_enter += 1
+      if self.icaur_override_enter >= ICAUR_OVERRIDE_ENTER_FRAMES:
+        self.icaur_steer_override = True
+        self.icaur_override_clear = 0
+        self.icaur_override_enter = 0
+    else:
+      self.icaur_override_enter = 0
+    return self.icaur_steer_override
 
   def _compute_apply_angle(self, CS, actuators, steer_req):
     if not steer_req:
@@ -190,12 +234,23 @@ class CarController(CarControllerBase):
     cam_spoof = self._cam_torque_spoof_active(CS)
 
     lat_active = CC.latActive and not CS.out.standstill
-    driver_over = CS.out.steeringPressed or CS.steer_related_intervention
+    icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
+    if icaur:
+      driver_over = self._update_icaur_steer_override(CS, lat_active)
+    else:
+      driver_over = CS.out.steeringPressed or CS.steer_related_intervention
     steer_req = lat_active and not driver_over
 
     apply_angle = CS.out.steeringAngleDeg
-    if self.frame % LANE_KEEP_STEP == 0:
-      apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
+    # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every frame
+    # so EPS never sees a gap that looks like "still requesting" between even frames.
+    send_lane_keep = (self.frame % LANE_KEEP_STEP == 0) or (icaur and self.icaur_steer_override)
+    if send_lane_keep:
+      if self.frame % LANE_KEEP_STEP == 0:
+        apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
+      if not steer_req:
+        apply_angle = CS.out.steeringAngleDeg
+        self.last_apply_angle = apply_angle
       can_sends.append(cherycan.create_lane_keep_command(
         self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg,
       ))
