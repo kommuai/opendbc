@@ -36,6 +36,8 @@ class CarState(CarStateBase):
     self.pt5 = 0
     self.lkas_hud_status_passthrough = 0
     self.lkas_rdy_btn = False
+    self.res_btn = False
+    self.cruise_hud_state = 0
     self.op_long = True
     self.distance_val = 1
 
@@ -154,9 +156,11 @@ class CarState(CarStateBase):
       self.is_cruise_latch = False
 
     if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK, CAR.BYD_M6):
-      cruise_state = parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"]
-      ret.cruiseState.enabled = cruise_state in (3, 5, 6, 7)
+      # BYD ACC HUD: 2 = standstill standby (RES window); 3/5/6/7 = cruise active
+      self.cruise_hud_state = int(parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"])
+      ret.cruiseState.enabled = self.cruise_hud_state in (3, 5, 6, 7)
     else:
+      self.cruise_hud_state = 0
       ret.cruiseState.enabled = self.is_cruise_latch
 
     ret.leftBlinker = bool(cp.vl["STALKS"]["LEFT_BLINKER"])
