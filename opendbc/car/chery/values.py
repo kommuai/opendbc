@@ -104,13 +104,13 @@ CHERY_ICAUR_SAFETY_PARAM = 4
 ICAUR_DISABLE_TORQUE_SPOOF = True
 ICAUR_DISABLE_HUD_OVERRIDE = True
 # iCaur Seal-style latched steer override (DRIVER_TORQUE / steeringTorque, raw units).
-# Enter: moving mean |T|≈3.19 (6 routes, 2026-07-20 mine, not engage-validated) + margin 2 → 5.
-# Exit: same ratio as Seal6 HEAD (exit/enter = 4/25) → round(5*4/25)=1.
-# Frames: Seal6 HEAD 5 enter / 20 exit @ 100 Hz CC. Caveat: corpus had 0 enabled frames.
+# Enter: Jul 20–21 logs — quiet p99=2, active-steer p50=3; 59% of turn frames stay below 5 → enter 3.
+# Exit: Seal6 ratio (exit/enter = 4/25) → round(3*4/25)=1.
+# Frames: 3 enter / 20 exit @ 100 Hz CC (faster latch; quiet max=3).
 ICAUR_DRIVER_OVERRIDE_ENABLED = True
-ICAUR_OVERRIDE_ENTER = 5
+ICAUR_OVERRIDE_ENTER = 3
 ICAUR_OVERRIDE_EXIT = 1
-ICAUR_OVERRIDE_ENTER_FRAMES = 5
+ICAUR_OVERRIDE_ENTER_FRAMES = 3
 ICAUR_OVERRIDE_EXIT_FRAMES = 20
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 
