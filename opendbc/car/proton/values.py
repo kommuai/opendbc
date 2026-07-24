@@ -80,6 +80,7 @@ class CAR(Platforms):
       )
     ],
     CarSpecs(mass=1370.0, wheelbase=2.6, steerRatio=15.0),
+    dbc_dict=dbc_dict("proton_general_pt", "proton_radar"),
   )
   PROTON_X70 = ProtonPlatformConfig(
     [

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from cereal import car
-from opendbc.car import get_safety_config
+from opendbc.car import Bus, get_safety_config
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.proton.carcontroller import CarController
 from opendbc.car.proton.carstate import CarState
-from opendbc.car.proton.values import CAR, ProtonSafetyFlags
+from opendbc.car.proton.radar_interface import RadarInterface
+from opendbc.car.proton.values import CAR, DBC, ProtonSafetyFlags
 
 from openpilot.common.features import Features
 
@@ -12,10 +13,16 @@ from openpilot.common.features import Features
 class CarInterface(CarInterfaceBase):
   CarState = CarState
   CarController = CarController
+  RadarInterface = RadarInterface
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, alpha_long, is_release, docs):
     ret.brand = "proton"
+
+    # Fail-closed: only platforms with radar DBC may publish radar tracks.
+    # X50 Pre-FL bus1 track bank (0x20) can wake ~1s after ignition; RadarInterface
+    # holds publish until live bus1 cycles are confirmed.
+    ret.radarUnavailable = Bus.radar not in DBC[candidate]
 
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.proton)]
     safety_param = ProtonSafetyFlags(0)
