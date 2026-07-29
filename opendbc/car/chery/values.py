@@ -104,13 +104,14 @@ CHERY_ICAUR_SAFETY_PARAM = 4
 ICAUR_DISABLE_TORQUE_SPOOF = True
 ICAUR_DISABLE_HUD_OVERRIDE = True
 # iCaur Seal-style latched steer override (DRIVER_TORQUE / steeringTorque, raw units).
-# Tiered enter: |T|>=IMMEDIATE or steeringPressed → latch frame 1 (no LKAS fight window).
-# Light band ENTER..IMMEDIATE-1 keeps 3-frame debounce (quiet p99=2, active-steer p50=3).
-# Exit: Seal6 ratio (exit/enter = 4/25) → round(3*4/25)=1.
+# Hysteresis: latch when |T|>=ENTER (debounced) or |T|>=IMMEDIATE / steeringPressed;
+# stay latched until |T|<=EXIT for EXIT_FRAMES (EXIT < ENTER avoids chatter).
+# Tiered enter: IMMEDIATE/steeringPressed → frame 1; light band ENTER..IMMEDIATE-1 → debounce.
+# Exit low: hysteresis gap below ENTER (Seal6 ratio would be ~1 at enter=7; 3 avoids early release chatter).
 ICAUR_DRIVER_OVERRIDE_ENABLED = True
-ICAUR_OVERRIDE_ENTER = 3
-ICAUR_OVERRIDE_ENTER_IMMEDIATE = 8
-ICAUR_OVERRIDE_EXIT = 1
+ICAUR_OVERRIDE_ENTER = 7
+ICAUR_OVERRIDE_ENTER_IMMEDIATE = 10
+ICAUR_OVERRIDE_EXIT = 3
 ICAUR_OVERRIDE_ENTER_FRAMES = 3
 ICAUR_OVERRIDE_EXIT_FRAMES = 20
 OMODA_CAM_PARSER_MSGS = [("STEER_STATUS", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]

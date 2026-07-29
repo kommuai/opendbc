@@ -64,7 +64,7 @@ class CarController(CarControllerBase):
     self.icaur_override_clear = 0
 
   def _update_icaur_steer_override(self, CS, lat_active: bool) -> bool:
-    """Seal6-style hard-drop latch on |DRIVER_TORQUE|. Returns True while overriding."""
+    """Schmitt latch on |DRIVER_TORQUE|: enter high (7/10), exit low (3). Returns True while overriding."""
     if not ICAUR_DRIVER_OVERRIDE_ENABLED:
       self.icaur_steer_override = False
       self.icaur_override_enter = 0
@@ -79,6 +79,7 @@ class CarController(CarControllerBase):
       return False
 
     if self.icaur_steer_override:
+      # Hysteresis low band: hold latch until torque stays at/below EXIT.
       if driver_torque <= ICAUR_OVERRIDE_EXIT:
         self.icaur_override_clear += 1
         if self.icaur_override_clear >= ICAUR_OVERRIDE_EXIT_FRAMES:
@@ -92,16 +93,19 @@ class CarController(CarControllerBase):
       driver_torque >= ICAUR_OVERRIDE_ENTER_IMMEDIATE
       or CS.out.steeringPressed
     ):
+      # Hysteresis high (instant): firm driver input, no debounce fight window.
       self.icaur_steer_override = True
       self.icaur_override_clear = 0
       self.icaur_override_enter = 0
     elif driver_torque >= ICAUR_OVERRIDE_ENTER:
+      # Hysteresis high (debounced): light override band ENTER..IMMEDIATE-1 (7–9).
       self.icaur_override_enter += 1
       if self.icaur_override_enter >= ICAUR_OVERRIDE_ENTER_FRAMES:
         self.icaur_steer_override = True
         self.icaur_override_clear = 0
         self.icaur_override_enter = 0
     else:
+      # Dead band (EXIT, ENTER): LKAS active, no latch accumulation (4–6).
       self.icaur_override_enter = 0
     return self.icaur_steer_override
 
