@@ -18,6 +18,7 @@ from opendbc.car.chery.values import (
   ICAUR_DRIVER_OVERRIDE_ENABLED,
   ICAUR_OVERRIDE_ENTER,
   ICAUR_OVERRIDE_ENTER_FRAMES,
+  ICAUR_OVERRIDE_ENTER_IMMEDIATE,
   ICAUR_OVERRIDE_EXIT,
   ICAUR_OVERRIDE_EXIT_FRAMES,
   LANE_KEEP_STEP,
@@ -87,6 +88,13 @@ class CarController(CarControllerBase):
           self.last_apply_angle = CS.out.steeringAngleDeg
       else:
         self.icaur_override_clear = 0
+    elif (
+      driver_torque >= ICAUR_OVERRIDE_ENTER_IMMEDIATE
+      or CS.out.steeringPressed
+    ):
+      self.icaur_steer_override = True
+      self.icaur_override_clear = 0
+      self.icaur_override_enter = 0
     elif driver_torque >= ICAUR_OVERRIDE_ENTER:
       self.icaur_override_enter += 1
       if self.icaur_override_enter >= ICAUR_OVERRIDE_ENTER_FRAMES:
