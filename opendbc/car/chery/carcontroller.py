@@ -16,11 +16,10 @@ from opendbc.car.chery.values import (
   HUD_STEP,
   ICAUR_DISABLE_TORQUE_SPOOF,
   ICAUR_DRIVER_OVERRIDE_ENABLED,
-  ICAUR_OVERRIDE_ENTER,
-  ICAUR_OVERRIDE_ENTER_FRAMES,
-  ICAUR_OVERRIDE_ENTER_IMMEDIATE,
+  ICAUR_LKAS_CMD_DEADBAND_DEG,
   ICAUR_OVERRIDE_EXIT,
   ICAUR_OVERRIDE_EXIT_FRAMES,
+  ICAUR_OVERRIDE_OPPOSING_TORQUE,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
   OMODA_DISABLE_HUD_OVERRIDE,
@@ -58,55 +57,58 @@ class CarController(CarControllerBase):
     self.eps_spoof_counter = 0
     self.eps_spoof_armed = False  # latched on first cam-spoof frame to sync with PT counter
     self.eps_tap_active_for = 0   # frames remaining on the current HOW-suppression tap
-    # iCaur Seal-style steer override latch
+    # iCaur steer override latch (steeringPressed or opposing torque)
     self.icaur_steer_override = False
-    self.icaur_override_enter = 0
     self.icaur_override_clear = 0
 
-  def _update_icaur_steer_override(self, CS, lat_active: bool) -> bool:
-    """Schmitt latch on |DRIVER_TORQUE|: enter high (7/10), exit low (3). Returns True while overriding."""
+  @staticmethod
+  def _driver_opposes_lkas(CS, cmd_angle_deg: float) -> bool:
+    """True when |T| is high and driver torque opposes the LKAS angle command."""
+    cmd_delta = cmd_angle_deg - CS.out.steeringAngleDeg
+    if abs(cmd_delta) <= ICAUR_LKAS_CMD_DEADBAND_DEG:
+      return False
+    cmd_dir = 1 if cmd_delta > 0 else -1
+
+    driver_torque = abs(CS.out.steeringTorque)
+    if driver_torque < ICAUR_OVERRIDE_OPPOSING_TORQUE:
+      return False
+
+    driver_dir = CS.out.steeringTorqueEps
+    if driver_dir == 0:
+      return False
+    driver_dir = 1 if driver_dir > 0 else -1
+    return driver_dir != cmd_dir
+
+  def _update_icaur_steer_override(self, CS, lat_active: bool, cmd_angle_deg: float) -> bool:
+    """Latch when driver presses or opposes LKAS; exit on low torque hysteresis."""
     if not ICAUR_DRIVER_OVERRIDE_ENABLED:
       self.icaur_steer_override = False
-      self.icaur_override_enter = 0
       self.icaur_override_clear = 0
       return False
 
     driver_torque = abs(CS.out.steeringTorque)
     if not lat_active:
       self.icaur_steer_override = False
-      self.icaur_override_enter = 0
       self.icaur_override_clear = 0
       return False
 
+    wants_override = (
+      CS.out.steeringPressed
+      or self._driver_opposes_lkas(CS, cmd_angle_deg)
+    )
+
     if self.icaur_steer_override:
-      # Hysteresis low band: hold latch until torque stays at/below EXIT.
       if driver_torque <= ICAUR_OVERRIDE_EXIT:
         self.icaur_override_clear += 1
         if self.icaur_override_clear >= ICAUR_OVERRIDE_EXIT_FRAMES:
           self.icaur_steer_override = False
           self.icaur_override_clear = 0
-          self.icaur_override_enter = 0
           self.last_apply_angle = CS.out.steeringAngleDeg
       else:
         self.icaur_override_clear = 0
-    elif (
-      driver_torque >= ICAUR_OVERRIDE_ENTER_IMMEDIATE
-      or CS.out.steeringPressed
-    ):
-      # Hysteresis high (instant): firm driver input, no debounce fight window.
+    elif wants_override:
       self.icaur_steer_override = True
       self.icaur_override_clear = 0
-      self.icaur_override_enter = 0
-    elif driver_torque >= ICAUR_OVERRIDE_ENTER:
-      # Hysteresis high (debounced): light override band ENTER..IMMEDIATE-1 (7–9).
-      self.icaur_override_enter += 1
-      if self.icaur_override_enter >= ICAUR_OVERRIDE_ENTER_FRAMES:
-        self.icaur_steer_override = True
-        self.icaur_override_clear = 0
-        self.icaur_override_enter = 0
-    else:
-      # Dead band (EXIT, ENTER): LKAS active, no latch accumulation (4–6).
-      self.icaur_override_enter = 0
     return self.icaur_steer_override
 
   def _compute_apply_angle(self, CS, actuators, steer_req):
@@ -248,7 +250,7 @@ class CarController(CarControllerBase):
     lat_active = CC.latActive and not CS.out.standstill
     icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
     if icaur:
-      driver_over = self._update_icaur_steer_override(CS, lat_active)
+      driver_over = self._update_icaur_steer_override(CS, lat_active, CC.actuators.steeringAngleDeg)
     else:
       driver_over = CS.out.steeringPressed or CS.steer_related_intervention
     steer_req = lat_active and not driver_over
