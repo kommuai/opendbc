@@ -21,6 +21,7 @@ from opendbc.car.byd.values import CAR as BYD
 from opendbc.car.dnga.values import CAR as DNGA
 from opendbc.car.chery.values import CAR as CHERY
 from opendbc.car.geely.values import CAR as GEELY
+from opendbc.car.perodua_qve.values import CAR as PERODUA_QVE
 
 # FIXME: add routes for these cars
 non_tested_cars = [
@@ -64,6 +65,9 @@ non_tested_cars = [
 
   # Geely (bootstrap fingerprint; replace with full bus-0 capture before on-road)
   GEELY.GEELY_GALAXY_E5,
+
+  # Perodua QV-E P01A BEV (Magna Steyr modular platform)
+  PERODUA_QVE.PERODUA_QVE,
 ]
 
 

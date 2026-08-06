@@ -12,6 +12,9 @@ uint32_t microsecond_timer_get(void) {
 #include "opendbc/safety/can.h"
 #include "opendbc/safety/safety.h"
 
+bool ignition_can = false;
+uint32_t ignition_can_cnt = 0U;
+
 void safety_tick_current_safety_config() {
   safety_tick(&current_safety_config);
 }

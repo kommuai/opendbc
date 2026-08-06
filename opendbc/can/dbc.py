@@ -21,6 +21,7 @@ from opendbc.car.proton.protoncan import proton_checksum
 from opendbc.car.byd.bydcan import byd_checksum
 from opendbc.car.chery.cherycan import chery_checksum, chery_pcm_buttons_checksum
 from opendbc.car.geely.geelycan import geely_checksum
+from opendbc.car.perodua_qve.peroduaqvecan import qve_checksum
 
 
 class SignalType:
@@ -42,6 +43,7 @@ class SignalType:
   BYD_CHECKSUM = 15
   CHERY_CHECKSUM = 16
   GEELY_CHECKSUM = 17
+  QVE_CHECKSUM = 18
 
 
 @dataclass
@@ -215,6 +217,8 @@ def get_checksum_state(dbc_name: str) -> ChecksumState | None:
     return ChecksumState(8, 4, 7, -1, False, SignalType.CHERY_CHECKSUM, chery_checksum)
   elif dbc_name.startswith("geely_"):
     return ChecksumState(8, 4, 39, 47, False, SignalType.GEELY_CHECKSUM, geely_checksum)
+  elif dbc_name.startswith("perodua_qve_"):
+    return ChecksumState(8, 4, 7, 11, False, SignalType.QVE_CHECKSUM, qve_checksum)
   return None
 
 
@@ -227,10 +231,14 @@ def set_signal_type(sig: Signal, chk: ChecksumState | None, dbc_name: str, line_
       # geely_lkas_0x33_checksum applies to LKAS (BO_ 51 / 0x33) only, not EPS etc.
       if dbc_name.startswith("geely_") and address != 0x33:
         return
+      if dbc_name.startswith("perodua_qve_") and address not in (0xA5, 0x1AE):
+        return
       sig.type = chk.checksum_type
       sig.calc_checksum = chk.calc_checksum
     elif sig.name == "CHECKSUM_BUTTONS" and dbc_name.startswith("chery_"):
       sig.type = SignalType.CHRYSLER_CHECKSUM
       sig.calc_checksum = chery_pcm_buttons_checksum
     elif sig.name == "COUNTER":
+      if dbc_name.startswith("perodua_qve_") and address not in (0xA5, 0x1AE):
+        return
       sig.type = SignalType.COUNTER

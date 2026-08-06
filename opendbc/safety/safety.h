@@ -31,6 +31,7 @@
 #include "opendbc/safety/modes/dnga.h"
 #include "opendbc/safety/modes/proton.h"
 #include "opendbc/safety/modes/chery.h"
+#include "opendbc/safety/modes/perodua_qve.h"
 
 uint32_t GET_BYTES(const CANPacket_t *msg, int start, int len) {
   uint32_t ret = 0U;
@@ -251,6 +252,7 @@ bool safety_tx_hook(CANPacket_t *msg) {
 
 static int get_fwd_bus(int bus_num) {
   int destination_bus;
+  // Default: radar/PT bus 0 <-> cam bus 2. Bus 1 (QVE main) is never forwarded.
   if (bus_num == 0) {
     destination_bus = 2;
   } else if (bus_num == 2) {
@@ -427,6 +429,7 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
     {SAFETY_DNGA, &dnga_hooks},
     {SAFETY_PROTON, &proton_hooks},
     {SAFETY_CHERY, &chery_hooks},
+    {SAFETY_PERODUA_QVE, &perodua_qve_hooks},
   };
 
   // reset state set by safety mode
