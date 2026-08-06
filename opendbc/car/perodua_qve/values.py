@@ -31,6 +31,11 @@ class PeroduaQveSafetyFlags(IntFlag):
 BUS2_ALWAYS_FORWARD = 0x50
 BUS2_ALSO_FORWARD = 0x80
 
+# Gated cam-bus lane spoof (0xB0/0xB1). Default OFF — dual-TX / geometry not ready.
+ENABLE_CAM_LANE_SPOOF = False
+# ~15 Hz stock; control loop 100 Hz → send every N frames when enabled.
+CAM_LANE_SPOOF_PERIOD = 7
+
 # Known cam-bus IDs on bus 2 (ascending), for tests/reference. Excludes BUS2_ALWAYS_FORWARD.
 BUS2_POOL: tuple[int, ...] = (
   0x51, 0x70, 0x71,
@@ -165,6 +170,12 @@ CRUISE_STATE_READY = 0x4B
 PCM_BTN_SET_MASK = 0x05
 ACC_CMD_SET_BYTE4 = 0xD5
 ACC_CMD_RES_BYTE3 = 0xDF
+
+CAM_PARSER_MSGS = [
+  # ignore_alive: counter sync only; must not invalidate car while spoof is gated off
+  ("CAM_SESSION_HDR", math.nan),  # 0x80 — preferred session counter (byte2)
+  ("CAM_LANE_FD", math.nan),      # 0xB0 — fallback counter
+]
 
 PARSER_MSGS = [
   ("IMU", 100),

@@ -22,6 +22,7 @@ from opendbc.car.perodua_qve.values import (
   CANBUS,
   CRUISE_STATE_ENABLED,
   CRUISE_STATE_READY,
+  CAM_PARSER_MSGS,
   DBC,
   DOOR_CLOSED_BYTE2,
   DOOR_CLOSED_STATE,
@@ -64,6 +65,8 @@ class CarState(CarStateBase):
     self.follow_bars = -1
     self.follow_bars_candidate = -1
     self.follow_bars_stable = 0
+    self.cam_session_counter = 0  # cam bus b2; prefer 0x80, else 0xB0
+    self.cam_session_counter_valid = False
 
   def _update_follow_bars(self, follow_byte: int, hud_byte: int | None) -> int:
     decoded = qve_follow_distance_bars(follow_byte, hud_byte)
@@ -144,6 +147,31 @@ class CarState(CarStateBase):
     b3_pedal = (b3 - BRAKE_B3_IDLE) / BRAKE_B3_RANGE
     b5_pedal = (b5 - BRAKE_B5_IDLE) / BRAKE_B5_RANGE
     return float(min(1.0, max(0.0, max(b3_pedal, b5_pedal))))
+
+
+  @staticmethod
+  def _cam_counter_if_seen(cp_cam, msg_name: str, addr: int) -> int | None:
+    """Return byte2 only if this cam message has been received at least once."""
+    state = cp_cam.message_states.get(addr)
+    if state is None or not state.timestamps:
+      return None
+    try:
+      return int(cp_cam.vl[msg_name]["COUNTER_B2"]) & 0xFF
+    except (KeyError, TypeError, ValueError):
+      return None
+
+  def _update_cam_session_counter(self, can_parsers) -> None:
+    cp_cam = can_parsers.get(Bus.cam)
+    if cp_cam is None:
+      return
+    # Prefer 0x80 session header; fallback stock 0xB0. Skip never-seen msgs (vl defaults to 0).
+    b2 = self._cam_counter_if_seen(cp_cam, "CAM_SESSION_HDR", 0x80)
+    if b2 is None:
+      b2 = self._cam_counter_if_seen(cp_cam, "CAM_LANE_FD", 0xB0)
+    if b2 is None:
+      return
+    self.cam_session_counter = b2
+    self.cam_session_counter_valid = True
 
   def update(self, can_parsers):
     cp = can_parsers[Bus.pt]
@@ -263,6 +291,8 @@ class CarState(CarStateBase):
     self.prev_set_btn = set_btn
     self.prev_res_btn = res_btn
 
+    self._update_cam_session_counter(can_parsers)
+
     return ret
 
   @staticmethod
@@ -271,5 +301,12 @@ class CarState(CarStateBase):
     return CANParser(DBC[CP.carFingerprint]["pt"], PARSER_MSGS, CANBUS.pt)
 
   @staticmethod
+  def get_cam_can_parser(CP):
+    return CANParser(DBC[CP.carFingerprint]["pt"], CAM_PARSER_MSGS, CANBUS.cam)
+
+  @staticmethod
   def get_can_parsers(CP):
-    return {Bus.pt: CarState.get_can_parser(CP)}
+    return {
+      Bus.pt: CarState.get_can_parser(CP),
+      Bus.cam: CarState.get_cam_can_parser(CP),
+    }

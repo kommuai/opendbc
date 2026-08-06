@@ -165,6 +165,13 @@ BO_ 690 TRANSMISSION: 8 XXX
  SG_ GEAR : 40|8@1+ (1,0) [0|255] "" XXX
 
 CM_ "Perodua QV-E (P01A) powertrain / body CAN. Reverse-engineered from QVE captures.";
+
+BO_ 128 CAM_SESSION_HDR: 20 XXX
+ SG_ COUNTER_B2 : 16|8@1+ (1,0) [0|255] "" XXX
+
+BO_ 176 CAM_LANE_FD: 64 XXX
+ SG_ COUNTER_B2 : 16|8@1+ (1,0) [0|255] "" XXX
+
 CM_ BO_ 224 STALK "Turn stalk: byte2 TURN_SIGNAL 1=left 2=right 8=generic toggle";
 CM_ BO_ 221 STALK_2 "Turn stalk aux: byte2 0x2A=left 0x34=right";
 CM_ BO_ 188 GAS_PEDAL "Accel 0-1: max(byte5,byte6,byte7&0x7F)/64; byte7 0x80=pedal active";
@@ -204,6 +211,9 @@ CM_ SG_ 188 GAS_PEDAL_3 "Low 7 bits are position; 0x80 is active flag not travel
 CM_ SG_ 181 BRAKE_PRESSURE_1 "Primary pressure byte3; idle 0x0C";
 CM_ SG_ 181 BRAKE_PRESSURE_2 "Aux pressure byte5; idle 8";
 CM_ SG_ 181 BRAKE_PHASE "Cycles 0x08..0xE8 step 0x20; not pedal travel";
+
+CM_ BO_ 128 CAM_SESSION_HDR "Cam keepalive/session 0x80; byte2 session counter for B0/B1 sync";
+CM_ BO_ 176 CAM_LANE_FD "Cam lane FD 0xB0; counter byte2 fallback when 0x80 missing";
 
 VAL_ 386 SEATBELT_DRIVER 224 "UNLATCHED" 225 "LATCHED" 241 "BUCKLING" 243 "UNLATCHED";
 VAL_ 690 GEAR 4 "D" 8 "N" 9 "R" 136 "P";

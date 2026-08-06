@@ -66,5 +66,17 @@ class TestPeroduaQveSafety(unittest.TestCase):
     self.assertTrue(self.safety.get_vehicle_moving())
 
 
+  def test_tx_cam_lane_spoof_allowed(self):
+    # 0xB0 (64B) / 0xB1 (16B) on cam bus must be TX-whitelisted for gated spoof.
+    b0 = libsafety_py.make_CANPacket(0xB0, self.CAM_BUS, bytes(64))
+    b1 = libsafety_py.make_CANPacket(0xB1, self.CAM_BUS, bytes(16))
+    self.assertTrue(self.safety.safety_tx_hook(b0))
+    self.assertTrue(self.safety.safety_tx_hook(b1))
+    # Still blocked on wrong bus / other cam IDs
+    self.assertFalse(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0xB0, self.MAIN_BUS, bytes(64))))
+    self.assertFalse(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0xA5, self.MAIN_BUS, bytes(8))))
+    self.assertFalse(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0x80, self.CAM_BUS, bytes(20))))
+
+
 if __name__ == "__main__":
   unittest.main()
