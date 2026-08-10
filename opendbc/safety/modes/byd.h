@@ -188,6 +188,13 @@ static bool byd_fwd_hook(int bus_num, int addr) {
 }
 
 static safety_config byd_init(uint16_t param) {
+  // Reset mode flags every init — these are sticky statics and must not leak across params.
+  byd_alt_engage = false;
+  byd_steering_torque_spoof = false;
+  byd_mpc_lka_engage = false;
+  byd_relax_controls = false;
+  byd_stock_long = false;
+
   safety_config cfg;
   static const CanMsg BYD_TX_MSGS[] = {
     {0x1E2, 0, 8, .check_relay = true},   // STEERING_MODULE_ADAS
@@ -195,7 +202,7 @@ static safety_config byd_init(uint16_t param) {
     {0x32E, 0, 8, .check_relay = false},   // ACC_CMD
     {0x3B0, 0, 8, .check_relay = false},  // PCM_BUTTONS
     {0x3B0, 2, 8, .check_relay = false},
-    {0x1FC, 2, 8, .check_relay = false},  // STEERING_TORQUE
+    {0x1FC, 2, 8, .check_relay = false},  // STEERING_TORQUE spoof TX (cam bus)
   };
 
   static RxCheck byd_rx_checks[] = {
@@ -209,7 +216,8 @@ static safety_config byd_init(uint16_t param) {
 
   cfg = BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS);
   if (param == 1U) {
-    /* default cfg already selected */
+    // Atto 3: ACC_CMD(814) engage + block PT→cam 0x1FC; cam_lka TX's spoof on bus 2.
+    byd_steering_torque_spoof = true;
   } else if (param == 2U) {
     static RxCheck byd_rx_checks_alt[] = {
       {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},

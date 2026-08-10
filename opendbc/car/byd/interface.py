@@ -26,7 +26,8 @@ class CarInterface(CarInterfaceBase):
     ret.brand = "byd"
 
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.byd)]
-    ret.safetyConfigs[0].safetyParam = 1
+    # Default 0: no torque spoof/block. Platforms that need spoof set their own param.
+    ret.safetyConfigs[0].safetyParam = 0
 
     ret.steerLimitTimer = 0.6
     ret.steerActuatorDelay = 0.01
@@ -59,7 +60,10 @@ class CarInterface(CarInterfaceBase):
     elif candidate in (CAR.BYD_ATTO3, CAR.BYD_M6, CAR.BYD_SEAL6):
       ret.steerControlType = car.CarParams.SteerControlType.angle
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.52, 0.43, 0.32], [1.5, 1.4, 1.1]]
-      if candidate in (CAR.BYD_M6, CAR.BYD_SEAL6):
+      if candidate == CAR.BYD_ATTO3:
+        # safetyParam 1: ACC_CMD(814) engage + STEERING_TORQUE spoof (block PT→cam 0x1FC)
+        ret.safetyConfigs[0].safetyParam = 1
+      elif candidate in (CAR.BYD_M6, CAR.BYD_SEAL6):
         ret.safetyConfigs[0].safetyParam = 3
       if candidate == CAR.BYD_SEAL6:
         ret.pcmCruise = True
