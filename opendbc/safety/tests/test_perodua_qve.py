@@ -3,8 +3,8 @@ import unittest
 
 from opendbc.car.structs import CarParams
 from opendbc.car.perodua_qve.values import (
-  BUS2_ALSO_FORWARD,
   BUS2_ALWAYS_FORWARD,
+  BUS2_FORWARD_RANGE,
   PeroduaQveSafetyFlags,
   qve_bus2_split_addrs,
 )
@@ -44,9 +44,11 @@ class TestPeroduaQveSafety(unittest.TestCase):
     self.assertEqual(self.CAM_BUS, self.safety.safety_fwd_hook(self.RADAR_BUS, 0x71))
     self.assertEqual(-1, self.safety.safety_fwd_hook(self.MAIN_BUS, 0xA0))
     self.assertEqual(self.RADAR_BUS, self.safety.safety_fwd_hook(self.CAM_BUS, BUS2_ALWAYS_FORWARD))
-    self.assertEqual(self.RADAR_BUS, self.safety.safety_fwd_hook(self.CAM_BUS, BUS2_ALSO_FORWARD))
+    for addr in BUS2_FORWARD_RANGE:
+      self.assertEqual(self.RADAR_BUS, self.safety.safety_fwd_hook(self.CAM_BUS, addr))
     self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, 0x51))
-    self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, 0x81))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, 0x89))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, 0xB0))
     self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, 0x3A2))
     for addr in self.blocked:
       self.assertEqual(-1, self.safety.safety_fwd_hook(self.CAM_BUS, addr))

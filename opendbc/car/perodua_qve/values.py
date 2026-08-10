@@ -29,10 +29,10 @@ class PeroduaQveSafetyFlags(IntFlag):
 
 
 BUS2_ALWAYS_FORWARD = 0x50
-BUS2_ALSO_FORWARD = 0x80
+BUS2_FORWARD_RANGE: tuple[int, ...] = tuple(range(0x80, 0x89))  # 0x80-0x88
 
-# Gated cam-bus lane spoof (0xB0/0xB1). Default OFF — dual-TX / geometry not ready.
-ENABLE_CAM_LANE_SPOOF = False
+# Cam-bus lane spoof TX (0xB0/0xB1). Stock camera still emits these; dual-TX on cam bus.
+ENABLE_CAM_LANE_SPOOF = True
 # ~15 Hz stock; control loop 100 Hz → send every N frames when enabled.
 CAM_LANE_SPOOF_PERIOD = 7
 
@@ -50,9 +50,10 @@ BUS2_POOL: tuple[int, ...] = (
 
 
 def qve_bus2_split_addrs() -> tuple[list[int], list[int]]:
-  """Cam bus 2 -> radar bus 0: BUS2_ALWAYS_FORWARD and BUS2_ALSO_FORWARD forwarded; all else blocked."""
-  blocked = [a for a in BUS2_POOL if a != BUS2_ALSO_FORWARD]
-  return blocked, [BUS2_ALSO_FORWARD]
+  """Cam bus 2 -> radar bus 0: 0x50 + 0x80-0x88 forwarded; all else blocked."""
+  forward_set = set(BUS2_FORWARD_RANGE)
+  blocked = [a for a in BUS2_POOL if a not in forward_set]
+  return blocked, list(BUS2_FORWARD_RANGE)
 
 
 # Reverse-engineered from can_print_changes captures.

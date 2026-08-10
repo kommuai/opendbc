@@ -9,7 +9,8 @@
 #define PERODUA_QVE_CAM_BUS                 2U
 
 #define PERODUA_QVE_CAM_TO_RADAR_ALLOW      0x50U
-#define PERODUA_QVE_CAM_TO_RADAR_ALLOW_2    0x80U
+#define PERODUA_QVE_CAM_TO_RADAR_RANGE_LO   0x80U
+#define PERODUA_QVE_CAM_TO_RADAR_RANGE_HI   0x88U
 
 #define PERODUA_QVE_GAS_PEDAL         0xBCU
 #define PERODUA_QVE_BRAKE             0xB5U
@@ -95,11 +96,18 @@ static bool perodua_qve_tx_hook(const CANPacket_t *msg) {
 }
 
 static bool perodua_qve_fwd_hook(int bus_num, int addr) {
+  // true = block. Cam bus 2 -> radar bus 0: allow 0x50 and 0x80-0x88 only.
   if (bus_num != PERODUA_QVE_CAM_BUS) {
     return false;
   }
-  return (addr != (int)PERODUA_QVE_CAM_TO_RADAR_ALLOW) &&
-         (addr != (int)PERODUA_QVE_CAM_TO_RADAR_ALLOW_2);
+  if (addr == (int)PERODUA_QVE_CAM_TO_RADAR_ALLOW) {
+    return false;
+  }
+  if ((addr >= (int)PERODUA_QVE_CAM_TO_RADAR_RANGE_LO) &&
+      (addr <= (int)PERODUA_QVE_CAM_TO_RADAR_RANGE_HI)) {
+    return false;
+  }
+  return true;
 }
 
 static safety_config perodua_qve_init(uint16_t param) {

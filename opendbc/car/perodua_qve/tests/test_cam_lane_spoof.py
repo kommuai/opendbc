@@ -61,11 +61,11 @@ class TestCamLanePacker(unittest.TestCase):
 
 
 class TestCamLaneControllerGate(unittest.TestCase):
-  def test_enable_flag_default_off(self):
-    self.assertFalse(ENABLE_CAM_LANE_SPOOF)
+  def test_enable_flag_on(self):
+    self.assertTrue(ENABLE_CAM_LANE_SPOOF)
 
+  @mock.patch('opendbc.car.perodua_qve.carcontroller.ENABLE_CAM_LANE_SPOOF', False)
   def test_controller_sends_nothing_when_disabled(self):
-    self.assertFalse(ENABLE_CAM_LANE_SPOOF)
     CC = mock.Mock()
     CS = mock.Mock()
     CS.out.steeringAngleDeg = 0.0
@@ -75,7 +75,6 @@ class TestCamLaneControllerGate(unittest.TestCase):
       _, sends = ctrl.update(CC, CS, 0)
       self.assertEqual(sends, [])
 
-  @mock.patch('opendbc.car.perodua_qve.carcontroller.ENABLE_CAM_LANE_SPOOF', True)
   @mock.patch('opendbc.car.perodua_qve.carcontroller.CAM_LANE_SPOOF_PERIOD', 1)
   def test_controller_sends_when_enabled(self):
     CC = mock.Mock()
