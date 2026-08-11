@@ -19,6 +19,7 @@ from opendbc.car.chery.values import (
   ICAUR_LKAS_CMD_DEADBAND_DEG,
   ICAUR_OVERRIDE_EXIT,
   ICAUR_OVERRIDE_EXIT_FRAMES,
+  ICAUR_OVERRIDE_INSTANT_TORQUE,
   ICAUR_OVERRIDE_OPPOSING_TORQUE,
   LANE_KEEP_STEP,
   LKAS_INFO_STEP,
@@ -57,7 +58,7 @@ class CarController(CarControllerBase):
     self.eps_spoof_counter = 0
     self.eps_spoof_armed = False  # latched on first cam-spoof frame to sync with PT counter
     self.eps_tap_active_for = 0   # frames remaining on the current HOW-suppression tap
-    # iCaur steer override latch (steeringPressed or opposing torque)
+    # iCaur steer override latch (pressed / firm yank / opposing torque)
     self.icaur_steer_override = False
     self.icaur_override_clear = 0
 
@@ -80,7 +81,7 @@ class CarController(CarControllerBase):
     return driver_dir != cmd_dir
 
   def _update_icaur_steer_override(self, CS, lat_active: bool, cmd_angle_deg: float) -> bool:
-    """Latch when driver presses or opposes LKAS; exit on low torque hysteresis."""
+    """Latch on pressed, firm yank, or opposing LKAS; exit on low torque hysteresis."""
     if not ICAUR_DRIVER_OVERRIDE_ENABLED:
       self.icaur_steer_override = False
       self.icaur_override_clear = 0
@@ -92,8 +93,10 @@ class CarController(CarControllerBase):
       self.icaur_override_clear = 0
       return False
 
+    # pressed: CarState 1-frame |T|>=10. instant: firm yank |T|>=20. opposing: curve-safe.
     wants_override = (
       CS.out.steeringPressed
+      or driver_torque >= ICAUR_OVERRIDE_INSTANT_TORQUE
       or self._driver_opposes_lkas(CS, cmd_angle_deg)
     )
 

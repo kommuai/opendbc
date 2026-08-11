@@ -17,6 +17,8 @@ from opendbc.car.chery.values import (
   ICAUR_GAS_PRESSED,
   ICAUR_GEAR_MAP,
   ICAUR_PT_PARSER_MSGS,
+  ICAUR_STEERING_PRESSED_MIN_COUNT,
+  ICAUR_STEERING_PRESSED_TORQUE,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
   OMODA_CAM_PARSER_MSGS,
@@ -91,7 +93,10 @@ class CarState(CarStateBase):
       steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
       self.prev_angle = ret.steeringAngleDeg
       ret.steeringTorqueEps = ret.steeringTorque * steer_dir
-      ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) >= 10, 5)
+      ret.steeringPressed = self.update_steering_pressed(
+        abs(ret.steeringTorque) >= ICAUR_STEERING_PRESSED_TORQUE,
+        ICAUR_STEERING_PRESSED_MIN_COUNT,
+      )
       ret.brakePressed = brake >= ICAUR_BRAKE_PRESSED
       ret.brake = brake if ret.brakePressed else 0.0
       ret.gasPressed = gas >= ICAUR_GAS_PRESSED
