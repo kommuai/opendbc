@@ -93,7 +93,7 @@ class CarController(CarControllerBase):
       self.icaur_override_clear = 0
       return False
 
-    # pressed: CarState 1-frame |T|>=10. instant: firm yank |T|>=20. opposing: curve-safe.
+    # pressed: CarState 1-frame |T|>=PRESSED (7). instant: |T|>=20. opposing: |T|>=10 curve-safe.
     wants_override = (
       CS.out.steeringPressed
       or driver_torque >= ICAUR_OVERRIDE_INSTANT_TORQUE

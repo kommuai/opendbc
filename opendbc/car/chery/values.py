@@ -104,15 +104,13 @@ CHERY_ICAUR_SAFETY_PARAM = 4
 ICAUR_DISABLE_TORQUE_SPOOF = True
 ICAUR_DISABLE_HUD_OVERRIDE = True
 # iCaur steer override: latch (drop LKAS) on steeringPressed, firm yank, OR opposing torque.
-# OPPOSING_TORQUE=10 matches CarState steeringPressed floor (Jul20-21 qlogs: pressed p50=23,
-# sharp-turn |T|>=10 is 4.2% vs 3.4% pressed; quiet p99=2). CMD_DEADBAND=0.5° ignores noise
-# when planner angle ≈ measured. Exit: |T|<=3 for 20 frames (~200 ms).
-# PRESSED_MIN_COUNT: was 5 (~50ms+). 0 ⇒ count>0 on first |T|>=10 frame (~10ms) so the
-# first intentional tug drops LKAS; accepts ~+3pp sharp-turn latch vs debounce=5 (Jul30 sim).
-# INSTANT_TORQUE: redundant firm-yank path (frame-1 |T|>=20) if pressed publish lags.
+# OPPOSING_TORQUE kept at 10 (curve-safe). PRESSED_TORQUE=7 catches light first nudges that
+# peaked 5–8 on 2026-08-13--01-23-35 while |T|>=10 often needed a second yank; jul20-21 sim
+# sharp_OFF|T|<10 18.2%→24.3% (+6pp) vs press=10 — acceptable for trial. Exit: |T|<=3 for
+# 20 frames (~200 ms). PRESSED_MIN_COUNT=0 ⇒ first |T|>=PRESSED frame. INSTANT=20 firm yank.
 ICAUR_DRIVER_OVERRIDE_ENABLED = True
 ICAUR_OVERRIDE_OPPOSING_TORQUE = 10
-ICAUR_STEERING_PRESSED_TORQUE = 10
+ICAUR_STEERING_PRESSED_TORQUE = 7
 ICAUR_STEERING_PRESSED_MIN_COUNT = 0
 ICAUR_OVERRIDE_INSTANT_TORQUE = 20
 ICAUR_LKAS_CMD_DEADBAND_DEG = 0.5
