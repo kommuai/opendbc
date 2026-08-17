@@ -6,7 +6,7 @@ from opendbc.car.byd.cam_lka.carstate import CarState as CamLkaCarState
 from opendbc.car.byd.mpc_lka.carcontroller import CarController as MpcLkaCarController
 from opendbc.car.byd.mpc_lka.carstate import CarState as MpcLkaCarState
 from opendbc.car.byd.radar_interface import RadarInterface
-from opendbc.car.byd.values import CAR, PLATFORM_MPC_LKA, BydFlags
+from opendbc.car.byd.values import CAR, PLATFORM_MPC_LKA, BydFlags, BYD_ATTO_STYLE_PLATFORMS, CANBUS
 
 
 class CarInterface(CarInterfaceBase):
@@ -78,11 +78,14 @@ class CarInterface(CarInterfaceBase):
 
     return ret
 
-  def _update(self, c):
-    ret = self.CS.update(self.cp, self.cp_cam)
-    events = self.create_common_events(ret)
-    ret.events = events.to_msg()
-    return ret
+  def update(self, can_packets):
+    if not self.CP.openpilotLongitudinalControl:
+      bus = CANBUS.cam_bus if self.CP.carFingerprint in BYD_ATTO_STYLE_PLATFORMS else CANBUS.main_bus
+      for _, frames in can_packets:
+        for addr, dat, src in frames:
+          if addr == 0x3B0 and src == bus and len(dat) >= 8 and not dat[0] & 0x18:
+            self.CS.sng_pcm_idle = bytes(dat)
+    return super().update(can_packets)
 
   def apply(self, c, now_nanos):
     return self.CC.update(c, self.CS, now_nanos)

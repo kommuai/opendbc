@@ -2,6 +2,7 @@ import numpy as np
 from time import monotonic
 
 from opendbc.can.packer import CANPacker
+from opendbc.car.sng_helper import SngHelper
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_dist_to_meas_limits
 from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, send_buttons
@@ -10,9 +11,8 @@ from opendbc.car.proton.values import DBC, CAR, CarControllerParams
 PROTON_DRIVER_TORQUE_FACTOR = 30
 STEER_DISABLE_BLEND_DELAY_S = 0.55
 STEER_DISABLE_BLEND_DURATION_S = 0.5
-SNG_INITIAL_PRESS_DELAY_FRAMES = 310
-SNG_REPEAT_PRESS_DELAY_FRAMES = 110
-SNG_MAX_RESUME_PRESSES = 2
+SNG_INITIAL_PRESS_DELAY_S = 3
+SNG_RESUME_PRESS_MIN_FRAMES = 2
 CANCEL_SPAM_INTERVAL_FRAMES = 15
 CANCEL_SPAM_PRESS_COUNT = 2
 ACCEL_POSITIVE_SCALE = 16
@@ -61,9 +61,8 @@ class CarController(CarControllerBase):
     self.prev_steer_enabled = False
     self.last_steer_disable = 0.0
 
-    self.sng_next_press_frame = 0 # The frame where the next resume press is allowed
-    self.resume_counter = 0       # Counter for tracking the progress of a resume press
-    self.is_sng_check = False
+    self.sng = SngHelper(SNG_INITIAL_PRESS_DELAY_S)
+    self.resume_counter = 0  # progress of current resume press in frames
 
     self.cancel_press_cnt = 0
     self.last_cancel_press = 0
@@ -92,23 +91,17 @@ class CarController(CarControllerBase):
     return apply_steer, lat_active, steer_enabled
 
   def _update_sng(self, CC, CS, can_sends):
-    if not (CS.cruise_standstill and CC.longActive):
-      self.is_sng_check = False
-      return
-
-    if not self.is_sng_check:
-      self.is_sng_check = True
-      self.sng_next_press_frame = self.frame + SNG_INITIAL_PRESS_DELAY_FRAMES
+    if (press := self.sng.tick(
+      self.frame,
+      CS.cruise_standstill and CC.longActive,
+      CS.out.gasPressed,
+      CS.res_btn_pressed,
+      CS.out.brakePressed,
+      CC.actuators.accel > 0 if self.openpilot_long else self.sng.lead_ready() or self.resume_counter,
+      self.resume_counter >= SNG_RESUME_PRESS_MIN_FRAMES,
+    )) is None:
       self.resume_counter = 0
-      return
-
-    if CS.out.gasPressed or CS.res_btn_pressed or self.resume_counter >= SNG_MAX_RESUME_PRESSES:
-      self.sng_next_press_frame = max(self.sng_next_press_frame, self.frame + SNG_REPEAT_PRESS_DELAY_FRAMES)
-      self.resume_counter = 0
-      return
-
-    # Brake check added for resume because S70 can still increase speed when standstill if brake pressed.
-    if CC.actuators.accel > 0 and self.frame > self.sng_next_press_frame and not CS.out.brakePressed:
+    elif press:
       can_sends.append(send_buttons(self.packer, False))
       self.resume_counter += 1
 
