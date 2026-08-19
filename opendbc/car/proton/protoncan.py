@@ -12,13 +12,8 @@ def proton_checksum(address: int, sig, d: bytearray) -> int:
 
 
 def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, wheel_touch_warning_2,
-                             lks_aux, lks_audio, lks_tactile, lks_assist_mode, lka_enable, stock_ldw_ste,
-                             steer_enabled, new_lka):
-
-  # Disable steering vibration for LDW if steer not enabled and LKS set to Warn Only mode and Tactile warning type
-  ldw_steering = 0 if (
-    not steer_enabled and not lks_aux and lks_assist_mode and lks_tactile and not lks_audio
-  ) else stock_ldw_ste
+                             lks_aux, lks_audio, lks_tactile, lks_assist_mode, lka_enable, stock_ldw_steer,
+                             new_lka):
 
   values = {
     "LKA_ENABLE": lka_enable,
@@ -27,7 +22,7 @@ def create_can_steer_command(packer, steer, steer_req, wheel_touch_warning, whee
     "STEER_CMD": abs(steer) if steer_req else 0,
     "STEER_DIR": steer <= 0,
     "LDW_READY": 1,
-    "LDW_STEERING": ldw_steering,
+    "LDW_STEERING": stock_ldw_steer,
     "SET_ME_1": 1,
     "SET_ME_1_2": new_lka, # Currently only for X90, pre-FL X50 needs to be False or LKS cannot be changed
     "LKS_STATUS": 1,
@@ -92,3 +87,9 @@ def send_buttons(packer, send_cruise=True):
     }
 
   return packer.make_can_msg("ACC_BUTTONS", 2, values)
+
+
+def create_steering_torque_spoof(packer, stock):
+  addr, dat, bus = packer.make_can_msg("STEERING_TORQUE", 2, {**stock, "MAIN_TORQUE": 125})
+  dat = bytearray(dat); dat[7] = proton_checksum(addr, None, dat)
+  return addr, bytes(dat), bus

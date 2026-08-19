@@ -15,7 +15,7 @@ def _proton_checksum_fix(msg):
 
 
 class TestProtonSafety(unittest.TestCase):
-  TX_MSGS = [[432, 0], [417, 0], [643, 2]]
+  TX_MSGS = [[432, 0], [417, 0], [643, 2], [336, 2]]
 
   def setUp(self):
     self.safety = libsafety_py.libsafety
