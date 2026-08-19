@@ -5,6 +5,7 @@
 static uint8_t proton_crc8_lut_8h2f[256];
 static uint8_t proton_acc_tx_block_frames = 0U;
 static uint8_t proton_lka_tx_block_frames = 0U;
+static uint8_t proton_tq_tx_block_frames = 0U;
 static uint8_t proton_pcm_stock_off_count = 0U;
 static bool proton_pcm_saw_stock_engaged = false;
 
@@ -15,6 +16,7 @@ static bool proton_pcm_saw_stock_engaged = false;
 #define PROTON_GAS_PEDAL       0x084U  // 132
 #define PROTON_PARKING_BRAKE   0x125U  // 293
 #define PROTON_WHEEL_SPEED     0x122U  // 290
+#define PROTON_STEERING_TORQUE 0x150U  // 336
 #define PROTON_MAX_STEER_SEEN  599
 
 #define PROTON_ACC_TX_BLOCK_MAX 3U
@@ -134,6 +136,10 @@ static bool proton_tx_hook(const CANPacket_t *msg) {
     proton_acc_tx_block_frames = PROTON_ACC_TX_BLOCK_MAX;
   }
 
+  if (addr == (int)PROTON_STEERING_TORQUE) {
+    proton_tq_tx_block_frames = PROTON_ACC_TX_BLOCK_MAX;
+  }
+
   return !violation;
 }
 
@@ -141,7 +147,11 @@ static bool proton_fwd_hook(int bus_num, int addr) {
   bool block = false;
 
   if (bus_num == 0) {
-    block = false;
+    bool is_tq_msg = (addr == (int)PROTON_STEERING_TORQUE) && (proton_tq_tx_block_frames > 0U);
+    if (is_tq_msg) {
+      proton_tq_tx_block_frames--;
+    }
+    block = is_tq_msg;
   } else if (bus_num == 2) {
     // Block camera LKA only for the brief window after device LKAS transmit; then allow stock again.
     bool is_lka_msg = (addr == (int)PROTON_ADAS_LKAS) && (proton_lka_tx_block_frames > 0U);
@@ -167,6 +177,7 @@ static safety_config proton_init(uint16_t param) {
   gen_crc_lookup_table_8(0x2F, proton_crc8_lut_8h2f);
   proton_acc_tx_block_frames = 0U;
   proton_lka_tx_block_frames = 0U;
+  proton_tq_tx_block_frames = 0U;
   proton_pcm_stock_off_count = 0U;
   proton_pcm_saw_stock_engaged = false;
   controls_allowed = false;
@@ -175,6 +186,7 @@ static safety_config proton_init(uint16_t param) {
     {PROTON_ADAS_LKAS, 0, 8, .check_relay = true, .disable_static_blocking = true},
     {PROTON_ACC_CMD, 0, 8, .check_relay = true, .disable_static_blocking = true},
     {PROTON_ACC_BUTTONS, 2, 8, .check_relay = false},
+    {PROTON_STEERING_TORQUE, 2, 8, .check_relay = false},
   };
 
   static RxCheck proton_rx_checks[] = {
