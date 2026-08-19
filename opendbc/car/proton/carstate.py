@@ -60,6 +60,7 @@ class CarState(CarStateBase):
     self.blinker_on_alc_speed = False
     self.blinker_start_time = 0
     self.distance_val = 1
+    self.steering_torque_values = {}
 
   def set_cur_blinker(self, alc_below_min_speed, right_blinker):
     self.blinker_start_time = monotonic()
@@ -129,9 +130,7 @@ class CarState(CarStateBase):
 
     self._update_lks_state(cp_cam)
     ret.stockAccelCmd = float(self.stock_acc_cmd)
-
-    # If cruise mode is ICC, make bukapilot control steering so it won't disengage by itself.
-    ret.lkaDisabled = not (self.lka_enable or self.is_icc_on)
+    ret.lkaDisabled = not self.is_icc_on
 
     self.parse_wheel_speeds(ret,
       cp.vl["WHEEL_SPEED"]["WHEELSPEED_F"],
@@ -167,6 +166,7 @@ class CarState(CarStateBase):
     ret.steeringAngleDeg = cp.vl["STEERING_MODULE"]["STEER_ANGLE"]
     steer_dir = 1 if (ret.steeringAngleDeg - self.prev_angle >= 0) else -1
     self.prev_angle = ret.steeringAngleDeg
+    self.steering_torque_values = dict(cp.vl["STEERING_TORQUE"])
     ret.steeringTorque = cp.vl["STEERING_TORQUE"]["MAIN_TORQUE"] * steer_dir
     ret.steeringTorqueEps = cp.vl["STEERING_MODULE"]["STEER_RATE"] * steer_dir
     if self.CP.carFingerprint == CAR.PROTON_X50:

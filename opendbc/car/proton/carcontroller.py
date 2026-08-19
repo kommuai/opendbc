@@ -5,7 +5,7 @@ from opendbc.can.packer import CANPacker
 from opendbc.car.sng_helper import SngHelper
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_dist_to_meas_limits
-from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, send_buttons
+from opendbc.car.proton.protoncan import create_acc_cmd, create_can_steer_command, create_steering_torque_spoof, send_buttons
 from opendbc.car.proton.values import DBC, CAR, CarControllerParams
 
 PROTON_DRIVER_TORQUE_FACTOR = 30
@@ -127,7 +127,10 @@ class CarController(CarControllerBase):
 
     apply_steer, lat_active, steer_enabled = self._compute_steer(CC, CS)
 
-    if (self.frame % 2) == 0:
+    if self.frame % 2 == 0:
+      if CC.latActive:
+        can_sends.append(create_steering_torque_spoof(self.packer, CS.steering_torque_values))
+
       # stock lane departure settings
       ldw_steering = CS.stock_ldw_steering
       if self.always_lks_tactile:
@@ -148,15 +151,14 @@ class CarController(CarControllerBase):
           self.packer,
           steer_cmd,
           lat_active,
-          CS.hand_on_wheel_warning and CS.is_icc_on,
-          CS.hand_on_wheel_warning_2 and CS.is_icc_on,
+          CS.hand_on_wheel_warning,
+          CS.hand_on_wheel_warning_2,
           CS.lks_aux,
           lks_audio,
           lks_tactile,
           CS.lks_assist_mode,
           CS.lka_enable,
           ldw_steering,
-          steer_enabled,
           is_x90,
         )
       )
