@@ -38,7 +38,7 @@ unsupported_platforms = {
 
 # Car names match if all words in a phrase appear in the car name
 unsupported_cars = {
-  "(South America only)", "Honda Accord 2018-22", "Honda Civic 201.*", "Honda Civic Hatchback",
+  "(South America only)", "Honda Civic 201.*", "Honda Civic Hatchback",
   "Honda CR-V 2015-16", "Honda Inspire", "Lexus ES 2017-18", "Lexus NX 2018-19",
   "Lexus RX 201.*", "Toyota Corolla 201.*"
 }
