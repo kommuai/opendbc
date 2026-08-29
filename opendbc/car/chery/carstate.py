@@ -26,6 +26,9 @@ from opendbc.car.chery.values import (
   OMODA_PT_PARSER_MSGS,
   PT_PARSER_MSGS,
   STEER_RELATED_INTERVENTION_DEG_MIN,
+  TIGGO21_CAM_PARSER_BYPASS,
+  TIGGO21_CAM_PARSER_MSGS,
+  TIGGO21_PT_PARSER_MSGS,
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -62,6 +65,8 @@ class CarState(CarStateBase):
     ret.personality = -1
     omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
     icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
+    tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
+    steer_related_steer = icaur or tiggo21
 
     # --- Wheels / pedals / gear ---
     if icaur:
@@ -107,6 +112,18 @@ class CarState(CarStateBase):
       self.eps_steering_angle = ret.steeringAngleDeg
       self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
       self.eps_counter = int(steer["COUNTER"])
+    elif tiggo21:
+      steer = cp.vl["STEER_RELATED"]
+      ret.steeringAngleDeg = max(-450.0, min(450.0, float(steer["STEERING_ANGLE"])))
+      ret.steeringTorque = float(steer["DRIVER_TORQUE"])
+      steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
+      self.prev_angle = ret.steeringAngleDeg
+      ret.steeringTorqueEps = ret.steeringTorque * steer_dir
+      ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
+      self.eps_steering_angle = ret.steeringAngleDeg
+      self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
+      self.eps_counter = int(steer["COUNTER"])
+      ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     else:
       eps = cp.vl["EPS"]
       ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
@@ -121,7 +138,7 @@ class CarState(CarStateBase):
       ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
 
       ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
-    if omoda:
+    if omoda or tiggo21:
       raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)
       if raw <= OMODA_BRAKE_PRESSURE_RAW_MAX:
         ret.brake = raw / OMODA_BRAKE_PRESSURE_RAW_MAX
@@ -165,6 +182,10 @@ class CarState(CarStateBase):
 
     set_kph = float(hud["SET_SPEED"])
     self.cruise_state = int(hud["CRUISE_STATE"])
+    # Tiggo 8 Pro 2022-24: HUD cruise-state values are unreliable; use 0x220 STEER_STATE.
+    tiggo21_steer_state = int(cam.vl["TIGGO21_LANE_KEEP"]["STEER_STATE"]) if tiggo21 else 0
+    if tiggo21:
+      self.cruise_state = 3 if tiggo21_steer_state in (2, 4) else 1
     ret.cruiseState.available = True
     ret.cruiseState.enabled = self.cruise_state == 3
     ret.cruiseState.speed = ret.cruiseState.speedCluster = set_kph * CV.KPH_TO_MS if set_kph > 0 else 0.0
@@ -190,11 +211,11 @@ class CarState(CarStateBase):
       self.prev_icc, self.prev_cruise = icc, cruise_btn
 
     # --- ADAS / LKAS state used by CarController ---
-    self.lkas_info_steer_related = 0.0 if icaur else float(cp.vl["LKAS_INFO"]["STEER_RELATED"])
+    self.lkas_info_steer_related = float(cp.vl["LKAS_INFO"]["STEER_RELATED"])
     # Jaecoo: STEER_RELATED angle raw>=36000 is a status code (decoded ≈342.7°), not road angle.
-    # iCaur: same bits are real degrees — rely on DRIVER_TORQUE via steeringPressed instead.
+    # iCaur/Tiggo21: same bits are real degrees — rely on DRIVER_TORQUE via steeringPressed instead.
     self.steer_related_intervention = (
-      False if icaur else
+      False if steer_related_steer else
       float(cp.vl["STEER_RELATED"]["STEERING_ANGLE"]) >= STEER_RELATED_INTERVENTION_DEG_MIN
     )
 
@@ -210,6 +231,8 @@ class CarState(CarStateBase):
       msgs = OMODA_PT_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
       msgs = ICAUR_PT_PARSER_MSGS
+    elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
+      msgs = TIGGO21_PT_PARSER_MSGS
     else:
       msgs = PT_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)
@@ -220,6 +243,14 @@ class CarState(CarStateBase):
       msgs = OMODA_CAM_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
       msgs = ICAUR_CAM_PARSER_MSGS
+    elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
+      msgs = TIGGO21_CAM_PARSER_MSGS
+      parser = CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.tiggo21_cam_bus)
+      for addr in TIGGO21_CAM_PARSER_BYPASS:
+        if addr in parser.message_states:
+          parser.message_states[addr].ignore_counter = True
+          parser.message_states[addr].ignore_checksum = True
+      return parser
     else:
       msgs = CAM_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.cam_bus)

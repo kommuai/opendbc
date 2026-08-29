@@ -11,6 +11,10 @@ from opendbc.car.chery.values import (
   CHERY_OMODA_SAFETY_PARAM,
   ICAUR_DISABLE_TORQUE_SPOOF,
   OMODA_DISABLE_TORQUE_SPOOF,
+  TIGGO_DISABLE_TORQUE_SPOOF,
+  TIGGO_DISABLE_HUD_OVERRIDE,
+  CHERY_NATIVE_HUD_FWD_PARAM,
+  CHERY_TIGGO21_SAFETY_PARAM,
 )
 
 
@@ -37,6 +41,18 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[0].safetyParam = CHERY_OMODA_SAFETY_PARAM
       if OMODA_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+    elif candidate == CAR.CHERY_TIGGO_8_PRO_2025:
+      if TIGGO_DISABLE_TORQUE_SPOOF:
+        ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+      if TIGGO_DISABLE_HUD_OVERRIDE:
+        ret.safetyConfigs[0].safetyParam |= CHERY_NATIVE_HUD_FWD_PARAM
+    elif candidate == CAR.CHERY_TIGGO_8_PRO_2022_2024:
+      # 2022-24: ADAS on bus 1, stock LKAS cmd 0x220 (not Jaecoo 0x345).
+      if TIGGO_DISABLE_TORQUE_SPOOF:
+        ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
+      if TIGGO_DISABLE_HUD_OVERRIDE:
+        ret.safetyConfigs[0].safetyParam |= CHERY_NATIVE_HUD_FWD_PARAM
+      ret.safetyConfigs[0].safetyParam |= CHERY_TIGGO21_SAFETY_PARAM
     elif candidate == CAR.CHERY_ICAUR_03:
       ret.safetyConfigs[0].safetyParam = CHERY_ICAUR_SAFETY_PARAM
       if ICAUR_DISABLE_TORQUE_SPOOF:

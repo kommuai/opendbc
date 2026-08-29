@@ -10,8 +10,8 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  # LANE_KEEP, LKAS_INFO(0), LKAS_INFO(2), HUD, EPS(2), PCM(0), PCM(2).
-  TX_MSGS = [[0x345, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
+  # LANE_KEEP, TIGGO21_LK(0), TIGGO21_LK(2), LKAS_INFO(0), LKAS_INFO(2), HUD, EPS(2), PCM(0), PCM(2).
+  TX_MSGS = [[0x345, 0], [0x220, 0], [0x220, 2], [0x394, 0], [0x394, 2], [0x387, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
   SAFETY_PARAM = 0
 
   def setUp(self):
@@ -194,8 +194,74 @@ class TestCherySafety(unittest.TestCase):
                      msg="STEER_RELATED must always forward")
 
 
+class TestCheryTiggoNoTorqueSpoofSafety(TestCherySafety):
+  """Tiggo 8 Pro: no torque spoof + native HUD fwd (production safetyParam=10)."""
+
+  SAFETY_PARAM = 2 | 8  # NO_TORQUE_SPOOF | NATIVE_HUD_FWD
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387),
+                     msg="Tiggo must forward cam HUD to PT (no HUD override)")
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
+
+  def test_fwd_blocks_pt_torque_when_engaged(self):
+    self._rx(self._wheel_speed(0.0, 0.0))
+    self.safety.set_controls_allowed(False)
+    for addr in (0x394, 0x1D3):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd to cam when spoof disabled")
+
+    self._rx(self._wheel_speed(30.0, 30.0))
+    self.safety.set_controls_allowed(True)
+    for addr in (0x394, 0x1D3):
+      self.assertEqual(2, self.safety.safety_fwd_hook(0, addr),
+                       msg=f"PT 0x{addr:x} should fwd to cam when spoof disabled")
+    self.assertEqual(2, self.safety.safety_fwd_hook(0, 0x0C4),
+                     msg="STEER_RELATED must always forward")
+
+
+class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
+  """Tiggo 8 Pro 2022-24: HUD on bus 1, 0x220 LKAS (production safetyParam=26)."""
+
+  SAFETY_PARAM = 2 | 8 | 16  # NO_TORQUE_SPOOF | NATIVE_HUD_FWD | TIGGO21
+
+  def _tiggo21_lane_keep(self, steer_state: int, bus: int = 1):
+    return self.packer.make_can_msg_safety(
+      "TIGGO21_LANE_KEEP",
+      bus,
+      {
+        "STEER_CMD": 0,
+        "STEER_STATE": steer_state,
+        "COUNTER": 0,
+      },
+    )
+
+  def test_controls_allowed_follows_0x220_steer_state_on_bus1(self):
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._tiggo21_lane_keep(0))
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._tiggo21_lane_keep(2))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._tiggo21_lane_keep(4))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._tiggo21_lane_keep(0))
+    self.assertFalse(self.safety.get_controls_allowed())
+
+  def test_fwd_blocks_native_0x220_pt_to_cam(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(0, 0x220))
+
+
 class TestCheryOmodaSafety(TestCherySafety):
   SAFETY_PARAM = 1
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x394))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387),
+                     msg="Omoda must forward cam HUD to PT (no HUD override)")
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
 
   def test_controls_allowed_follows_hud_cruise_state(self):
     self.assertFalse(self.safety.get_controls_allowed())
@@ -215,7 +281,8 @@ class TestCheryOmodaNoTorqueSpoofSafety(TestCheryOmodaSafety):
   def test_fwd_blocks_camera_lane_keep(self):
     self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
     self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
-    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x387))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387),
+                     msg="Omoda must forward cam HUD to PT (no HUD override)")
     self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x3A5))
 
   def test_fwd_blocks_pt_torque_when_engaged(self):
@@ -237,7 +304,7 @@ class TestCheryOmodaNoTorqueSpoofSafety(TestCheryOmodaSafety):
   def test_fwd_allows_cam_lkas_to_pt_when_spoof_disabled(self):
     self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x394))
     self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
-    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x387))
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x387))
 
 
 class TestCheryIcaurSafety(TestCherySafety):

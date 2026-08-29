@@ -27,12 +27,18 @@ from opendbc.car.chery.values import (
   OMODA_DISABLE_TORQUE_SPOOF,
   OMODA_PCM_DISABLE_RES_CYCLE_S,
   ICAUR_DISABLE_HUD_OVERRIDE,
+  TIGGO_DISABLE_TORQUE_SPOOF,
+  TIGGO_DISABLE_HUD_OVERRIDE,
+  TIGGO21_BLINKER_LK_TEST,
+  TIGGO21_BLINKER_LK_TEST_ANGLE_DEG,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_std_steer_angle_limits
 
 ButtonType = car.CarState.ButtonEvent.Type
+
+_TIGGO_PLATFORMS = (CAR.CHERY_TIGGO_8_PRO_2025, CAR.CHERY_TIGGO_8_PRO_2022_2024)
 
 
 class CarController(CarControllerBase):
@@ -61,6 +67,7 @@ class CarController(CarControllerBase):
     # iCaur steer override latch (pressed / firm yank / opposing torque)
     self.icaur_steer_override = False
     self.icaur_override_clear = 0
+    self.tiggo21_lk_counter = 0
 
   @staticmethod
   def _driver_opposes_lkas(CS, cmd_angle_deg: float) -> bool:
@@ -231,6 +238,7 @@ class CarController(CarControllerBase):
     fp = self.CP.carFingerprint
     return (
       (fp == CAR.CHERY_OMODA_5 and OMODA_DISABLE_TORQUE_SPOOF) or
+      (fp in _TIGGO_PLATFORMS and TIGGO_DISABLE_TORQUE_SPOOF) or
       (fp == CAR.CHERY_ICAUR_03 and ICAUR_DISABLE_TORQUE_SPOOF)
     )
 
@@ -259,24 +267,52 @@ class CarController(CarControllerBase):
     steer_req = lat_active and not driver_over
 
     apply_angle = CS.out.steeringAngleDeg
+    tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
+    # Tiggo 2022-24 EPS probe: blinker -> 0x220 LANE_KEEP + LKAS_INFO enable + angle nudge.
+    blinker_l = CS.out.leftBlinker
+    blinker_r = CS.out.rightBlinker
+    tiggo21_blinker_lk = (
+        TIGGO21_BLINKER_LK_TEST
+        and tiggo21
+        and (blinker_l or blinker_r)
+    )
+    if tiggo21_blinker_lk:
+      steer_req = True
+      nudge = TIGGO21_BLINKER_LK_TEST_ANGLE_DEG
+      apply_angle = CS.out.steeringAngleDeg + (nudge if blinker_l else -nudge)
+
     # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every frame
     # so EPS never sees a gap that looks like "still requesting" between even frames.
     send_lane_keep = (self.frame % LANE_KEEP_STEP == 0) or (icaur and self.icaur_steer_override)
     if send_lane_keep:
-      if self.frame % LANE_KEEP_STEP == 0:
+      if self.frame % LANE_KEEP_STEP == 0 and not tiggo21_blinker_lk:
         apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
-      if not steer_req:
-        apply_angle = CS.out.steeringAngleDeg
-        self.last_apply_angle = apply_angle
-      can_sends.append(cherycan.create_lane_keep_command(
-        self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg,
-      ))
+      if tiggo21:
+        if not steer_req:
+          apply_angle = 0.0  # stock idle wire value (neutral), not road-angle echo
+          self.last_apply_angle = apply_angle
+        can_sends.extend(cherycan.create_tiggo21_lane_keep_commands(
+          self.packer, apply_angle, steer_req, self.tiggo21_lk_counter,
+        ))
+        if self.frame % LANE_KEEP_STEP == 0:
+          self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
+      else:
+        if not steer_req:
+          apply_angle = CS.out.steeringAngleDeg
+          self.last_apply_angle = apply_angle
+        can_sends.append(cherycan.create_lane_keep_command(
+          self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg,
+        ))
 
     if self.frame % LKAS_INFO_STEP == 0:
       # Bus-2 mirror only when cruise is engaged. At standstill (cruise off) we let
       # panda forward the native LKAS_INFO PT->cam — injecting a stale spoof there
       # makes the cam see MAIN_TORQUE>0 with LKAS inactive, which the meter flags.
-      if not self._torque_spoof_disabled():
+      if tiggo21_blinker_lk:
+        can_sends.append(cherycan.create_tiggo21_lkas_info_enable(
+          self.packer, True, steer_related=CS.lkas_info_steer_related,
+        ))
+      elif not self._torque_spoof_disabled():
         can_sends.extend(cherycan.create_lkas_info_torque_spoof(
           self.packer, steer_req, steer_req,
           steer_related=CS.lkas_info_steer_related,
@@ -286,7 +322,8 @@ class CarController(CarControllerBase):
 
     if self.frame % HUD_STEP == 0 and not (
         (self.CP.carFingerprint == CAR.CHERY_OMODA_5 and OMODA_DISABLE_HUD_OVERRIDE) or
-        (self.CP.carFingerprint == CAR.CHERY_ICAUR_03 and ICAUR_DISABLE_HUD_OVERRIDE)
+        (self.CP.carFingerprint == CAR.CHERY_ICAUR_03 and ICAUR_DISABLE_HUD_OVERRIDE) or
+        (self.CP.carFingerprint in _TIGGO_PLATFORMS and TIGGO_DISABLE_HUD_OVERRIDE)
     ):
       can_sends.append(cherycan.create_hud_override(self.packer, CS.cam_hud, self.hud_counter))
       self.hud_counter = (self.hud_counter + 1) % 16

@@ -15,7 +15,24 @@ from opendbc.car.chery.values import (
   SPOOF_TORQUE_RAMP,
   SPOOF_TORQUE_VAR_MIN,
   SPOOF_VAR_PROB,
+  TIGGO21_LK_ANGLE_BIAS_DEG,
 )
+
+TIGGO21_LK_ADDR = 0x220
+TIGGO21_LK_IDLE_PADDING = {
+  "SET_ME_XFF": 0,
+  "SET_ME_XFC": 0,
+  "SET_ME_XF4": 0,
+  "SET_ME_X63": 0,
+  "SET_ME_XF": 0,
+}
+TIGGO21_LK_ACTIVE_PADDING = {
+  "SET_ME_XFF": 0x80,
+  "SET_ME_XFC": 0x07,
+  "SET_ME_XF4": 0,
+  "SET_ME_X63": 0,
+  "SET_ME_XF": 0,
+}
 
 # --- Re-exported / referenced by opendbc.can.dbc; do not rename. ---
 
@@ -42,6 +59,49 @@ def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg)
     "LKAS_ENABLE": int(steer_req),
     **LANE_KEEP_PADDING,
   })
+
+
+def _finalize_tiggo21_lane_keep(data: bytearray, steer_req: bool, counter: int) -> None:
+  """Tiggo 2022-24 0x220: byte1 0x50/0x70/0x90/0xb0/0xd0/0xf0 = STEER_REQ; idle 0x08."""
+  if steer_req:
+    # Do not preserve packer low nibble — it corrupts byte1 (0x54/0x7c vs stock 0x50/0x70).
+    data[1] = 0x50 + (((int(counter) % 6) << 5) & 0xF0)
+  else:
+    data[1] = 0x08
+  data[7] = chery_checksum(TIGGO21_LK_ADDR, None, data)
+
+
+def create_tiggo21_lane_keep_command(packer, physical_angle_deg, steer_req, counter, bus):
+  """Build Tiggo 2022-24 stock LANE_KEEP on 0x220 (physical angle; wire adds TIGGO21_LK_ANGLE_BIAS_DEG)."""
+  wire_angle = float(physical_angle_deg) + TIGGO21_LK_ANGLE_BIAS_DEG
+  padding = TIGGO21_LK_IDLE_PADDING  # stock active 0x220 also uses zero padding (not 0x80/0x07)
+  addr, payload, bus = packer.make_can_msg("TIGGO21_LANE_KEEP", bus, {
+    "STEER_CMD_ANGLE": wire_angle,
+    "COUNTER": int(counter) % 16,
+    **padding,
+  })
+  data = bytearray(payload)
+  _finalize_tiggo21_lane_keep(data, steer_req, counter)
+  return addr, bytes(data), bus
+
+
+def create_tiggo21_lane_keep_commands(packer, physical_angle_deg, steer_req, counter):
+  """Mirror stock Tiggo 2022-24 LANE_KEEP on bus 2 and bus 0."""
+  buses = (CANBUS.tiggo21_lk_bus, CANBUS.main_bus)
+  return [
+    create_tiggo21_lane_keep_command(packer, physical_angle_deg, steer_req, counter, bus)
+    for bus in buses
+  ]
+
+
+def create_tiggo21_lkas_info_enable(packer, lkas_enable, steer_related=0.0):
+  """Minimal LKAS_INFO for Tiggo 2022-24 bench probes (torque spoof disabled on this platform)."""
+  signals = {
+    "MAIN_TORQUE": 0.0,
+    "LKAS_ENABLE": int(lkas_enable),
+    "STEER_RELATED": float(steer_related),
+  }
+  return packer.make_can_msg("LKAS_INFO", CANBUS.main_bus, signals)
 
 
 _PCM_BUTTON_FIELDS = ("ICC_TOGGLE", "CRUISE_BUTTON", "RES_BUTTON")
