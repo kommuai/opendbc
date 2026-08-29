@@ -236,10 +236,6 @@ BO_ 544 TIGGO21_LANE_KEEP: 8 XXX
  SG_ COUNTER : 51|4@0+ (1,0) [0|15] "" XXX
  SG_ CHECKSUM : 63|8@0+ (1,0) [0|255] "" XXX
 
-BO_ 705 SPEED_RELATED_ALT: 8 XXX
- SG_ NON_CAL_SPEED1 : 1|9@0+ (1,0) [0|511] "" XXX
- SG_ NON_CAL_SPEED2 : 17|9@0+ (1,0) [0|511] "" XXX
-
 
 CM_ SG_ 269 GEAR "D is 4, N is 3, R is 2, P is 1";
 CM_ SG_ 768 GEAR "Omoda 5: 0x300 byte0 bits 0-3. 0xB=D 0xC=N 0xD=R 0xE=P.";
@@ -274,16 +270,16 @@ CM_ BO_ 547 "iCaur 03 wheel speed B (0x223). Same 13-bit encoding as 0x222; byte
 CM_ BO_ 306 "iCaur 03 brake pressure (0x132 start bit 31, 8-bit motorola). DBC scale 0.01 so raw 100 → 1.0; CarState uses 0..1.";
 CM_ BO_ 330 "iCaur 03 gas pedal (0x14A start bit 23, 12-bit motorola). phys=(raw-2000)/1000 so idle raw 2000→0 and raw 3000→1.0.";
 CM_ BO_ 581 "iCaur 03 stalk/blinker (0x245 start bit 11, 4-bit). Left=4|6, right=8|9.";
-CM_ SG_ 581 BLINKER "iCaur03: left when 4 or 6; right when 8 or 9. For the Tiggo 8 2022-24 lane-keep reference, a left-blinker trigger selects command value 60 on TIGGO21_LANE_KEEP (0x220).";
+CM_ SG_ 581 BLINKER "iCaur03: left when 4 or 6; right when 8 or 9. For the Tiggo 8 2022-24 lane-keep reference, a left-blinker trigger selects command value 40 on TIGGO21_LANE_KEEP (0x220).";
 CM_ BO_ 789 "iCaur 03 transmission (0x315 start bit 11, 4-bit gear).";
 CM_ SG_ 789 GEAR "iCaur03: P=11 D=1 N=10 R=9.";
-CM_ BO_ 544 "Chery Tiggo 8 2022-24 lane-keep reference (0x220). On a left-blinker trigger, send STEER_CMD value 60. STEER_STATE meanings: 0 = nothing engaged; 2 = ACC on but LKA off; 4 = ACC and LKA on.";
-CM_ SG_ 544 STEER_CMD "Tiggo 8 2022-24 reference: left-blinker trigger uses command value 60.";
+CM_ BO_ 544 "Chery Tiggo 8 2022-24 lane-keep reference (0x220). On a left-blinker trigger, send STEER_CMD value 40. STEER_STATE meanings: 0 = nothing engaged; 2 = ACC on but LKA off; 4 = ACC and LKA on.";
+CM_ SG_ 544 STEER_CMD "Tiggo 8 2022-24 reference: left-blinker trigger uses command value 40.";
 CM_ SG_ 544 STEER_STATE "Tiggo 8 2022-24: 0=NONE; 2=ACC_ONLY (LKA off); 4=ACC_AND_LKA.";
 
 VAL_ 768 GEAR 11 "D" 12 "N" 13 "R" 14 "P";
 VAL_ 581 BLINKER 4 "LEFT" 6 "LEFT" 8 "RIGHT" 9 "RIGHT";
-VAL_ 544 STEER_CMD 60 "LEFT_BLINKER_REFERENCE";
+VAL_ 544 STEER_CMD 40 "LEFT_BLINKER_REFERENCE";
 VAL_ 544 STEER_STATE 0 "NONE" 2 "ACC_ONLY" 4 "ACC_AND_LKA";
 VAL_ 789 GEAR 1 "D" 9 "R" 10 "N" 11 "P";
 VAL_ 903 FOLLOW_DISTANCE 0 "UNKNOWN" 1 "1_BAR" 2 "2_BAR" 3 "3_BAR" 4 "4_BAR" 5 "5_BAR" 6 "UNKNOWN" 7 "UNKNOWN";

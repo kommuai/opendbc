@@ -30,6 +30,7 @@ from opendbc.car.chery.values import (
   TIGGO_DISABLE_TORQUE_SPOOF,
   TIGGO_DISABLE_HUD_OVERRIDE,
   TIGGO21_BLINKER_LK_TEST,
+  TIGGO21_BLINKER_LK_LEFT_CMD_DEG,
   TIGGO21_BLINKER_LK_TEST_ANGLE_DEG,
   lowpass_steer_cmd,
 )
@@ -279,7 +280,7 @@ class CarController(CarControllerBase):
     if tiggo21_blinker_lk:
       steer_req = True
       nudge = TIGGO21_BLINKER_LK_TEST_ANGLE_DEG
-      apply_angle = CS.out.steeringAngleDeg + (nudge if blinker_l else -nudge)
+      apply_angle = TIGGO21_BLINKER_LK_LEFT_CMD_DEG if blinker_l else (CS.out.steeringAngleDeg - nudge)
 
     # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every frame
     # so EPS never sees a gap that looks like "still requesting" between even frames.

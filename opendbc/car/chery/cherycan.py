@@ -19,20 +19,6 @@ from opendbc.car.chery.values import (
 )
 
 TIGGO21_LK_ADDR = 0x220
-TIGGO21_LK_IDLE_PADDING = {
-  "SET_ME_XFF": 0,
-  "SET_ME_XFC": 0,
-  "SET_ME_XF4": 0,
-  "SET_ME_X63": 0,
-  "SET_ME_XF": 0,
-}
-TIGGO21_LK_ACTIVE_PADDING = {
-  "SET_ME_XFF": 0x80,
-  "SET_ME_XFC": 0x07,
-  "SET_ME_XF4": 0,
-  "SET_ME_X63": 0,
-  "SET_ME_XF": 0,
-}
 
 # --- Re-exported / referenced by opendbc.can.dbc; do not rename. ---
 
@@ -74,11 +60,9 @@ def _finalize_tiggo21_lane_keep(data: bytearray, steer_req: bool, counter: int) 
 def create_tiggo21_lane_keep_command(packer, physical_angle_deg, steer_req, counter, bus):
   """Build Tiggo 2022-24 stock LANE_KEEP on 0x220 (physical angle; wire adds TIGGO21_LK_ANGLE_BIAS_DEG)."""
   wire_angle = float(physical_angle_deg) + TIGGO21_LK_ANGLE_BIAS_DEG
-  padding = TIGGO21_LK_IDLE_PADDING  # stock active 0x220 also uses zero padding (not 0x80/0x07)
   addr, payload, bus = packer.make_can_msg("TIGGO21_LANE_KEEP", bus, {
-    "STEER_CMD_ANGLE": wire_angle,
+    "STEER_CMD": wire_angle,
     "COUNTER": int(counter) % 16,
-    **padding,
   })
   data = bytearray(payload)
   _finalize_tiggo21_lane_keep(data, steer_req, counter)

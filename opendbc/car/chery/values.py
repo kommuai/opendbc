@@ -126,6 +126,7 @@ CHERY_TIGGO21_SAFETY_PARAM = 16
 TIGGO21_LK_ANGLE_BIAS_DEG = 39.1
 # Bench test: blinker -> 0x220 LANE_KEEP + LKAS_INFO enable (Tiggo 2022-24 only).
 TIGGO21_BLINKER_LK_TEST = True
+TIGGO21_BLINKER_LK_LEFT_CMD_DEG = 40.0
 TIGGO21_BLINKER_LK_TEST_ANGLE_DEG = 12.0
 # iCaur 03: standstill on 0x222; torque spoof off (same bit as Omoda).
 # HUD: Omoda-style — native cam HUD forwards to PT; no HUD override TX.
