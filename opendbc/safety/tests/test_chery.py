@@ -268,15 +268,18 @@ class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
     self.assertFalse(self.safety.get_controls_allowed())
 
   def test_fwd_blocks_camera_lane_keep(self):
+    # 0x345 is the generic Chery LKAS command and is always replaced on PT.
+    self.assertEqual(-1, self.safety.safety_fwd_hook(2, 0x345))
+
     self.safety.set_controls_allowed(False)
-    for addr in (0x220, 0x307, 0x345, 0x387, 0x394, 0x3A5, 0x999):
+    for addr in (0x220, 0x307, 0x387, 0x394, 0x3A5, 0x999):
       self.assertEqual(0, self.safety.safety_fwd_hook(2, addr),
                        msg=f"cam 0x{addr:x} must passthrough when not engaged")
     self.safety.set_controls_allowed(True)
     for addr in (0x220, 0x307):
       self.assertEqual(-1, self.safety.safety_fwd_hook(2, addr),
                        msg=f"cam 0x{addr:x} must be blocked when engaged")
-    for addr in (0x345, 0x387, 0x394, 0x3A5, 0x999):
+    for addr in (0x387, 0x394, 0x3A5, 0x999):
       self.assertEqual(0, self.safety.safety_fwd_hook(2, addr),
                        msg=f"cam 0x{addr:x} must fwd to PT")
 
