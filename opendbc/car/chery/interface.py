@@ -13,8 +13,10 @@ from opendbc.car.chery.values import (
   OMODA_DISABLE_TORQUE_SPOOF,
   TIGGO_DISABLE_TORQUE_SPOOF,
   TIGGO_DISABLE_HUD_OVERRIDE,
+  TIGGO_DISABLE_STOP_AND_GO,
   CHERY_NATIVE_HUD_FWD_PARAM,
   CHERY_TIGGO21_SAFETY_PARAM,
+  Tiggo21SteerLimits,
 )
 
 
@@ -46,8 +48,17 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
       if TIGGO_DISABLE_HUD_OVERRIDE:
         ret.safetyConfigs[0].safetyParam |= CHERY_NATIVE_HUD_FWD_PARAM
+      if TIGGO_DISABLE_STOP_AND_GO:
+        ret.autoResumeSng = False
     elif candidate == CAR.CHERY_TIGGO_8_PRO_2022_2024:
-      # 2022-24: ADAS on bus 1, stock LKAS cmd 0x220 (not Jaecoo 0x345).
+      # 2022-24: HUD on bus 1, 0x220 EPS torque (PI), stock LKAS not Jaecoo 0x345.
+      ret.steerControlType = car.CarParams.SteerControlType.torque
+      ret.steerActuatorDelay = 0.10
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0], [Tiggo21SteerLimits.STEER_MAX]]
+      ret.lateralTuning.init("pid")
+      ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0.], [0.22]]
+      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0.], [0.02]]
+      ret.lateralTuning.pid.kf = 0.00010
       if TIGGO_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
       if TIGGO_DISABLE_HUD_OVERRIDE:

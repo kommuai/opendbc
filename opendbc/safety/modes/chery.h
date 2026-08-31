@@ -7,14 +7,16 @@
 // via HUD on camera bus (matches chery_general_pt.dbc + CarState cruise parsing).
 #define CHERY_LANE_KEEP    0x345U
 #define CHERY_TIGGO21_LK   0x220U
+#define CHERY_STEER_STATUS 0x307U  // STEER_STATUS — Tiggo 2022-24 cam->PT drop + PT spoof
 #define CHERY_LKAS_INFO    0x394U
 #define CHERY_HUD          0x387U
+#define CHERY_LKA_STATUS   0x3A5U  // Tiggo 2022-24 ACC enable (TIGGO_8_ACC_ENABLE)
 #define CHERY_PCM_BUTTONS  0x360U
 #define CHERY_OMODA_SAFETY_PARAM          1U
 #define CHERY_OMODA_NO_TORQUE_SPOOF_PARAM 2U
 #define CHERY_ICAUR_SAFETY_PARAM          4U
 #define CHERY_NATIVE_HUD_FWD_PARAM        8U
-#define CHERY_TIGGO21_SAFETY_PARAM       16U  // HUD on bus 1 (2022-24), 0x220 LKAS cmd
+#define CHERY_TIGGO21_SAFETY_PARAM       16U  // HUD on bus 1 (2022-24), 0x220 LKAS on bus 2
 // PT-side messages that carry driver-torque / steering-input info. We block them
 // from forwarding to the camera bus *while controls_allowed* (cruise engaged) and
 // feed the camera our own spoofed copies instead, so the hands-on-wheel detector
@@ -33,12 +35,13 @@ static bool chery_native_hud_fwd = false;
 static bool chery_tiggo21_safety = false;
 
 static void chery_rx_hook(const CANPacket_t *msg) {
-  // Tiggo 8 Pro 2022-24 reports ACC/LKA state in 0x220 STEER_STATE on bus 1.
-  // Do not use its unreliable HUD cruise-state field for the safety gate.
-  if (chery_tiggo21_safety && (msg->addr == CHERY_TIGGO21_LK) &&
-      (msg->bus == 1U) && (GET_LEN(msg) >= 2U)) {
-    const uint8_t steer_state = (uint8_t)((msg->data[1] >> 2U) & 0x7U);
-    pcm_cruise_check((steer_state == 2U) || (steer_state == 4U));
+  // Tiggo 8 Pro 2022-24: match CarState — ACC enable is LKA_STATUS (0x3A5) on PT.
+  // Camera 0x220 STEER_STATE=2 is ACC_ONLY and stays high while stock ACC is off;
+  // using it arms controls_allowed too early, heartbeat clears it, then no re-arm.
+  if (chery_tiggo21_safety && (msg->addr == CHERY_LKA_STATUS) &&
+      (msg->bus == 0U) && (GET_LEN(msg) >= 3U)) {
+    const bool acc_enable = ((msg->data[2] >> 4U) & 1U) != 0U;  // TIGGO_8_ACC_ENABLE
+    pcm_cruise_check(acc_enable);
   }
 
   if (!chery_tiggo21_safety && (msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
@@ -85,16 +88,17 @@ static safety_config chery_init(uint16_t param) {
     {.msg = {{CHERY_ICAUR_WHEELSPEED_A, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static RxCheck chery_rx_checks_tiggo21[] = {
-    {.msg = {{CHERY_HUD, 1U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    // LKA_STATUS on PT gates controls_allowed (must be in rx_checks or rx_hook never runs).
+    {.msg = {{CHERY_LKA_STATUS, 0U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{CHERY_WHEELSPEED_2, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static const CanMsg CHERY_TX_MSGS[] = {
     {CHERY_LANE_KEEP, 0, 8, .check_relay = false},
     {CHERY_TIGGO21_LK, 0, 8, .check_relay = false},
-    {CHERY_TIGGO21_LK, 2, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 0, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 2, 8, .check_relay = false},  // mirror our spoof to cam while we block PT->cam fwd
     {CHERY_HUD, 0, 8, .check_relay = false},
+    {CHERY_STEER_STATUS, 0, 8, .check_relay = false},  // Tiggo 2022-24 PT keepalive while cam 0x307 is blocked
     {CHERY_EPS, 2, 8, .check_relay = false},  // EPS spoof on cam bus (DRIVER_TORQUE forced high)
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
@@ -127,6 +131,12 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   // left to forward — the cluster uses it for the LKA-engaged indicator and
   // blocking the whole frame caused a meter error in testing.
   if (bus_num == 2) {
+    // Tiggo 2022-24: passthrough cam 0x220/0x307 when OP is not engaged.
+    // While engaged, block so CarController can TX our LKAS / STEER_STATUS.
+    if (chery_tiggo21_safety && ((addr == (int)CHERY_TIGGO21_LK) ||
+                                 (addr == (int)CHERY_STEER_STATUS))) {
+      return controls_allowed;
+    }
     if (addr == (int)CHERY_LANE_KEEP) {
       return true;
     }
@@ -151,9 +161,6 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   // When chery_omoda_no_torque_spoof is set, leave native PT->cam torque frames
   // alone so the meter still sees stock EPS/LKAS while Python spoof is disabled.
   if (bus_num == 0) {
-    if (chery_tiggo21_safety && (addr == (int)CHERY_TIGGO21_LK)) {
-      return true;
-    }
     if ((addr == (int)CHERY_EPS) && chery_cam_torque_spoof_active() && !chery_omoda_no_torque_spoof) {
       return true;
     }

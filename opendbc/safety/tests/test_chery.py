@@ -10,8 +10,8 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  # LANE_KEEP, TIGGO21_LK(0), TIGGO21_LK(2), LKAS_INFO(0), LKAS_INFO(2), HUD, EPS(2), PCM(0), PCM(2).
-  TX_MSGS = [[0x345, 0], [0x220, 0], [0x220, 2], [0x394, 0], [0x394, 2], [0x387, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
+  # LANE_KEEP, TIGGO21_LK(0), LKAS_INFO(0), LKAS_INFO(2), HUD, STEER_STATUS(0), EPS(2), PCM(0), PCM(2).
+  TX_MSGS = [[0x345, 0], [0x220, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x307, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
   SAFETY_PARAM = 0
 
   def setUp(self):
@@ -223,11 +223,11 @@ class TestCheryTiggoNoTorqueSpoofSafety(TestCherySafety):
 
 
 class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
-  """Tiggo 8 Pro 2022-24: HUD on bus 1, 0x220 LKAS (production safetyParam=26)."""
+  """Tiggo 8 Pro 2022-24: HUD on bus 1, 0x220 LKAS on bus 2 (production safetyParam=26)."""
 
   SAFETY_PARAM = 2 | 8 | 16  # NO_TORQUE_SPOOF | NATIVE_HUD_FWD | TIGGO21
 
-  def _tiggo21_lane_keep(self, steer_state: int, bus: int = 1):
+  def _tiggo21_lane_keep(self, steer_state: int, bus: int = 2):
     return self.packer.make_can_msg_safety(
       "TIGGO21_LANE_KEEP",
       bus,
@@ -238,19 +238,47 @@ class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
       },
     )
 
-  def test_controls_allowed_follows_0x220_steer_state_on_bus1(self):
+  def _lka_status(self, acc_enable: int, bus: int = 0):
+    return self.packer.make_can_msg_safety(
+      "LKA_STATUS",
+      bus,
+      {"TIGGO_8_ACC_ENABLE": acc_enable},
+    )
+
+  def test_controls_allowed_follows_hud_cruise_state(self):
+    """Tiggo 2022-24 must not gate on HUD (layout differs; CarState ignores it)."""
     self.assertFalse(self.safety.get_controls_allowed())
-    self._rx(self._tiggo21_lane_keep(0))
+    self._rx(self._hud(3, bus=1))
     self.assertFalse(self.safety.get_controls_allowed())
-    self._rx(self._tiggo21_lane_keep(2))
-    self.assertTrue(self.safety.get_controls_allowed())
-    self._rx(self._tiggo21_lane_keep(4))
-    self.assertTrue(self.safety.get_controls_allowed())
-    self._rx(self._tiggo21_lane_keep(0))
+    self._rx(self._hud(3, bus=2))
     self.assertFalse(self.safety.get_controls_allowed())
 
-  def test_fwd_blocks_native_0x220_pt_to_cam(self):
-    self.assertEqual(-1, self.safety.safety_fwd_hook(0, 0x220))
+  def test_controls_allowed_follows_lka_status_acc_enable(self):
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._tiggo21_lane_keep(2))
+    self.assertFalse(self.safety.get_controls_allowed(),
+                     msg="cam 0x220 STEER_STATE=2 must not arm controls_allowed")
+    self._rx(self._lka_status(0, bus=2))
+    self.assertFalse(self.safety.get_controls_allowed())
+    self._rx(self._lka_status(1))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._lka_status(1))
+    self.assertTrue(self.safety.get_controls_allowed())
+    self._rx(self._lka_status(0))
+    self.assertFalse(self.safety.get_controls_allowed())
+
+  def test_fwd_blocks_camera_lane_keep(self):
+    self.safety.set_controls_allowed(False)
+    for addr in (0x220, 0x307, 0x345, 0x387, 0x394, 0x3A5, 0x999):
+      self.assertEqual(0, self.safety.safety_fwd_hook(2, addr),
+                       msg=f"cam 0x{addr:x} must passthrough when not engaged")
+    self.safety.set_controls_allowed(True)
+    for addr in (0x220, 0x307):
+      self.assertEqual(-1, self.safety.safety_fwd_hook(2, addr),
+                       msg=f"cam 0x{addr:x} must be blocked when engaged")
+    for addr in (0x345, 0x387, 0x394, 0x3A5, 0x999):
+      self.assertEqual(0, self.safety.safety_fwd_hook(2, addr),
+                       msg=f"cam 0x{addr:x} must fwd to PT")
 
 
 class TestCheryOmodaSafety(TestCherySafety):

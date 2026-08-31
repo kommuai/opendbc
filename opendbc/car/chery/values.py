@@ -11,8 +11,8 @@ from opendbc.car.lateral import AngleSteeringLimits
 class CANBUS:
   main_bus = 0   # PT / EPS  — LANE_KEEP + LKAS_INFO TX
   cam_bus = 2    # stock cam — HUD, LANE_KEEP RX
-  tiggo21_cam_bus = 1  # Tiggo 8 Pro 2022-24: ADAS on bus 1 (not bus 2)
-  tiggo21_lk_bus = 2   # Tiggo 2022-24 stock LANE_KEEP command (mirrored on bus 0)
+  tiggo21_cam_bus = 1  # Tiggo 8 Pro 2022-24: HUD on bus 1
+  tiggo21_lk_bus = 2   # Tiggo 2022-24 stock LANE_KEEP (0x220) RX; cam->PT native fwd, no OP TX
 
 
 # --- CarController timing ---
@@ -91,7 +91,7 @@ OMODA_PT_PARSER_MSGS = [
   ("OMODA_TRANSMISSION", 100), ("OMODA_BRAKE", 50), ("HUD", 20),
 ]
 # Tiggo 8 Pro 2022-24: STEER_RELATED steer (not EPS), Omoda brake/trans, LKAS_INFO on PT.
-# HUD and 0x220 lane-keep state are on bus 1 — parsed via TIGGO21_CAM_PARSER_MSGS (not PT); ACC_UNCERTAIN is intentionally excluded for Tiggo 2022-24.
+# HUD is on bus 1; 0x220 TIGGO21_LANE_KEEP is on bus 2. ACC_UNCERTAIN is intentionally excluded.
 TIGGO21_PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50),
   ("STEER_RELATED", 100), ("GAS", 100),
@@ -99,13 +99,13 @@ TIGGO21_PT_PARSER_MSGS = [
   ("STALK", 50), ("PCM_BUTTONS", 20),
   ("SPEED_RELATED", 50),
   ("SEATBELT_287", 50), ("SEATBELT_430", 50),
-  ("BCM_STAT_412", math.nan), ("LKAS_INFO", 50),
+  ("BCM_STAT_412", math.nan), ("LKAS_INFO", 50), ("LKA_STATUS", 20),
 ]
-# Bus 1 ADAS for 2022-24: HUD plus 0x220 TIGGO21_LANE_KEEP for ACC/LKA state.
-TIGGO21_CAM_PARSER_MSGS = [("HUD", 20), ("TIGGO21_LANE_KEEP", 50)]
-# Bus-1 ADAS uses a different layout than chery_general_pt.dbc (Jaecoo/Omoda):
-# HUD byte7 is stuffed 0xFF, ACC_UNCERT byte7 is 0x7F — not chery_checksum fields.
-TIGGO21_CAM_PARSER_BYPASS = (0x387, 0x3DE)  # ignore counter + checksum
+# Tiggo 8 Pro 2022-24: do not decode HUD (Jaecoo layout does not match bus-1 0x387).
+TIGGO21_CAM_PARSER_MSGS = []
+TIGGO21_LK_PARSER_MSGS = [("TIGGO21_LANE_KEEP", 50), ("STEER_STATUS", 20)]
+TIGGO21_CAM_PARSER_BYPASS = ()
+TIGGO21_LK_PARSER_BYPASS = (0x220, 0x307)  # ignore counter + checksum on stock 0x220 / 0x307
 
 # Omoda 5: 0x2E9 byte 2 is multiplexed — raw 1..5 are message variants, not pedal.
 OMODA_BRAKE_PRESSURE_RAW_MAX = 0x35
@@ -120,14 +120,19 @@ CHERY_OMODA_NO_TORQUE_SPOOF_PARAM = 2
 # Native cam HUD forwards to PT (safetyParam NATIVE_HUD_FWD); keeps Jaecoo RX/wheels.
 TIGGO_DISABLE_TORQUE_SPOOF = True
 TIGGO_DISABLE_HUD_OVERRIDE = True
+# Temporarily disable Tiggo 8 stop-and-go (no RES/SET auto-resume from standstill).
+TIGGO_DISABLE_STOP_AND_GO = True
 CHERY_NATIVE_HUD_FWD_PARAM = 8
 CHERY_TIGGO21_SAFETY_PARAM = 16
-# Tiggo 2022-24 LANE_KEEP (0x220): Jaecoo DBC scale with +39.1 deg wire bias (neutral raw 8192).
-TIGGO21_LK_ANGLE_BIAS_DEG = 39.1
-# Bench test: blinker -> 0x220 LANE_KEEP + LKAS_INFO enable (Tiggo 2022-24 only).
-TIGGO21_BLINKER_LK_TEST = True
-TIGGO21_BLINKER_LK_LEFT_CMD_DEG = 40.0
-TIGGO21_BLINKER_LK_TEST_ANGLE_DEG = 12.0
+# Tiggo 8 Pro 2022-24: 0x220 STEER_CMD is EPS torque. High from stock cam max (11-bit).
+class Tiggo21SteerLimits:
+  STEER_MAX = 134
+  STEER_DELTA_UP = 8
+  STEER_DELTA_DOWN = 12
+  STEER_DRIVER_ALLOWANCE = 15
+  STEER_DRIVER_MULTIPLIER = 1
+  STEER_DRIVER_FACTOR = 1
+
 # iCaur 03: standstill on 0x222; torque spoof off (same bit as Omoda).
 # HUD: Omoda-style — native cam HUD forwards to PT; no HUD override TX.
 CHERY_ICAUR_SAFETY_PARAM = 4
@@ -211,7 +216,7 @@ class CAR(Platforms):
       kommu_supported=True,
       acc_low_speed=True,
       acc_speed_range="0 - 150",
-      acc_stop_and_go=True,
+      acc_stop_and_go=False,
       lkc_torque="TBD",
       lkc_speed_range="0 - 150",
       max_steering_angle="TBD",

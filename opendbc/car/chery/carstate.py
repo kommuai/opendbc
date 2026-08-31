@@ -28,6 +28,8 @@ from opendbc.car.chery.values import (
   STEER_RELATED_INTERVENTION_DEG_MIN,
   TIGGO21_CAM_PARSER_BYPASS,
   TIGGO21_CAM_PARSER_MSGS,
+  TIGGO21_LK_PARSER_BYPASS,
+  TIGGO21_LK_PARSER_MSGS,
   TIGGO21_PT_PARSER_MSGS,
 )
 
@@ -39,6 +41,9 @@ _CAM_HUD_FIELDS = (
   "NEW_SIGNAL_1", "PCW", "CRUISE_STATE", "GAS_OVERRIDE", "AEB_RELATED", "SET_SPEED",
   "HANDS_ON_WHEEL_STEER",
 )
+# Tiggo 2022-24: STEER_STATUS (0x307) fields copied from cam onto the PT spoof.
+_CAM_STEER_STATUS_FIELDS = ("LKAS_AVAILABLE", "LKAS_AVAILABLE_2", "UNKNOWN", "ADAS_STATE")
+_CAM_STEER_STATUS_DEFAULT = {"LKAS_AVAILABLE": 1, "LKAS_AVAILABLE_2": 0, "UNKNOWN": 0, "ADAS_STATE": 1}
 
 
 class CarState(CarStateBase):
@@ -52,6 +57,7 @@ class CarState(CarStateBase):
     self.lkas_info_steer_related = 0.0
     self.steer_related_intervention = False
     self.cam_hud = {f: 0 for f in _CAM_HUD_FIELDS}
+    self.cam_steer_status = dict(_CAM_STEER_STATUS_DEFAULT)
     # Live EPS snapshot — used by CarController to rebuild EPS on bus 2 byte-identical
     # to stock (panda blocks native fwd while our spoof loop is active).
     self.eps_steering_angle = 0.0
@@ -175,26 +181,33 @@ class CarState(CarStateBase):
     ret.espDisabled = False
 
     # --- Cruise / HUD ---
-    hud = cp.vl["HUD"] if omoda else cam.vl["HUD"]
-    self.cam_hud = {f: hud[f] for f in _CAM_HUD_FIELDS}
-    ret.stockAeb = bool(hud["AEB"])
-    ret.stockFcw = bool(hud["PCW"])
-
-    set_kph = float(hud["SET_SPEED"])
-    self.cruise_state = int(hud["CRUISE_STATE"])
-    # Tiggo 8 Pro 2022-24: HUD cruise-state values are unreliable; use 0x220 STEER_STATE.
-    tiggo21_steer_state = int(cam.vl["TIGGO21_LANE_KEEP"]["STEER_STATE"]) if tiggo21 else 0
     if tiggo21:
-      self.cruise_state = 3 if tiggo21_steer_state in (2, 4) else 1
+      # Tiggo 2022-24 HUD (0x387) is a different layout; do not decode AEB/PCW/set-speed.
+      acc_enable = bool(cp.vl["LKA_STATUS"]["TIGGO_8_ACC_ENABLE"])
+      self.cruise_state = 3 if acc_enable else 1
+      ret.stockAeb = False
+      ret.stockFcw = False
+      set_kph = 0.0
+      ss_state = can_parsers[Bus.alt].message_states.get(0x307)
+      if ss_state is not None and ss_state.first_seen_nanos:
+        ss = can_parsers[Bus.alt].vl["STEER_STATUS"]
+        self.cam_steer_status = {f: int(ss[f]) for f in _CAM_STEER_STATUS_FIELDS}
+    else:
+      hud = cp.vl["HUD"] if omoda else cam.vl["HUD"]
+      self.cam_hud = {f: hud[f] for f in _CAM_HUD_FIELDS}
+      ret.stockAeb = bool(hud["AEB"])
+      ret.stockFcw = bool(hud["PCW"])
+      set_kph = float(hud["SET_SPEED"])
+      self.cruise_state = int(hud["CRUISE_STATE"])
+      distance_raw = int(hud["FOLLOW_DISTANCE"])
+      personality = FOLLOW_RAW_TO_PERSONALITY.get(distance_raw, -1)
+      ret.personality = max(0, min(personality, 2)) if personality != -1 else -1
+
     ret.cruiseState.available = True
     ret.cruiseState.enabled = self.cruise_state == 3
     ret.cruiseState.speed = ret.cruiseState.speedCluster = set_kph * CV.KPH_TO_MS if set_kph > 0 else 0.0
     ret.cruiseState.standstill = ret.standstill and ret.cruiseState.enabled
     ret.cruiseState.nonAdaptive = False
-
-    distance_raw = int(hud["FOLLOW_DISTANCE"])
-    personality = FOLLOW_RAW_TO_PERSONALITY.get(distance_raw, -1)
-    ret.personality = max(0, min(personality, 2)) if personality != -1 else -1
 
     # --- PCM buttons ---
     if icaur:
@@ -223,7 +236,10 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can_parsers(CP):
-    return {Bus.pt: CarState.get_can_parser(CP), Bus.cam: CarState.get_cam_can_parser(CP)}
+    parsers = {Bus.pt: CarState.get_can_parser(CP), Bus.cam: CarState.get_cam_can_parser(CP)}
+    if CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
+      parsers[Bus.alt] = CarState.get_tiggo21_lk_parser(CP)
+    return parsers
 
   @staticmethod
   def get_can_parser(CP):
@@ -244,13 +260,16 @@ class CarState(CarStateBase):
     elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
       msgs = ICAUR_CAM_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
-      msgs = TIGGO21_CAM_PARSER_MSGS
-      parser = CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.tiggo21_cam_bus)
-      for addr in TIGGO21_CAM_PARSER_BYPASS:
-        if addr in parser.message_states:
-          parser.message_states[addr].ignore_counter = True
-          parser.message_states[addr].ignore_checksum = True
-      return parser
+      return CANParser(DBC[CP.carFingerprint]["pt"], TIGGO21_CAM_PARSER_MSGS, CANBUS.tiggo21_cam_bus)
     else:
       msgs = CAM_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.cam_bus)
+
+  @staticmethod
+  def get_tiggo21_lk_parser(CP):
+    parser = CANParser(DBC[CP.carFingerprint]["pt"], TIGGO21_LK_PARSER_MSGS, CANBUS.tiggo21_lk_bus)
+    for addr in TIGGO21_LK_PARSER_BYPASS:
+      if addr in parser.message_states:
+        parser.message_states[addr].ignore_counter = True
+        parser.message_states[addr].ignore_checksum = True
+    return parser

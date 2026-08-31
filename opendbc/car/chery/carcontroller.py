@@ -4,6 +4,7 @@ from opendbc.can.packer import CANPacker
 from opendbc.car import DT_CTRL
 from opendbc.car.chery import cherycan
 from opendbc.car.chery.values import (
+  CANBUS,
   AUTORESUME_BURST_FRAMES,
   AUTORESUME_CYCLE_S,
   CAR,
@@ -29,13 +30,12 @@ from opendbc.car.chery.values import (
   ICAUR_DISABLE_HUD_OVERRIDE,
   TIGGO_DISABLE_TORQUE_SPOOF,
   TIGGO_DISABLE_HUD_OVERRIDE,
-  TIGGO21_BLINKER_LK_TEST,
-  TIGGO21_BLINKER_LK_LEFT_CMD_DEG,
-  TIGGO21_BLINKER_LK_TEST_ANGLE_DEG,
+  TIGGO_DISABLE_STOP_AND_GO,
+  Tiggo21SteerLimits,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
-from opendbc.car.lateral import apply_std_steer_angle_limits
+from opendbc.car.lateral import apply_driver_steer_torque_limits, apply_std_steer_angle_limits
 
 ButtonType = car.CarState.ButtonEvent.Type
 
@@ -69,6 +69,8 @@ class CarController(CarControllerBase):
     self.icaur_steer_override = False
     self.icaur_override_clear = 0
     self.tiggo21_lk_counter = 0
+    self.steer_status_counter = 0
+    self.apply_torque_last = 0
 
   @staticmethod
   def _driver_opposes_lkas(CS, cmd_angle_deg: float) -> bool:
@@ -211,7 +213,10 @@ class CarController(CarControllerBase):
 
     # Omoda never uses the Jaecoo RES/SET standstill alternation — only pcmDisable recovery above.
     # iCaur has no PCM_BUTTONS (0x360) on the bus — do not inject Jaecoo button frames.
+    # Tiggo 8 2025: stop-and-go temporarily off. 2022-24 uses Jaecoo RES/SET auto-resume.
     if omoda or self.CP.carFingerprint == CAR.CHERY_ICAUR_03:
+      return
+    if self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2025 and TIGGO_DISABLE_STOP_AND_GO:
       return
 
     hard_disarm = self.CP.openpilotLongitudinalControl or not self.acc_armed
@@ -269,35 +274,29 @@ class CarController(CarControllerBase):
 
     apply_angle = CS.out.steeringAngleDeg
     tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
-    # Tiggo 2022-24 EPS probe: blinker -> 0x220 LANE_KEEP + LKAS_INFO enable + angle nudge.
-    blinker_l = CS.out.leftBlinker
-    blinker_r = CS.out.rightBlinker
-    tiggo21_blinker_lk = (
-        TIGGO21_BLINKER_LK_TEST
-        and tiggo21
-        and (blinker_l or blinker_r)
-    )
-    if tiggo21_blinker_lk:
-      steer_req = True
-      nudge = TIGGO21_BLINKER_LK_TEST_ANGLE_DEG
-      apply_angle = TIGGO21_BLINKER_LK_LEFT_CMD_DEG if blinker_l else (CS.out.steeringAngleDeg - nudge)
 
     # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every frame
     # so EPS never sees a gap that looks like "still requesting" between even frames.
     send_lane_keep = (self.frame % LANE_KEEP_STEP == 0) or (icaur and self.icaur_steer_override)
     if send_lane_keep:
-      if self.frame % LANE_KEEP_STEP == 0 and not tiggo21_blinker_lk:
-        apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
       if tiggo21:
-        if not steer_req:
-          apply_angle = 0.0  # stock idle wire value (neutral), not road-angle echo
-          self.last_apply_angle = apply_angle
-        can_sends.extend(cherycan.create_tiggo21_lane_keep_commands(
-          self.packer, apply_angle, steer_req, self.tiggo21_lk_counter,
-        ))
-        if self.frame % LANE_KEEP_STEP == 0:
-          self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
+        # Passthrough stock 0x220 unless OP is engaged (panda blocks cam->PT then).
+        if CC.enabled:
+          apply_torque = apply_driver_steer_torque_limits(
+            int(round(CC.actuators.torque * Tiggo21SteerLimits.STEER_MAX)) if steer_req else 0,
+            self.apply_torque_last, CS.out.steeringTorqueEps, Tiggo21SteerLimits,
+          )
+          self.apply_torque_last = apply_torque
+          can_sends.extend(cherycan.create_tiggo21_lane_keep_commands(
+            self.packer, apply_torque, steer_req, self.tiggo21_lk_counter,
+          ))
+          if self.frame % LANE_KEEP_STEP == 0:
+            self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
+        else:
+          self.apply_torque_last = 0
       else:
+        if self.frame % LANE_KEEP_STEP == 0:
+          apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
         if not steer_req:
           apply_angle = CS.out.steeringAngleDeg
           self.last_apply_angle = apply_angle
@@ -305,15 +304,18 @@ class CarController(CarControllerBase):
           self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg,
         ))
 
+    # Tiggo 2022-24: passthrough cam 0x307 unless engaged; then spoof on PT (20 Hz).
+    if tiggo21 and CC.enabled and self.frame % HUD_STEP == 0:
+      can_sends.append(cherycan.create_steer_status_spoof(
+        self.packer, self.steer_status_counter, CS.cam_steer_status, bus=CANBUS.main_bus,
+      ))
+      self.steer_status_counter = (self.steer_status_counter + 1) % 16
+
     if self.frame % LKAS_INFO_STEP == 0:
       # Bus-2 mirror only when cruise is engaged. At standstill (cruise off) we let
       # panda forward the native LKAS_INFO PT->cam — injecting a stale spoof there
       # makes the cam see MAIN_TORQUE>0 with LKAS inactive, which the meter flags.
-      if tiggo21_blinker_lk:
-        can_sends.append(cherycan.create_tiggo21_lkas_info_enable(
-          self.packer, True, steer_related=CS.lkas_info_steer_related,
-        ))
-      elif not self._torque_spoof_disabled():
+      if not self._torque_spoof_disabled():
         can_sends.extend(cherycan.create_lkas_info_torque_spoof(
           self.packer, steer_req, steer_req,
           steer_related=CS.lkas_info_steer_related,
@@ -368,6 +370,10 @@ class CarController(CarControllerBase):
     self._auto_resume(CS, can_sends)
 
     new_actuators = CC.actuators.as_builder()
-    new_actuators.steeringAngleDeg = apply_angle
+    if tiggo21:
+      new_actuators.torque = self.apply_torque_last / Tiggo21SteerLimits.STEER_MAX
+      new_actuators.torqueOutputCan = self.apply_torque_last
+    else:
+      new_actuators.steeringAngleDeg = apply_angle
     self.frame += 1
     return new_actuators, can_sends
