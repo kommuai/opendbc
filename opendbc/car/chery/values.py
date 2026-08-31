@@ -11,8 +11,8 @@ from opendbc.car.lateral import AngleSteeringLimits
 class CANBUS:
   main_bus = 0   # PT / EPS  — LANE_KEEP + LKAS_INFO TX
   cam_bus = 2    # stock cam — HUD, LANE_KEEP RX
-  tiggo21_cam_bus = 1  # Tiggo 8 Pro 2022-24: HUD on bus 1
-  tiggo21_lk_bus = 2   # Tiggo 2022-24 stock 0x220 / 0x307 receive bus
+  tiggo22_cam_bus = 1  # Tiggo 8 Pro 2022-24: HUD on bus 1
+  tiggo22_lk_bus = 2   # Tiggo 2022-24 stock 0x220 / 0x307 receive bus
 
 
 # --- CarController timing ---
@@ -54,8 +54,9 @@ ICAUR_BLINKER_LEFT = (4, 6)
 ICAUR_BLINKER_RIGHT = (8, 9)
 # HUD FOLLOW_DISTANCE: raw 1 = 1-bar (closest) … raw 5 = 5-bar (farthest); 0/6/7 unknown.
 FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}
-# Tiggo 8 Pro 2022-24 meter DISTANCE_BAR: 1 bar=aggressive, 2=normal, 3=chill.
-TIGGO_DISTANCE_BAR_TO_PERSONALITY = {1: 2, 2: 0, 3: 1}  # 0 aggressive / 1 standard / 2 relaxed
+# Tiggo 8 Pro 2022-24 meter DISTANCE_BAR → LongitudinalPersonality.
+# Cluster vs raw (verified): 1 bar=raw 2, 2 bar=raw 0, 3 bar=raw 1, ACC off=raw 3.
+TIGGO_DISTANCE_BAR_TO_PERSONALITY = {2: 0, 0: 1, 1: 2}
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
 # Jaecoo only: STEER_RELATED status when raw>=36000 (decoded with STEERING_ANGLE factor/offset).
 # iCaur must not use this — 0xC4 STEERING_ANGLE is real road angle there.
@@ -93,8 +94,8 @@ OMODA_PT_PARSER_MSGS = [
   ("OMODA_TRANSMISSION", 100), ("OMODA_BRAKE", 50), ("HUD", 20),
 ]
 # Tiggo 8 Pro 2022-24: STEER_RELATED steer (not EPS), Omoda brake/trans, LKAS_INFO on PT.
-# HUD is on bus 1; 0x220 TIGGO21_LANE_KEEP is on bus 2. ACC_UNCERTAIN is intentionally excluded.
-TIGGO21_PT_PARSER_MSGS = [
+# HUD is on bus 1; 0x220 TIGGO22_LANE_KEEP is on bus 2. ACC_UNCERTAIN is intentionally excluded.
+TIGGO22_PT_PARSER_MSGS = [
   ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50),
   ("STEER_RELATED", 100), ("GAS", 100),
   ("OMODA_BRAKE", 50), ("OMODA_TRANSMISSION", 100),
@@ -104,9 +105,9 @@ TIGGO21_PT_PARSER_MSGS = [
   ("BCM_STAT_412", math.nan), ("LKAS_INFO", 50), ("LKA_STATUS", 20), ("TIGGO8PRO_2022_METER", 20),
 ]
 # Tiggo 8 Pro 2022-24: do not decode HUD (Jaecoo layout does not match bus-1 0x387).
-TIGGO21_CAM_PARSER_MSGS = []
-TIGGO21_LK_PARSER_MSGS = [("TIGGO21_LANE_KEEP", 50), ("STEER_STATUS", 20)]
-TIGGO21_LK_PARSER_BYPASS = (0x220, 0x307)  # ignore counter + checksum on stock 0x220 / 0x307
+TIGGO22_CAM_PARSER_MSGS = []
+TIGGO22_LK_PARSER_MSGS = [("TIGGO22_LANE_KEEP", 50), ("STEER_STATUS", 20)]
+TIGGO22_LK_PARSER_BYPASS = (0x220, 0x307)  # ignore counter + checksum on stock 0x220 / 0x307
 
 # Omoda 5: 0x2E9 byte 2 is multiplexed — raw 1..5 are message variants, not pedal.
 OMODA_BRAKE_PRESSURE_RAW_MAX = 0x35
@@ -124,12 +125,12 @@ TIGGO_DISABLE_HUD_OVERRIDE = True
 # Temporarily disable Tiggo 8 stop-and-go (no RES/SET auto-resume from standstill).
 TIGGO_DISABLE_STOP_AND_GO = True
 CHERY_NATIVE_HUD_FWD_PARAM = 8
-CHERY_TIGGO21_SAFETY_PARAM = 16
+CHERY_TIGGO22_SAFETY_PARAM = 16
 # Tiggo 8 Pro 2022-24: 0x220 STEER_CMD is EPS torque. High from stock cam max (11-bit).
-class Tiggo21SteerLimits:
+class Tiggo22SteerLimits:
   STEER_MAX = 134
   STEER_DELTA_UP = 8
-  STEER_DELTA_DOWN = 12
+  STEER_DELTA_DOWN = 5
   STEER_DRIVER_ALLOWANCE = 15
   STEER_DRIVER_MULTIPLIER = 1
   STEER_DRIVER_FACTOR = 1

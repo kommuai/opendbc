@@ -26,10 +26,10 @@ from opendbc.car.chery.values import (
   OMODA_PT_PARSER_MSGS,
   PT_PARSER_MSGS,
   STEER_RELATED_INTERVENTION_DEG_MIN,
-  TIGGO21_CAM_PARSER_MSGS,
-  TIGGO21_LK_PARSER_BYPASS,
-  TIGGO21_LK_PARSER_MSGS,
-  TIGGO21_PT_PARSER_MSGS,
+  TIGGO22_CAM_PARSER_MSGS,
+  TIGGO22_LK_PARSER_BYPASS,
+  TIGGO22_LK_PARSER_MSGS,
+  TIGGO22_PT_PARSER_MSGS,
   TIGGO_DISTANCE_BAR_TO_PERSONALITY,
 )
 
@@ -71,8 +71,8 @@ class CarState(CarStateBase):
     ret.personality = -1
     omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
     icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
-    tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
-    steer_related_steer = icaur or tiggo21
+    tiggo22 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
+    steer_related_steer = icaur or tiggo22
 
     # --- Wheels / pedals / gear ---
     if icaur:
@@ -133,7 +133,7 @@ class CarState(CarStateBase):
       ret.steeringTorqueEps = ret.steeringTorque * steer_dir
       ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
       ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
-    if omoda or tiggo21:
+    if omoda or tiggo22:
       raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)
       if raw <= OMODA_BRAKE_PRESSURE_RAW_MAX:
         ret.brake = raw / OMODA_BRAKE_PRESSURE_RAW_MAX
@@ -170,7 +170,7 @@ class CarState(CarStateBase):
     ret.espDisabled = False
 
     # --- Cruise / HUD ---
-    if tiggo21:
+    if tiggo22:
       # Tiggo 2022-24 HUD (0x387) is a different layout; use the dedicated meter (0x305).
       meter = cp.vl["TIGGO8PRO_2022_METER"]
       set_kph = float(meter["SET_SPEED"])
@@ -218,7 +218,7 @@ class CarState(CarStateBase):
     # --- ADAS / LKAS state used by CarController ---
     self.lkas_info_steer_related = float(cp.vl["LKAS_INFO"]["STEER_RELATED"])
     # Jaecoo: STEER_RELATED angle raw>=36000 is a status code (decoded ≈342.7°), not road angle.
-    # iCaur/Tiggo21: same bits are real degrees — rely on DRIVER_TORQUE via steeringPressed instead.
+    # iCaur/Tiggo22: same bits are real degrees — rely on DRIVER_TORQUE via steeringPressed instead.
     self.steer_related_intervention = (
       False if steer_related_steer else
       float(cp.vl["STEER_RELATED"]["STEERING_ANGLE"]) >= STEER_RELATED_INTERVENTION_DEG_MIN
@@ -230,7 +230,7 @@ class CarState(CarStateBase):
   def get_can_parsers(CP):
     parsers = {Bus.pt: CarState.get_can_parser(CP), Bus.cam: CarState.get_cam_can_parser(CP)}
     if CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
-      parsers[Bus.alt] = CarState.get_tiggo21_lk_parser(CP)
+      parsers[Bus.alt] = CarState.get_tiggo22_lk_parser(CP)
     return parsers
 
   @staticmethod
@@ -240,7 +240,7 @@ class CarState(CarStateBase):
     elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
       msgs = ICAUR_PT_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
-      msgs = TIGGO21_PT_PARSER_MSGS
+      msgs = TIGGO22_PT_PARSER_MSGS
     else:
       msgs = PT_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)
@@ -252,15 +252,15 @@ class CarState(CarStateBase):
     elif CP.carFingerprint == CAR.CHERY_ICAUR_03:
       msgs = ICAUR_CAM_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
-      return CANParser(DBC[CP.carFingerprint]["pt"], TIGGO21_CAM_PARSER_MSGS, CANBUS.tiggo21_cam_bus)
+      return CANParser(DBC[CP.carFingerprint]["pt"], TIGGO22_CAM_PARSER_MSGS, CANBUS.tiggo22_cam_bus)
     else:
       msgs = CAM_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.cam_bus)
 
   @staticmethod
-  def get_tiggo21_lk_parser(CP):
-    parser = CANParser(DBC[CP.carFingerprint]["pt"], TIGGO21_LK_PARSER_MSGS, CANBUS.tiggo21_lk_bus)
-    for addr in TIGGO21_LK_PARSER_BYPASS:
+  def get_tiggo22_lk_parser(CP):
+    parser = CANParser(DBC[CP.carFingerprint]["pt"], TIGGO22_LK_PARSER_MSGS, CANBUS.tiggo22_lk_bus)
+    for addr in TIGGO22_LK_PARSER_BYPASS:
       if addr in parser.message_states:
         parser.message_states[addr].ignore_counter = True
         parser.message_states[addr].ignore_checksum = True

@@ -10,7 +10,7 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  # LANE_KEEP, TIGGO21_LK(0), LKAS_INFO(0), LKAS_INFO(2), HUD, STEER_STATUS(0), EPS(2), PCM(0), PCM(2).
+  # LANE_KEEP, TIGGO22_LK(0), LKAS_INFO(0), LKAS_INFO(2), HUD, STEER_STATUS(0), EPS(2), PCM(0), PCM(2).
   TX_MSGS = [[0x345, 0], [0x220, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x307, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
   SAFETY_PARAM = 0
 
@@ -222,14 +222,14 @@ class TestCheryTiggoNoTorqueSpoofSafety(TestCherySafety):
                      msg="STEER_RELATED must always forward")
 
 
-class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
+class TestCheryTiggo22Safety(TestCheryTiggoNoTorqueSpoofSafety):
   """Tiggo 8 Pro 2022-24: HUD on bus 1, 0x220 LKAS on bus 2 (production safetyParam=26)."""
 
-  SAFETY_PARAM = 2 | 8 | 16  # NO_TORQUE_SPOOF | NATIVE_HUD_FWD | TIGGO21
+  SAFETY_PARAM = 2 | 8 | 16  # NO_TORQUE_SPOOF | NATIVE_HUD_FWD | TIGGO22
 
-  def _tiggo21_lane_keep(self, steer_state: int, bus: int = 2):
+  def _tiggo22_lane_keep(self, steer_state: int, bus: int = 2):
     return self.packer.make_can_msg_safety(
-      "TIGGO21_LANE_KEEP",
+      "TIGGO22_LANE_KEEP",
       bus,
       {
         "STEER_CMD": 0,
@@ -255,7 +255,7 @@ class TestCheryTiggo21Safety(TestCheryTiggoNoTorqueSpoofSafety):
 
   def test_controls_allowed_follows_lka_status_acc_enable(self):
     self.assertFalse(self.safety.get_controls_allowed())
-    self._rx(self._tiggo21_lane_keep(2))
+    self._rx(self._tiggo22_lane_keep(2))
     self.assertFalse(self.safety.get_controls_allowed(),
                      msg="cam 0x220 STEER_STATE=2 must not arm controls_allowed")
     self._rx(self._lka_status(0, bus=2))

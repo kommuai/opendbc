@@ -31,7 +31,7 @@ from opendbc.car.chery.values import (
   TIGGO_DISABLE_TORQUE_SPOOF,
   TIGGO_DISABLE_HUD_OVERRIDE,
   TIGGO_DISABLE_STOP_AND_GO,
-  Tiggo21SteerLimits,
+  Tiggo22SteerLimits,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
@@ -68,7 +68,7 @@ class CarController(CarControllerBase):
     # iCaur steer override latch (pressed / firm yank / opposing torque)
     self.icaur_steer_override = False
     self.icaur_override_clear = 0
-    self.tiggo21_lk_counter = 0
+    self.tiggo22_lk_counter = 0
     self.steer_status_counter = 0
     self.apply_torque_last = 0
 
@@ -258,18 +258,18 @@ class CarController(CarControllerBase):
       return False
     return CS.out.standstill or CS.out.cruiseState.enabled
 
-  def _update_tiggo21(self, CC, CS, steer_req, can_sends) -> None:
+  def _update_tiggo22(self, CC, CS, steer_req, can_sends) -> None:
     """Generate the Tiggo 2022-24 PT replacements only while openpilot is engaged."""
     if self.frame % LANE_KEEP_STEP == 0:
       if CC.enabled:
-        requested_torque = int(round(CC.actuators.torque * Tiggo21SteerLimits.STEER_MAX)) if steer_req else 0
+        requested_torque = int(round(CC.actuators.torque * Tiggo22SteerLimits.STEER_MAX)) if steer_req else 0
         self.apply_torque_last = apply_driver_steer_torque_limits(
-          requested_torque, self.apply_torque_last, CS.out.steeringTorqueEps, Tiggo21SteerLimits,
+          requested_torque, self.apply_torque_last, CS.out.steeringTorqueEps, Tiggo22SteerLimits,
         )
-        can_sends.append(cherycan.create_tiggo21_lane_keep_command(
-          self.packer, self.apply_torque_last, steer_req, self.tiggo21_lk_counter, CANBUS.main_bus,
+        can_sends.append(cherycan.create_tiggo22_lane_keep_command(
+          self.packer, self.apply_torque_last, steer_req, self.tiggo22_lk_counter, CANBUS.main_bus,
         ))
-        self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
+        self.tiggo22_lk_counter = (self.tiggo22_lk_counter + 1) % 16
       else:
         self.apply_torque_last = 0
 
@@ -294,10 +294,10 @@ class CarController(CarControllerBase):
     steer_req = lat_active and not driver_over
 
     apply_angle = CS.out.steeringAngleDeg
-    tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
+    tiggo22 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
 
-    if tiggo21:
-      self._update_tiggo21(CC, CS, steer_req, can_sends)
+    if tiggo22:
+      self._update_tiggo22(CC, CS, steer_req, can_sends)
     else:
       # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every
       # frame so EPS never sees a gap that looks like "still requesting".
@@ -371,8 +371,8 @@ class CarController(CarControllerBase):
     self._auto_resume(CS, can_sends)
 
     new_actuators = CC.actuators.as_builder()
-    if tiggo21:
-      new_actuators.torque = self.apply_torque_last / Tiggo21SteerLimits.STEER_MAX
+    if tiggo22:
+      new_actuators.torque = self.apply_torque_last / Tiggo22SteerLimits.STEER_MAX
       new_actuators.torqueOutputCan = self.apply_torque_last
     else:
       new_actuators.steeringAngleDeg = apply_angle

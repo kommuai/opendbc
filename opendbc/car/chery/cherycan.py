@@ -15,10 +15,10 @@ from opendbc.car.chery.values import (
   SPOOF_TORQUE_RAMP,
   SPOOF_TORQUE_VAR_MIN,
   SPOOF_VAR_PROB,
-  Tiggo21SteerLimits,
+  Tiggo22SteerLimits,
 )
 
-TIGGO21_LK_ADDR = 0x220
+TIGGO22_LK_ADDR = 0x220
 
 # --- Re-exported / referenced by opendbc.can.dbc; do not rename. ---
 
@@ -47,22 +47,22 @@ def create_lane_keep_command(packer, steer_angle_deg, steer_req, meas_angle_deg)
   })
 
 
-def _finalize_tiggo21_lane_keep(data: bytearray, steer_req: bool, counter: int) -> None:
+def _finalize_tiggo22_lane_keep(data: bytearray, steer_req: bool, counter: int) -> None:
   """Tiggo 2022-24 0x220 byte1: STEER_STATE bits 4..2 (4=LKA, 2=ACC_ONLY) + 3-bit counter."""
   steer_state = 4 if steer_req else 2  # stock ACC-on idle is 2, not 0
   data[1] = ((steer_state & 0x7) << 2) | (((int(counter) % 6) << 5) & 0xE0)
-  data[7] = chery_checksum(TIGGO21_LK_ADDR, None, data)
+  data[7] = chery_checksum(TIGGO22_LK_ADDR, None, data)
 
 
-def create_tiggo21_lane_keep_command(packer, torque, steer_req, counter, bus):
+def create_tiggo22_lane_keep_command(packer, torque, steer_req, counter, bus):
   """Tiggo 2022-24 0x220 EPS torque. Neutral STEER_CMD=0; clip to tested ±STEER_MAX."""
-  torque = max(-Tiggo21SteerLimits.STEER_MAX, min(Tiggo21SteerLimits.STEER_MAX, int(round(float(torque)))))
-  addr, payload, bus = packer.make_can_msg("TIGGO21_LANE_KEEP", bus, {
+  torque = max(-Tiggo22SteerLimits.STEER_MAX, min(Tiggo22SteerLimits.STEER_MAX, int(round(float(torque)))))
+  addr, payload, bus = packer.make_can_msg("TIGGO22_LANE_KEEP", bus, {
     "STEER_CMD": torque,
     "COUNTER": int(counter) % 16,
   })
   data = bytearray(payload)
-  _finalize_tiggo21_lane_keep(data, steer_req, counter)
+  _finalize_tiggo22_lane_keep(data, steer_req, counter)
   return addr, bytes(data), bus
 
 

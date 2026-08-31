@@ -6,7 +6,7 @@
 // Chery (Jaecoo J7 PHEV, etc.) — TX whitelist for LANE_KEEP; cruise engagement gates controls_allowed
 // via HUD on camera bus (matches chery_general_pt.dbc + CarState cruise parsing).
 #define CHERY_LANE_KEEP    0x345U
-#define CHERY_TIGGO21_LK   0x220U
+#define CHERY_TIGGO22_LK   0x220U
 #define CHERY_STEER_STATUS 0x307U  // STEER_STATUS — Tiggo 2022-24 cam->PT drop + PT spoof
 #define CHERY_LKAS_INFO    0x394U
 #define CHERY_HUD          0x387U
@@ -16,7 +16,7 @@
 #define CHERY_OMODA_NO_TORQUE_SPOOF_PARAM 2U
 #define CHERY_ICAUR_SAFETY_PARAM          4U
 #define CHERY_NATIVE_HUD_FWD_PARAM        8U
-#define CHERY_TIGGO21_SAFETY_PARAM       16U  // HUD on bus 1 (2022-24), 0x220 LKAS on bus 2
+#define CHERY_TIGGO22_SAFETY_PARAM       16U  // HUD on bus 1 (2022-24), 0x220 LKAS on bus 2
 // PT-side messages that carry driver-torque / steering-input info. We block them
 // from forwarding to the camera bus *while controls_allowed* (cruise engaged) and
 // feed the camera our own spoofed copies instead, so the hands-on-wheel detector
@@ -32,19 +32,19 @@ static bool chery_omoda_safety = false;
 static bool chery_omoda_no_torque_spoof = false;
 static bool chery_icaur_safety = false;
 static bool chery_native_hud_fwd = false;
-static bool chery_tiggo21_safety = false;
+static bool chery_tiggo22_safety = false;
 
 static void chery_rx_hook(const CANPacket_t *msg) {
   // Tiggo 8 Pro 2022-24: match CarState — ACC enable is LKA_STATUS (0x3A5) on PT.
   // Camera 0x220 STEER_STATE=2 is ACC_ONLY and stays high while stock ACC is off;
   // using it arms controls_allowed too early, heartbeat clears it, then no re-arm.
-  if (chery_tiggo21_safety && (msg->addr == CHERY_LKA_STATUS) &&
+  if (chery_tiggo22_safety && (msg->addr == CHERY_LKA_STATUS) &&
       (msg->bus == 0U) && (GET_LEN(msg) >= 3U)) {
     const bool acc_enable = ((msg->data[2] >> 4U) & 1U) != 0U;  // TIGGO_8_ACC_ENABLE
     pcm_cruise_check(acc_enable);
   }
 
-  if (!chery_tiggo21_safety && (msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
+  if (!chery_tiggo22_safety && (msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
     const bool hud_bus_ok = (msg->bus == 2U) || (chery_omoda_safety && (msg->bus == 0U));
     if (hud_bus_ok) {
       const uint8_t cruise_state = (uint8_t)((msg->data[4] >> 2) & 0x3U);
@@ -85,14 +85,14 @@ static safety_config chery_init(uint16_t param) {
     {.msg = {{CHERY_HUD, 2U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{CHERY_ICAUR_WHEELSPEED_A, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
-  static RxCheck chery_rx_checks_tiggo21[] = {
+  static RxCheck chery_rx_checks_tiggo22[] = {
     // LKA_STATUS on PT gates controls_allowed (must be in rx_checks or rx_hook never runs).
     {.msg = {{CHERY_LKA_STATUS, 0U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{CHERY_WHEELSPEED_2, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static const CanMsg CHERY_TX_MSGS[] = {
     {CHERY_LANE_KEEP, 0, 8, .check_relay = false},
-    {CHERY_TIGGO21_LK, 0, 8, .check_relay = false},
+    {CHERY_TIGGO22_LK, 0, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 0, 8, .check_relay = false},
     {CHERY_LKAS_INFO, 2, 8, .check_relay = false},  // mirror our spoof to cam while we block PT->cam fwd
     {CHERY_HUD, 0, 8, .check_relay = false},
@@ -106,15 +106,15 @@ static safety_config chery_init(uint16_t param) {
   chery_omoda_no_torque_spoof = (param & CHERY_OMODA_NO_TORQUE_SPOOF_PARAM) != 0U;
   chery_icaur_safety = (param & CHERY_ICAUR_SAFETY_PARAM) != 0U;
   chery_native_hud_fwd = (param & CHERY_NATIVE_HUD_FWD_PARAM) != 0U;
-  chery_tiggo21_safety = (param & CHERY_TIGGO21_SAFETY_PARAM) != 0U;
+  chery_tiggo22_safety = (param & CHERY_TIGGO22_SAFETY_PARAM) != 0U;
   if (chery_omoda_safety) {
     return BUILD_SAFETY_CFG(chery_rx_checks_omoda, CHERY_TX_MSGS);
   }
   if (chery_icaur_safety) {
     return BUILD_SAFETY_CFG(chery_rx_checks_icaur, CHERY_TX_MSGS);
   }
-  if (chery_tiggo21_safety) {
-    return BUILD_SAFETY_CFG(chery_rx_checks_tiggo21, CHERY_TX_MSGS);
+  if (chery_tiggo22_safety) {
+    return BUILD_SAFETY_CFG(chery_rx_checks_tiggo22, CHERY_TX_MSGS);
   }
   return BUILD_SAFETY_CFG(chery_rx_checks_j7, CHERY_TX_MSGS);
 }
@@ -131,7 +131,7 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   if (bus_num == 2) {
     // Tiggo 2022-24: passthrough cam 0x220/0x307 when OP is not engaged.
     // While engaged, block so CarController can TX our LKAS / STEER_STATUS.
-    if (chery_tiggo21_safety && ((addr == (int)CHERY_TIGGO21_LK) ||
+    if (chery_tiggo22_safety && ((addr == (int)CHERY_TIGGO22_LK) ||
                                  (addr == (int)CHERY_STEER_STATUS))) {
       return controls_allowed;
     }
