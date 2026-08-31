@@ -28,19 +28,14 @@ unsupported_brands = {
 
 # Platform keys match if any part of the string is in the list
 unsupported_platforms = {
-  "ACURA", "GENESIS", "HONDA_CITY_7G", "HONDA_CIVIC_BOSCH", "HONDA_CRV_HYBRID",
-  "HONDA_E", "HONDA_FIT", "HONDA_FREED", "HONDA_INSIGHT", "HONDA_NBOX",
-  "HONDA_ODYSSEY", "HONDA_PASSPORT", "HONDA_PILOT", "HONDA_RIDGELINE", "LEXUS_CTH",
-  "LEXUS_GS", "LEXUS_IS", "LEXUS_LC", "LEXUS_LS", "LEXUS_RC",
-  "TOYOTA_AVALON", "TOYOTA_CHR", "TOYOTA_HIGHLANDER", "TOYOTA_MIRAI",
-  "TOYOTA_PRIUS", "TOYOTA_RAV4", "TOYOTA_SIENNA", "TOYOTA_YARIS"
+  "ACURA", "GENESIS",
+  "HONDA_E", "HONDA_FIT", "HONDA_FREED", "HONDA_INSIGHT",
+  "HONDA_ODYSSEY", "HONDA_PASSPORT", "HONDA_PILOT", "HONDA_RIDGELINE"
 }
 
 # Car names match if all words in a phrase appear in the car name
 unsupported_cars = {
-  "(South America only)", "Honda Civic 201.*", "Honda Civic Hatchback",
-  "Honda CR-V 2015-16", "Honda Inspire", "Lexus ES 2017-18", "Lexus NX 2018-19",
-  "Lexus RX 201.*", "Toyota Corolla 201.*"
+  "(South America only)"
 }
 
 CAR_MAPPING = {
