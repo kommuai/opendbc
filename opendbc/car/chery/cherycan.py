@@ -8,6 +8,8 @@ from opendbc.car.chrysler.chryslercan import chrysler_checksum
 from opendbc.car.crc import CRC8J1850
 from opendbc.car.chery.values import (
   CANBUS,
+  GAS_ADDR,
+  GAS_SPOOF_RAW,
   LANE_KEEP_PADDING,
   SPOOF_NEG_PROB,
   SPOOF_TORQUE_MAX,
@@ -117,6 +119,47 @@ def create_pcm_button(packer, counter: int, bus: int, button: str):
   signals = {b: int(b == button) for b in _PCM_BUTTON_FIELDS}
   signals["COUNTER"] = int(counter) % 16
   return packer.make_can_msg("PCM_BUTTONS", bus, signals)
+
+
+def _gas_checksum(data: bytearray) -> int:
+  return (~sum(data[:7])) & 0xFF
+
+
+def gas_checksum_ok(dat: bytes) -> bool:
+  return len(dat) >= 8 and dat[7] == _gas_checksum(bytearray(dat[:8]))
+
+
+def gas_looks_idle(dat: bytes) -> bool:
+  """Stock idle pedal frame — safe slot to overlay a tap without fighting ACC throttle."""
+  return len(dat) >= 8 and dat[4] == 0x07 and dat[3] == 0
+
+
+def gas_looks_pressed(dat: bytes) -> bool:
+  """Stock/spoof press: byte4==0x08 and throttle/pedal nibble non-zero."""
+  return len(dat) >= 8 and dat[4] == 0x08 and dat[3] != 0
+
+
+def create_gas_pedal_spoof(stock: bytes, bus: int, pressed: bool = True):
+  """Tiggo 2022-24 GAS (0xFA) on PT (bus 0). Stock ACC resumes from standstill on a pedal tap.
+
+  Overlay a press on a live stock frame. Keep stock's decrementing byte2 counter and
+  unused bytes; recompute byte7 = (~sum(bytes0..6)) & 0xFF.
+  """
+  if stock and len(stock) >= 8:
+    data = bytearray(stock[:8])
+  else:
+    data = bytearray(b"\x00\x00\x00\x00\x07\xd0\x00\x00")
+  raw = int(GAS_SPOOF_RAW) & 0x3F
+  if pressed:
+    data[3] = raw
+    data[4] = 0x08
+    data[6] = (data[6] & 0xC0) | raw
+  else:
+    data[3] = 0
+    data[4] = 0x07
+    data[6] = data[6] & 0xC0
+  data[7] = _gas_checksum(data)
+  return int(GAS_ADDR), bytes(data), bus
 
 
 # --- LKAS torque spoof: keeps stock "hands on wheel" detector quiet during LKAS. ---

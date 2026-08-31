@@ -32,6 +32,9 @@ from opendbc.car.chery.values import (
   TIGGO_DISABLE_HUD_OVERRIDE,
   TIGGO_DISABLE_STOP_AND_GO,
   Tiggo22SteerLimits,
+  GAS_SPOOF_BURST_FRAMES,
+  GAS_SPOOF_MAX_RETRIES,
+  GAS_SPOOF_RETRY_CYCLE_S,
   lowpass_steer_cmd,
 )
 from opendbc.car.interfaces import CarControllerBase
@@ -71,6 +74,12 @@ class CarController(CarControllerBase):
     self.tiggo22_lk_counter = 0
     self.steer_status_counter = 0
     self.apply_torque_last = 0
+    self.gas_burst_left = 0
+    self.gas_last_tx = b""
+    self.gas_last_ctr = None
+    self.prev_cruise_resume = False
+    self.gas_last_burst_frame = -10_000
+    self.gas_bursts_sent = 0
 
   @staticmethod
   def _driver_opposes_lkas(CS, cmd_angle_deg: float) -> bool:
@@ -213,8 +222,10 @@ class CarController(CarControllerBase):
 
     # Omoda never uses the Jaecoo RES/SET standstill alternation — only pcmDisable recovery above.
     # iCaur has no PCM_BUTTONS (0x360) on the bus — do not inject Jaecoo button frames.
-    # Tiggo 8 2025: stop-and-go temporarily off. 2022-24 uses Jaecoo RES/SET auto-resume.
+    # Tiggo 8 2025: stop-and-go off. 2022-24 resumes via GAS (0xFA) spoof, not RES/SET.
     if omoda or self.CP.carFingerprint == CAR.CHERY_ICAUR_03:
+      return
+    if self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
       return
     if self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2025 and TIGGO_DISABLE_STOP_AND_GO:
       return
@@ -258,6 +269,75 @@ class CarController(CarControllerBase):
       return False
     return CS.out.standstill or CS.out.cruiseState.enabled
 
+  def _start_tiggo22_gas_burst(self) -> None:
+    self.gas_burst_left = GAS_SPOOF_BURST_FRAMES
+    self.gas_last_tx = b""
+    self.gas_last_ctr = None
+    self.gas_last_burst_frame = self.frame
+    self.gas_bursts_sent += 1
+
+  def _tiggo22_gas_resume_blocked(self, CC, CS) -> bool:
+    return (
+      not CC.enabled
+      or not self.acc_armed
+      or not CS.out.cruiseState.enabled
+      or CS.out.brakePressed
+      or CS.out.gasPressed
+    )
+
+  def _send_tiggo22_gas_burst_tx(self, CS, can_sends) -> None:
+    if self.gas_burst_left <= 0:
+      return
+
+    stock = CS.gas_payload
+    if not cherycan.gas_checksum_ok(stock):
+      return
+    # Wait for a stock-idle tick so we replace one frame instead of fighting ACC bytes.
+    if not cherycan.gas_looks_idle(stock):
+      return
+    # Panda loopback: ignore our own echo so we wait for the next genuine stock tick.
+    if stock == self.gas_last_tx:
+      return
+    ctr = stock[2]
+    if ctr == self.gas_last_ctr:
+      return
+
+    addr, payload, bus = cherycan.create_gas_pedal_spoof(stock, CANBUS.main_bus)
+    can_sends.append((addr, payload, bus))
+    self.gas_last_tx = payload
+    self.gas_last_ctr = ctr
+    self.gas_burst_left -= 1
+
+  def _update_tiggo22_gas_burst(self, CC, CS, can_sends) -> None:
+    """Tiggo 2022-24 stop-and-go: one GAS (0xFA) burst when planner requests resume.
+
+    CC.cruiseControl.resume = enabled + cruise standstill + !longitudinalPlan.shouldStop.
+    Rising edge fires one 3-frame burst; up to GAS_SPOOF_MAX_RETRIES more if still stopped.
+    Each TX overlays press on a checksum-valid stock frame (same byte2 counter) on bus 0.
+    """
+    resume = bool(CC.cruiseControl.resume)
+    resume_rising = resume and not self.prev_cruise_resume
+    self.prev_cruise_resume = resume
+
+    if not resume:
+      self.gas_bursts_sent = 0
+    elif not CS.out.cruiseState.standstill:
+      self.gas_bursts_sent = 0
+      self.gas_burst_left = 0
+
+    blocked = self._tiggo22_gas_resume_blocked(CC, CS)
+    if self.gas_burst_left <= 0 and not blocked and resume:
+      if resume_rising:
+        self.gas_bursts_sent = 0
+        self._start_tiggo22_gas_burst()
+      elif CS.out.cruiseState.standstill:
+        elapsed = (self.frame - self.gas_last_burst_frame) * DT_CTRL
+        if (self.gas_bursts_sent <= GAS_SPOOF_MAX_RETRIES
+            and elapsed >= GAS_SPOOF_RETRY_CYCLE_S):
+          self._start_tiggo22_gas_burst()
+
+    self._send_tiggo22_gas_burst_tx(CS, can_sends)
+
   def _update_tiggo22(self, CC, CS, steer_req, can_sends) -> None:
     """Generate the Tiggo 2022-24 PT replacements only while openpilot is engaged."""
     if self.frame % LANE_KEEP_STEP == 0:
@@ -298,6 +378,7 @@ class CarController(CarControllerBase):
 
     if tiggo22:
       self._update_tiggo22(CC, CS, steer_req, can_sends)
+      self._update_tiggo22_gas_burst(CC, CS, can_sends)
     else:
       # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every
       # frame so EPS never sees a gap that looks like "still requesting".

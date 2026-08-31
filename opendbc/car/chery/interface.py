@@ -64,6 +64,7 @@ class CarInterface(CarInterfaceBase):
       if TIGGO_DISABLE_HUD_OVERRIDE:
         ret.safetyConfigs[0].safetyParam |= CHERY_NATIVE_HUD_FWD_PARAM
       ret.safetyConfigs[0].safetyParam |= CHERY_TIGGO22_SAFETY_PARAM
+      ret.autoResumeSng = True
     elif candidate == CAR.CHERY_ICAUR_03:
       ret.safetyConfigs[0].safetyParam = CHERY_ICAUR_SAFETY_PARAM
       if ICAUR_DISABLE_TORQUE_SPOOF:

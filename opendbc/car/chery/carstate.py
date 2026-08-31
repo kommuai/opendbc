@@ -3,6 +3,7 @@ from opendbc.can import CANParser
 from opendbc.car import Bus, create_button_events
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
+from opendbc.car.chery import cherycan
 from opendbc.car.chery.values import (
   CAM_PARSER_MSGS,
   CANBUS,
@@ -31,6 +32,8 @@ from opendbc.car.chery.values import (
   TIGGO22_LK_PARSER_MSGS,
   TIGGO22_PT_PARSER_MSGS,
   TIGGO_DISTANCE_BAR_TO_PERSONALITY,
+  GAS_ADDR,
+  GAS_SPOOF_RAW,
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -44,6 +47,29 @@ _CAM_HUD_FIELDS = (
 # Tiggo 2022-24: STEER_STATUS (0x307) fields copied from cam onto the PT spoof.
 _CAM_STEER_STATUS_FIELDS = ("LKAS_AVAILABLE", "LKAS_AVAILABLE_2", "UNKNOWN", "ADAS_STATE")
 _CAM_STEER_STATUS_DEFAULT = {"LKAS_AVAILABLE": 1, "LKAS_AVAILABLE_2": 0, "UNKNOWN": 0, "ADAS_STATE": 1}
+
+
+class Tiggo22PTCANParser(CANParser):
+  """Tiggo 2022-24 PT parser — stash last valid stock GAS (0xFA) raw frame for resume spoof."""
+
+  def __init__(self, dbc_name: str, messages, bus: int):
+    super().__init__(dbc_name, messages, bus)
+    self.gas_payload = b""
+    self.last_gas_dat = b""
+
+  def update(self, strings, sendcan: bool = False):
+    if strings and not isinstance(strings[0], list | tuple):
+      strings = [strings]
+    for entry in strings:
+      for address, dat, src in entry[1]:
+        if src != self.bus or address != GAS_ADDR or len(dat) < 8:
+          continue
+        frame = bytes(dat[:8])
+        self.last_gas_dat = frame
+        if (cherycan.gas_checksum_ok(frame)
+            and not (frame[4] == 0x08 and frame[3] == GAS_SPOOF_RAW)):
+          self.gas_payload = frame
+    return super().update(strings, sendcan)
 
 
 class CarState(CarStateBase):
@@ -64,6 +90,9 @@ class CarState(CarStateBase):
     self.eps_driver_torque = 0
     self.eps_counter = 0
     self.cruise_state = 1  # HUD CRUISE_STATE: 3=ENABLE 2=READY 1=IDLE
+    self.gas_payload = b""
+    # Tiggo 2022-24: TIGGO_8_ACC_ENABLE (0x3A5) flickers low at standstill while ACC still holds.
+    self.tiggo22_cruise_latched = False
 
   def update(self, can_parsers):
     cp, cam = can_parsers[Bus.pt], can_parsers[Bus.cam]
@@ -120,7 +149,16 @@ class CarState(CarStateBase):
           ICAUR_GEAR_MAP.get(int(cp.vl["ICAUR_TRANSMISSION"]["GEAR"]))
         )
       else:
-        ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
+        if tiggo22:
+          last_gas = cp.last_gas_dat
+          gas_from_parser = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
+          if len(last_gas) >= 5 and last_gas[4] == 0x08 and last_gas[3] == GAS_SPOOF_RAW:
+            ret.gasPressed = False
+          else:
+            ret.gasPressed = gas_from_parser
+          self.gas_payload = cp.gas_payload
+        else:
+          ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     else:
       eps = cp.vl["EPS"]
       ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
@@ -176,8 +214,22 @@ class CarState(CarStateBase):
       set_kph = float(meter["SET_SPEED"])
       distance_bar = int(meter["DISTANCE_BAR"])
       ret.personality = TIGGO_DISTANCE_BAR_TO_PERSONALITY.get(distance_bar, -1)
-      acc_enable = bool(cp.vl["LKA_STATUS"]["TIGGO_8_ACC_ENABLE"])
-      self.cruise_state = 3 if acc_enable else 1
+      acc_enable_raw = bool(cp.vl["LKA_STATUS"]["TIGGO_8_ACC_ENABLE"])
+      acc_off_meter = distance_bar == 3  # raw 3 = ACC off on cluster
+      pcm = cp.vl["PCM_BUTTONS"]
+      icc_cancel = bool(pcm["ICC_TOGGLE"]) and not self.prev_icc
+      # Hold cruise enabled through standstill ACC-enable flicker; clear on real driver/PCM cancel.
+      real_disengage = ret.brakePressed or acc_off_meter or set_kph <= 0 or icc_cancel
+      if acc_enable_raw:
+        self.tiggo22_cruise_latched = True
+      elif real_disengage:
+        self.tiggo22_cruise_latched = False
+      elif ret.standstill and self.tiggo22_cruise_latched and set_kph > 0 and not acc_off_meter:
+        pass  # keep latched — stock ACC still holding set speed at standstill
+      else:
+        self.tiggo22_cruise_latched = acc_enable_raw
+      cruise_enabled = self.tiggo22_cruise_latched
+      self.cruise_state = 3 if cruise_enabled else 1
       ret.stockAeb = False
       ret.stockFcw = False
       ss_state = can_parsers[Bus.alt].message_states.get(0x307)
@@ -196,7 +248,10 @@ class CarState(CarStateBase):
       ret.personality = max(0, min(personality, 2)) if personality != -1 else -1
 
     ret.cruiseState.available = True
-    ret.cruiseState.enabled = self.cruise_state == 3
+    if tiggo22:
+      ret.cruiseState.enabled = cruise_enabled
+    else:
+      ret.cruiseState.enabled = self.cruise_state == 3
     ret.cruiseState.speed = ret.cruiseState.speedCluster = set_kph * CV.KPH_TO_MS if set_kph > 0 else 0.0
     ret.cruiseState.standstill = ret.standstill and ret.cruiseState.enabled
     ret.cruiseState.nonAdaptive = False
@@ -241,6 +296,7 @@ class CarState(CarStateBase):
       msgs = ICAUR_PT_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
       msgs = TIGGO22_PT_PARSER_MSGS
+      return Tiggo22PTCANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)
     else:
       msgs = PT_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)

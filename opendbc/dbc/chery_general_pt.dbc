@@ -254,11 +254,13 @@ CM_ SG_ 666 BRAKE_PRESSURE "Offset -0.2 removes ~0.2 idle bias (Jaecoo J7); scal
 CM_ SG_ 903 FOLLOW_DISTANCE "Jaecoo J7 ACC gap bars on HUD byte1 bits 9-11 (3-bit LE). Raw 1=1 bar (min gap) .. raw 5=5 bars (max gap); 0/6/7 unknown.";
 CM_ SG_ 903 HANDS_ON_WHEEL_STEER "HUD 0x387 byte0 bit4 (0x10): 'ACC cancelled / uncertain' indicator the cluster latches AFTER cruise drops to CRUISE_STATE=1. NOT the active in-LKAS hands-on-wheel icon — CarController re-emits HUD on PT with this bit forced 0 to suppress spurious cancel glyphs.";
 CM_ SG_ 903 CANCEL_CRUISE_UNCERTAIN "HUD 0x387 byte0 bit5 (0x20).";
+CM_ SG_ 933 TIGGO_8_ACC_ENABLE "Tiggo 2022-24 0x3A5 bit20. Flickers low at standstill while ACC holds; CarState latches cruise enabled until brake, ICC cancel, meter ACC-off, or set-speed clear.";
 CM_ SG_ 933 HANDS_ON_WHEEL_WARN "LKA_STATUS 0x3a5 byte5 bit4 (0x10). Co-fires with the HUD cancel indicator after cruise drops — not the active in-LKAS hands-on-wheel icon.";
 CM_ BO_ 647 "Driver seatbelt: byte3 bit1 (Intel start bit 25) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 1072 "Driver seatbelt: byte5 bit6 (Intel start bit 46) set when unbuckled (Jaecoo J7 log).";
 CM_ BO_ 295 "BCM 0x127 (optional): door-related bytes vary; not present on every latch event — do not use alone for doorOpen.";
 CM_ BO_ 913 "CAN 0x391 STALK+BCM. Door: PAYLOAD391_B3 (wire byte3) 0x08 latched vs 0x09 ajar — use LSB (byte3&1), not B1/B6 (counter).";
+CM_ SG_ 250 GAS_PEDAL_PRESSURE "Tiggo 2022-24 0xFA byte6 bits 5-0. Idle 0; light resume tap ~12. byte7 checksum = (~sum(b0..b6))&0xFF.";
 CM_ SG_ 913 GENERIC_TOGGLE "Stalk/aux toggle -> carState.genericToggle; byte0 bit2 set (0xCC..) vs clear (0xC8..).";
 CM_ BO_ 914 "BCM 0x392 (Jaecoo J7): raw BCM; door decode uses 0x391 PAYLOAD391_B3 as in CM_ BO_ 913.";
 CM_ BO_ 1042 "BCM frame 0x412; trailing bytes roll (counter) in capture.";

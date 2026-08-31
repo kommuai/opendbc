@@ -37,6 +37,15 @@ EPS_TAP_PERIOD_FRAMES = 400    # ~4 s between taps
 # 10 Hz lowpass on the OP angle command (barely filters at 50 Hz LANE_KEEP).
 STEER_LOWPASS_ALPHA = math.exp(-2.0 * math.pi * 10.0 * 0.02)
 
+# Tiggo 2022-24 stop-and-go: GAS (0xFA) tap when CC.cruiseControl.resume (planner go).
+# Pedal/throttle raw ~20 (stock resume taps were 12–25); byte7 = (~sum(b0..b6))&0xFF.
+# Each burst frame overlays press on a fresh stock 0xFA (same counter) on bus 0 only.
+GAS_ADDR = 0xFA
+GAS_SPOOF_RAW = 20
+GAS_SPOOF_BURST_FRAMES = 3  # three stock ticks (~30 ms)
+GAS_SPOOF_RETRY_CYCLE_S = 1.0  # retry if still standstill while resume held
+GAS_SPOOF_MAX_RETRIES = 5  # up to 5 retries after first attempt (6 bursts total)
+
 # Auto-resume from standstill alternates one RES burst then one SET burst:
 # stock RES bumps set-speed by +1 km/h, so SET cancels that drift.
 AUTORESUME_CYCLE_S = 1.2

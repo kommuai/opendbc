@@ -11,7 +11,9 @@
 #define CHERY_LKAS_INFO    0x394U
 #define CHERY_HUD          0x387U
 #define CHERY_LKA_STATUS   0x3A5U  // Tiggo 2022-24 ACC enable (TIGGO_8_ACC_ENABLE)
+#define CHERY_TIGGO22_METER 0x305U  // Tiggo 2022-24 cluster SET_SPEED / DISTANCE_BAR
 #define CHERY_PCM_BUTTONS  0x360U
+#define CHERY_GAS          0x0FAU  // GAS pedal — Tiggo 2022-24 standstill resume spoof
 #define CHERY_OMODA_SAFETY_PARAM          1U
 #define CHERY_OMODA_NO_TORQUE_SPOOF_PARAM 2U
 #define CHERY_ICAUR_SAFETY_PARAM          4U
@@ -33,15 +35,41 @@ static bool chery_omoda_no_torque_spoof = false;
 static bool chery_icaur_safety = false;
 static bool chery_native_hud_fwd = false;
 static bool chery_tiggo22_safety = false;
+static bool chery_tiggo22_acc_latched = false;
+static uint8_t chery_tiggo22_set_speed = 0U;
+static uint8_t chery_tiggo22_distance_bar = 3U;  // raw 3 = ACC off on cluster
 
 static void chery_rx_hook(const CANPacket_t *msg) {
   // Tiggo 8 Pro 2022-24: match CarState — ACC enable is LKA_STATUS (0x3A5) on PT.
-  // Camera 0x220 STEER_STATE=2 is ACC_ONLY and stays high while stock ACC is off;
-  // using it arms controls_allowed too early, heartbeat clears it, then no re-arm.
+  // TIGGO_8_ACC_ENABLE flickers low at standstill while ACC still holds; latch for
+  // pcm_cruise_check so controls_allowed stays aligned with CarState cruise latch.
+  if (chery_tiggo22_safety && (msg->addr == CHERY_TIGGO22_METER) &&
+      (msg->bus == 0U) && (GET_LEN(msg) >= 4U)) {
+    chery_tiggo22_set_speed = msg->data[0];           // SET_SPEED 7|8@0+
+    chery_tiggo22_distance_bar = msg->data[2] & 0x3U;  // DISTANCE_BAR 17|2@0+
+    if ((chery_tiggo22_distance_bar == 3U) || (chery_tiggo22_set_speed == 0U)) {
+      chery_tiggo22_acc_latched = false;
+      pcm_cruise_check(false);
+    }
+  }
+
   if (chery_tiggo22_safety && (msg->addr == CHERY_LKA_STATUS) &&
       (msg->bus == 0U) && (GET_LEN(msg) >= 3U)) {
-    const bool acc_enable = ((msg->data[2] >> 4U) & 1U) != 0U;  // TIGGO_8_ACC_ENABLE
-    pcm_cruise_check(acc_enable);
+    const bool acc_enable_raw = ((msg->data[2] >> 4U) & 1U) != 0U;
+    const bool acc_off_meter = (chery_tiggo22_distance_bar == 3U);
+    const bool real_disengage = acc_off_meter || (chery_tiggo22_set_speed == 0U);
+    bool acc_effective = acc_enable_raw;
+
+    if (acc_enable_raw) {
+      chery_tiggo22_acc_latched = true;
+    } else if (real_disengage) {
+      chery_tiggo22_acc_latched = false;
+    } else if (chery_vehicle_stopped && chery_tiggo22_acc_latched) {
+      acc_effective = true;
+    } else if (!chery_vehicle_stopped) {
+      chery_tiggo22_acc_latched = acc_enable_raw;
+    }
+    pcm_cruise_check(acc_effective);
   }
 
   if (!chery_tiggo22_safety && (msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
@@ -88,6 +116,7 @@ static safety_config chery_init(uint16_t param) {
   static RxCheck chery_rx_checks_tiggo22[] = {
     // LKA_STATUS on PT gates controls_allowed (must be in rx_checks or rx_hook never runs).
     {.msg = {{CHERY_LKA_STATUS, 0U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    {.msg = {{CHERY_TIGGO22_METER, 0U, 8U, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
     {.msg = {{CHERY_WHEELSPEED_2, 0U, 8U, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
   };
   static const CanMsg CHERY_TX_MSGS[] = {
@@ -100,6 +129,8 @@ static safety_config chery_init(uint16_t param) {
     {CHERY_EPS, 2, 8, .check_relay = false},  // EPS spoof on cam bus (DRIVER_TORQUE forced high)
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
+    {CHERY_GAS, 0, 8, .check_relay = false},  // Tiggo 2022-24 gas-pedal resume spoof
+    {CHERY_GAS, 2, 8, .check_relay = false},
   };
   controls_allowed = false;
   chery_omoda_safety = (param & CHERY_OMODA_SAFETY_PARAM) != 0U;
@@ -107,6 +138,9 @@ static safety_config chery_init(uint16_t param) {
   chery_icaur_safety = (param & CHERY_ICAUR_SAFETY_PARAM) != 0U;
   chery_native_hud_fwd = (param & CHERY_NATIVE_HUD_FWD_PARAM) != 0U;
   chery_tiggo22_safety = (param & CHERY_TIGGO22_SAFETY_PARAM) != 0U;
+  chery_tiggo22_acc_latched = false;
+  chery_tiggo22_set_speed = 0U;
+  chery_tiggo22_distance_bar = 3U;
   if (chery_omoda_safety) {
     return BUILD_SAFETY_CFG(chery_rx_checks_omoda, CHERY_TX_MSGS);
   }
@@ -159,6 +193,9 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   // When chery_omoda_no_torque_spoof is set, leave native PT->cam torque frames
   // alone so the meter still sees stock EPS/LKAS while Python spoof is disabled.
   if (bus_num == 0) {
+    if (chery_tiggo22_safety && (addr == (int)CHERY_GAS)) {
+      return true;  // block stock GAS PT->cam — avoids idle/press split views during spoof
+    }
     if ((addr == (int)CHERY_EPS) && chery_cam_torque_spoof_active() && !chery_omoda_no_torque_spoof) {
       return true;
     }
