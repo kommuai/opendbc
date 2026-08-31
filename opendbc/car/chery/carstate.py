@@ -31,6 +31,7 @@ from opendbc.car.chery.values import (
   TIGGO21_LK_PARSER_BYPASS,
   TIGGO21_LK_PARSER_MSGS,
   TIGGO21_PT_PARSER_MSGS,
+  TIGGO_DISTANCE_BAR_TO_PERSONALITY,
 )
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -182,12 +183,15 @@ class CarState(CarStateBase):
 
     # --- Cruise / HUD ---
     if tiggo21:
-      # Tiggo 2022-24 HUD (0x387) is a different layout; do not decode AEB/PCW/set-speed.
+      # Tiggo 2022-24 HUD (0x387) is a different layout; use the dedicated meter (0x305).
+      meter = cp.vl["TIGGO8PRO_2022_METER"]
+      set_kph = float(meter["SET_SPEED"])
+      distance_bar = int(meter["DISTANCE_BAR"])
+      ret.personality = TIGGO_DISTANCE_BAR_TO_PERSONALITY.get(distance_bar, -1)
       acc_enable = bool(cp.vl["LKA_STATUS"]["TIGGO_8_ACC_ENABLE"])
       self.cruise_state = 3 if acc_enable else 1
       ret.stockAeb = False
       ret.stockFcw = False
-      set_kph = 0.0
       ss_state = can_parsers[Bus.alt].message_states.get(0x307)
       if ss_state is not None and ss_state.first_seen_nanos:
         ss = can_parsers[Bus.alt].vl["STEER_STATUS"]

@@ -95,6 +95,11 @@ BO_ 295 DOOR_BCM_127: 8 XXX
  SG_ B6 : 48|8@1+ (1,0) [0|255] "" XXX
  SG_ B7 : 56|8@1+ (1,0) [0|255] "" XXX
 
+BO_ 773 TIGGO8PRO_2022_METER: 8 XXX
+ SG_ SET_SPEED : 7|8@0+ (1,0) [0|255] "" XXX
+ SG_ DISTANCE_BAR : 17|2@0+ (1,0) [0|3] "" XXX
+ SG_ DISTANCE_BAR_2 : 31|2@0+ (1,0) [0|3] "" XXX
+
 BO_ 914 BCM_STAT_392: 8 XXX
  SG_ B0 : 0|8@1+ (1,0) [0|255] "" XXX
  SG_ B1 : 8|8@1+ (1,0) [0|255] "" XXX
@@ -293,3 +298,5 @@ VAL_ 913 GENERIC_TOGGLE 0 "OFF" 1 "ON";
 
 
 CM_ BO_ 775 "Tiggo 8 2022-24 STEER_STATUS (0x307): cam->PT dropped; PT spoof copies LKAS_AVAILABLE, LKAS_AVAILABLE_2, ADAS_STATE from cam and forces LKAS_FAULT=0.";
+
+CM_ SG_ 773 DISTANCE_BAR "Tiggo 8 Pro 2022-24: 1 bar = aggressive (personality 2), 2 bars = normal (personality 0), 3 bars = chill (personality 1).";

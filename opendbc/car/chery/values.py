@@ -53,7 +53,9 @@ ICAUR_GEAR_MAP = {11: "P", 1: "D", 10: "N", 9: "R"}
 ICAUR_BLINKER_LEFT = (4, 6)
 ICAUR_BLINKER_RIGHT = (8, 9)
 # HUD FOLLOW_DISTANCE: raw 1 = 1-bar (closest) … raw 5 = 5-bar (farthest); 0/6/7 unknown.
-FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}  # 0 aggressive / 1 standard / 2 relaxed
+FOLLOW_RAW_TO_PERSONALITY = {1: 0, 2: 0, 3: 1, 4: 2, 5: 2}
+# Tiggo 8 Pro 2022-24 meter DISTANCE_BAR: 1 bar=aggressive, 2=normal, 3=chill.
+TIGGO_DISTANCE_BAR_TO_PERSONALITY = {1: 2, 2: 0, 3: 1}  # 0 aggressive / 1 standard / 2 relaxed
 STEER_RELATED_INTERVENTION_RAW_MIN = 36000
 # Jaecoo only: STEER_RELATED status when raw>=36000 (decoded with STEERING_ANGLE factor/offset).
 # iCaur must not use this — 0xC4 STEERING_ANGLE is real road angle there.
@@ -99,7 +101,7 @@ TIGGO21_PT_PARSER_MSGS = [
   ("STALK", 50), ("PCM_BUTTONS", 20),
   ("SPEED_RELATED", 50),
   ("SEATBELT_287", 50), ("SEATBELT_430", 50),
-  ("BCM_STAT_412", math.nan), ("LKAS_INFO", 50), ("LKA_STATUS", 20),
+  ("BCM_STAT_412", math.nan), ("LKAS_INFO", 50), ("LKA_STATUS", 20), ("TIGGO8PRO_2022_METER", 20),
 ]
 # Tiggo 8 Pro 2022-24: do not decode HUD (Jaecoo layout does not match bus-1 0x387).
 TIGGO21_CAM_PARSER_MSGS = []
