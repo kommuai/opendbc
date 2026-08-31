@@ -258,6 +258,27 @@ class CarController(CarControllerBase):
       return False
     return CS.out.standstill or CS.out.cruiseState.enabled
 
+  def _update_tiggo21(self, CC, CS, steer_req, can_sends) -> None:
+    """Generate the Tiggo 2022-24 PT replacements only while openpilot is engaged."""
+    if self.frame % LANE_KEEP_STEP == 0:
+      if CC.enabled:
+        requested_torque = int(round(CC.actuators.torque * Tiggo21SteerLimits.STEER_MAX)) if steer_req else 0
+        self.apply_torque_last = apply_driver_steer_torque_limits(
+          requested_torque, self.apply_torque_last, CS.out.steeringTorqueEps, Tiggo21SteerLimits,
+        )
+        can_sends.append(cherycan.create_tiggo21_lane_keep_command(
+          self.packer, self.apply_torque_last, steer_req, self.tiggo21_lk_counter, CANBUS.main_bus,
+        ))
+        self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
+      else:
+        self.apply_torque_last = 0
+
+    if CC.enabled and self.frame % HUD_STEP == 0:
+      can_sends.append(cherycan.create_steer_status_spoof(
+        self.packer, self.steer_status_counter, CS.cam_steer_status, CANBUS.main_bus,
+      ))
+      self.steer_status_counter = (self.steer_status_counter + 1) % 16
+
   def update(self, CC, CS, now_nanos):
     del now_nanos
     can_sends = []
@@ -275,26 +296,13 @@ class CarController(CarControllerBase):
     apply_angle = CS.out.steeringAngleDeg
     tiggo21 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
 
-    # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every frame
-    # so EPS never sees a gap that looks like "still requesting" between even frames.
-    send_lane_keep = (self.frame % LANE_KEEP_STEP == 0) or (icaur and self.icaur_steer_override)
-    if send_lane_keep:
-      if tiggo21:
-        # Passthrough stock 0x220 unless OP is engaged (panda blocks cam->PT then).
-        if CC.enabled:
-          apply_torque = apply_driver_steer_torque_limits(
-            int(round(CC.actuators.torque * Tiggo21SteerLimits.STEER_MAX)) if steer_req else 0,
-            self.apply_torque_last, CS.out.steeringTorqueEps, Tiggo21SteerLimits,
-          )
-          self.apply_torque_last = apply_torque
-          can_sends.extend(cherycan.create_tiggo21_lane_keep_commands(
-            self.packer, apply_torque, steer_req, self.tiggo21_lk_counter,
-          ))
-          if self.frame % LANE_KEEP_STEP == 0:
-            self.tiggo21_lk_counter = (self.tiggo21_lk_counter + 1) % 16
-        else:
-          self.apply_torque_last = 0
-      else:
+    if tiggo21:
+      self._update_tiggo21(CC, CS, steer_req, can_sends)
+    else:
+      # LANE_KEEP normally at 50 Hz; while iCaur is overriding, TX STEER_REQ=0 every
+      # frame so EPS never sees a gap that looks like "still requesting".
+      send_lane_keep = (self.frame % LANE_KEEP_STEP == 0) or (icaur and self.icaur_steer_override)
+      if send_lane_keep:
         if self.frame % LANE_KEEP_STEP == 0:
           apply_angle = self._compute_apply_angle(CS, CC.actuators, steer_req)
         if not steer_req:
@@ -303,13 +311,6 @@ class CarController(CarControllerBase):
         can_sends.append(cherycan.create_lane_keep_command(
           self.packer, apply_angle, steer_req, CS.out.steeringAngleDeg,
         ))
-
-    # Tiggo 2022-24: passthrough cam 0x307 unless engaged; then spoof on PT (20 Hz).
-    if tiggo21 and CC.enabled and self.frame % HUD_STEP == 0:
-      can_sends.append(cherycan.create_steer_status_spoof(
-        self.packer, self.steer_status_counter, CS.cam_steer_status, bus=CANBUS.main_bus,
-      ))
-      self.steer_status_counter = (self.steer_status_counter + 1) % 16
 
     if self.frame % LKAS_INFO_STEP == 0:
       # Bus-2 mirror only when cruise is engaged. At standstill (cruise off) we let

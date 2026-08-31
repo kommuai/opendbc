@@ -66,10 +66,6 @@ def create_tiggo21_lane_keep_command(packer, torque, steer_req, counter, bus):
   return addr, bytes(data), bus
 
 
-def create_tiggo21_lane_keep_commands(packer, torque, steer_req, counter):
-  return [create_tiggo21_lane_keep_command(packer, torque, steer_req, counter, CANBUS.main_bus)]
-
-
 def create_steer_status_spoof(packer, counter, cam_status, bus=None):
   """Re-emit STEER_STATUS (0x307) on PT while engaged. LKAS_FAULT forced off.
 

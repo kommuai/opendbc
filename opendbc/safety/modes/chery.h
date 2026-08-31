@@ -45,9 +45,7 @@ static void chery_rx_hook(const CANPacket_t *msg) {
   }
 
   if (!chery_tiggo21_safety && (msg->addr == CHERY_HUD) && (GET_LEN(msg) >= 5U)) {
-    const bool hud_bus_ok = (msg->bus == 2U) ||
-                            (chery_omoda_safety && (msg->bus == 0U)) ||
-                            (chery_tiggo21_safety && (msg->bus == 1U));
+    const bool hud_bus_ok = (msg->bus == 2U) || (chery_omoda_safety && (msg->bus == 0U));
     if (hud_bus_ok) {
       const uint8_t cruise_state = (uint8_t)((msg->data[4] >> 2) & 0x3U);
       const bool cruise_engaged = (cruise_state == 3U);

@@ -26,7 +26,6 @@ from opendbc.car.chery.values import (
   OMODA_PT_PARSER_MSGS,
   PT_PARSER_MSGS,
   STEER_RELATED_INTERVENTION_DEG_MIN,
-  TIGGO21_CAM_PARSER_BYPASS,
   TIGGO21_CAM_PARSER_MSGS,
   TIGGO21_LK_PARSER_BYPASS,
   TIGGO21_LK_PARSER_MSGS,
@@ -94,43 +93,34 @@ class CarState(CarStateBase):
     ret.vEgoCluster = ret.vEgo
     ret.standstill = ret.vEgoRaw < 0.01
 
-    if icaur:
-      brake = max(0.0, min(float(cp.vl["ICAUR_BRAKE"]["BRAKE_PRESSURE"]), 1.0))
-      gas = max(0.0, min(float(cp.vl["ICAUR_GAS"]["GAS_PEDAL_PRESSURE"]), 1.0))
-      # Angle + driver torque both on STEER_RELATED (0xC4).
-      steer = cp.vl["STEER_RELATED"]
-      ret.steeringAngleDeg = max(-450.0, min(450.0, float(steer["STEERING_ANGLE"])))
-      ret.steeringTorque = float(steer["DRIVER_TORQUE"])
-      # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
-      steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
-      self.prev_angle = ret.steeringAngleDeg
-      ret.steeringTorqueEps = ret.steeringTorque * steer_dir
-      ret.steeringPressed = self.update_steering_pressed(
-        abs(ret.steeringTorque) >= ICAUR_STEERING_PRESSED_TORQUE,
-        ICAUR_STEERING_PRESSED_MIN_COUNT,
-      )
-      ret.brakePressed = brake >= ICAUR_BRAKE_PRESSED
-      ret.brake = brake if ret.brakePressed else 0.0
-      ret.gasPressed = gas >= ICAUR_GAS_PRESSED
-      # CarState.gas was removed (gasDEPRECATED); only gasPressed is published.
-      ret.gearShifter = self.parse_gear_shifter(
-        ICAUR_GEAR_MAP.get(int(cp.vl["ICAUR_TRANSMISSION"]["GEAR"]))
-      )
-      self.eps_steering_angle = ret.steeringAngleDeg
-      self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
-      self.eps_counter = int(steer["COUNTER"])
-    elif tiggo21:
+    if steer_related_steer:
       steer = cp.vl["STEER_RELATED"]
       ret.steeringAngleDeg = max(-450.0, min(450.0, float(steer["STEERING_ANGLE"])))
       ret.steeringTorque = float(steer["DRIVER_TORQUE"])
       steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
       self.prev_angle = ret.steeringAngleDeg
       ret.steeringTorqueEps = ret.steeringTorque * steer_dir
-      ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
+      if icaur:
+        ret.steeringPressed = self.update_steering_pressed(
+          abs(ret.steeringTorque) >= ICAUR_STEERING_PRESSED_TORQUE,
+          ICAUR_STEERING_PRESSED_MIN_COUNT,
+        )
+      else:
+        ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
       self.eps_steering_angle = ret.steeringAngleDeg
       self.eps_driver_torque = int(steer["DRIVER_TORQUE"])
       self.eps_counter = int(steer["COUNTER"])
-      ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
+
+      if icaur:
+        brake = max(0.0, min(float(cp.vl["ICAUR_BRAKE"]["BRAKE_PRESSURE"]), 1.0))
+        ret.brakePressed = brake >= ICAUR_BRAKE_PRESSED
+        ret.brake = brake if ret.brakePressed else 0.0
+        ret.gasPressed = cp.vl["ICAUR_GAS"]["GAS_PEDAL_PRESSURE"] >= ICAUR_GAS_PRESSED
+        ret.gearShifter = self.parse_gear_shifter(
+          ICAUR_GEAR_MAP.get(int(cp.vl["ICAUR_TRANSMISSION"]["GEAR"]))
+        )
+      else:
+        ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     else:
       eps = cp.vl["EPS"]
       ret.steeringAngleDeg = float(eps["STEERING_ANGLE"])
@@ -138,12 +128,10 @@ class CarState(CarStateBase):
       self.eps_steering_angle = float(eps["STEERING_ANGLE"])
       self.eps_driver_torque = int(eps["DRIVER_TORQUE"])
       self.eps_counter = int(eps["COUNTER"])
-      # DRIVER_TORQUE is unsigned; infer sign from angle delta for steeringTorqueEps.
       steer_dir = 1 if ret.steeringAngleDeg >= self.prev_angle else -1
       self.prev_angle = ret.steeringAngleDeg
       ret.steeringTorqueEps = ret.steeringTorque * steer_dir
       ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
-
       ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
     if omoda or tiggo21:
       raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)

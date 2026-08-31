@@ -12,7 +12,7 @@ class CANBUS:
   main_bus = 0   # PT / EPS  — LANE_KEEP + LKAS_INFO TX
   cam_bus = 2    # stock cam — HUD, LANE_KEEP RX
   tiggo21_cam_bus = 1  # Tiggo 8 Pro 2022-24: HUD on bus 1
-  tiggo21_lk_bus = 2   # Tiggo 2022-24 stock LANE_KEEP (0x220) RX; cam->PT native fwd, no OP TX
+  tiggo21_lk_bus = 2   # Tiggo 2022-24 stock 0x220 / 0x307 receive bus
 
 
 # --- CarController timing ---
@@ -106,7 +106,6 @@ TIGGO21_PT_PARSER_MSGS = [
 # Tiggo 8 Pro 2022-24: do not decode HUD (Jaecoo layout does not match bus-1 0x387).
 TIGGO21_CAM_PARSER_MSGS = []
 TIGGO21_LK_PARSER_MSGS = [("TIGGO21_LANE_KEEP", 50), ("STEER_STATUS", 20)]
-TIGGO21_CAM_PARSER_BYPASS = ()
 TIGGO21_LK_PARSER_BYPASS = (0x220, 0x307)  # ignore counter + checksum on stock 0x220 / 0x307
 
 # Omoda 5: 0x2E9 byte 2 is multiplexed — raw 1..5 are message variants, not pedal.
