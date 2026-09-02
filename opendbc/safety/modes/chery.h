@@ -13,7 +13,6 @@
 #define CHERY_LKA_STATUS   0x3A5U  // Tiggo 2022-24 ACC enable (TIGGO_8_ACC_ENABLE)
 #define CHERY_TIGGO22_METER 0x305U  // Tiggo 2022-24 cluster SET_SPEED / DISTANCE_BAR
 #define CHERY_PCM_BUTTONS  0x360U
-#define CHERY_GAS          0x0FAU  // GAS pedal — Tiggo 2022-24 standstill resume spoof
 #define CHERY_OMODA_SAFETY_PARAM          1U
 #define CHERY_OMODA_NO_TORQUE_SPOOF_PARAM 2U
 #define CHERY_ICAUR_SAFETY_PARAM          4U
@@ -129,8 +128,6 @@ static safety_config chery_init(uint16_t param) {
     {CHERY_EPS, 2, 8, .check_relay = false},  // EPS spoof on cam bus (DRIVER_TORQUE forced high)
     {CHERY_PCM_BUTTONS, 0, 6, .check_relay = false},
     {CHERY_PCM_BUTTONS, 2, 6, .check_relay = false},  // camera leg (panda doesn't forward our TX 0->2)
-    {CHERY_GAS, 0, 8, .check_relay = false},  // Tiggo 2022-24 gas-pedal resume spoof
-    {CHERY_GAS, 2, 8, .check_relay = false},
   };
   controls_allowed = false;
   chery_omoda_safety = (param & CHERY_OMODA_SAFETY_PARAM) != 0U;
@@ -193,9 +190,6 @@ static bool chery_fwd_hook(int bus_num, int addr) {
   // When chery_omoda_no_torque_spoof is set, leave native PT->cam torque frames
   // alone so the meter still sees stock EPS/LKAS while Python spoof is disabled.
   if (bus_num == 0) {
-    if (chery_tiggo22_safety && (addr == (int)CHERY_GAS)) {
-      return true;  // block stock GAS PT->cam — avoids idle/press split views during spoof
-    }
     if ((addr == (int)CHERY_EPS) && chery_cam_torque_spoof_active() && !chery_omoda_no_torque_spoof) {
       return true;
     }

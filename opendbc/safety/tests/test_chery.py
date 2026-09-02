@@ -10,8 +10,8 @@ class TestCherySafety(unittest.TestCase):
   """Chery safety: HUD cruise state on bus 2 gates controls_allowed via pcm_cruise_check."""
 
   # Must match opendbc/safety/modes/chery.h CHERY_TX_MSGS ([addr, bus]).
-  # LANE_KEEP, TIGGO22_LK(0), LKAS_INFO(0), LKAS_INFO(2), HUD, STEER_STATUS(0), EPS(2), PCM(0), PCM(2), GAS(0), GAS(2).
-  TX_MSGS = [[0x345, 0], [0x220, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x307, 0], [0x1D3, 2], [0x360, 0], [0x360, 2], [0xFA, 0], [0xFA, 2]]
+  # LANE_KEEP, TIGGO22_LK(0), LKAS_INFO(0), LKAS_INFO(2), HUD, STEER_STATUS(0), EPS(2), PCM(0), PCM(2).
+  TX_MSGS = [[0x345, 0], [0x220, 0], [0x394, 0], [0x394, 2], [0x387, 0], [0x307, 0], [0x1D3, 2], [0x360, 0], [0x360, 2]]
   SAFETY_PARAM = 0
 
   def setUp(self):
@@ -158,16 +158,6 @@ class TestCherySafety(unittest.TestCase):
     self.safety.set_controls_allowed(True)
     self.assertTrue(self._tx(self._eps(15.0, 5)))
 
-  def test_gas_spoof_tx_allowed_on_pt_and_cam(self):
-    msg0 = self.packer.make_can_msg_safety(
-      "GAS", 0, {"GAS_THROTTLE": 0.12, "GAS_PEDAL_PRESSURE": 0.12},
-    )
-    msg2 = self.packer.make_can_msg_safety(
-      "GAS", 2, {"GAS_THROTTLE": 0.12, "GAS_PEDAL_PRESSURE": 0.12},
-    )
-    self.assertTrue(self._tx(msg0))
-    self.assertTrue(self._tx(msg2))
-
   def _wheel_speed(self, fl_kph: float, fr_kph: float):
     return self.packer.make_can_msg_safety(
       "WHEELSPEED_2", 0,
@@ -296,10 +286,6 @@ class TestCheryTiggo22Safety(TestCheryTiggoNoTorqueSpoofSafety):
     self._rx(self._lka_status(0))
     self.assertFalse(self.safety.get_controls_allowed(),
                      msg="meter ACC-off should clear controls_allowed")
-
-  def test_fwd_blocks_pt_gas_for_tiggo22(self):
-    self.assertEqual(-1, self.safety.safety_fwd_hook(0, 0xFA),
-                     msg="stock GAS must not forward PT->cam on Tiggo 2022-24")
 
   def test_fwd_blocks_camera_lane_keep(self):
     # 0x345 is the generic Chery LKAS command and is always replaced on PT.
