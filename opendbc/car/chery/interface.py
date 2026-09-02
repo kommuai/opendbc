@@ -17,6 +17,9 @@ from opendbc.car.chery.values import (
   CHERY_NATIVE_HUD_FWD_PARAM,
   CHERY_TIGGO22_SAFETY_PARAM,
   Tiggo22SteerLimits,
+  TIGGO22_PID_KF,
+  TIGGO22_PID_KP_BP,
+  TIGGO22_PID_KP_V,
 )
 
 
@@ -56,9 +59,9 @@ class CarInterface(CarInterfaceBase):
       ret.steerActuatorDelay = 0.10
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0], [Tiggo22SteerLimits.STEER_MAX]]
       ret.lateralTuning.init("pid")
-      ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0.], [0.22]]
+      ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = TIGGO22_PID_KP_BP, TIGGO22_PID_KP_V
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0.], [0.02]]
-      ret.lateralTuning.pid.kf = 0.00010
+      ret.lateralTuning.pid.kf = TIGGO22_PID_KF
       if TIGGO_DISABLE_TORQUE_SPOOF:
         ret.safetyConfigs[0].safetyParam |= CHERY_OMODA_NO_TORQUE_SPOOF_PARAM
       if TIGGO_DISABLE_HUD_OVERRIDE:

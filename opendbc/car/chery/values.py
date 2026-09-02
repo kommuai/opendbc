@@ -144,6 +144,15 @@ class Tiggo22SteerLimits:
   STEER_DRIVER_MULTIPLIER = 1
   STEER_DRIVER_FACTOR = 1
 
+# Lateral PID / EPS TX tuning (Tiggo 8 Pro 2022-24)
+TIGGO22_PID_KF = 0.00005          # was 0.00010 — less highway FF wobble
+TIGGO22_FF_SPEED_ATTEN_MPS = 22.0 # scale FF down above this speed (v² FF grows fast)
+TIGGO22_FF_ATTEN_MIN = 0.45
+TIGGO22_PID_KP_BP = [0., 4., 12., 22.]
+TIGGO22_PID_KP_V = [0.10, 0.10, 0.16, 0.22]  # softer Kp below ~45 km/h
+TIGGO22_DES_ANGLE_ALPHA = 0.88   # low-speed desired-angle smoothing (<12 m/s)
+TIGGO22_DES_ANGLE_V_MAX = 12.0
+
 # iCaur 03: standstill on 0x222; torque spoof off (same bit as Omoda).
 # HUD: Omoda-style — native cam HUD forwards to PT; no HUD override TX.
 CHERY_ICAUR_SAFETY_PARAM = 4
