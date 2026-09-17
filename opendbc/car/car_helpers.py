@@ -1,6 +1,7 @@
 import re
 import os
 import time
+from functools import cache
 
 from opendbc.car import gen_empty_fingerprint
 from opendbc.car.can_definitions import CanRecvCallable, CanSendCallable
@@ -259,8 +260,24 @@ def get_demo_car_params():
   return CP
 
 
-def ignition_onroad(states) -> bool:
-  """Onroad ignition: line|CAN, or CAN-only when safetyParam ignores harness line."""
+def _ignores_ignition_line(configs) -> bool:
+  return any(config.safetyModel == CarParams.SafetyModel.proton and
+             config.safetyParam & ProtonSafetyFlags.IGNORE_IGNITION_LINE for config in configs)
+
+
+@cache
+def fingerprint_ignores_ignition_line(car_fingerprint: str) -> bool:
+  try:
+    configs = interfaces[car_fingerprint].get_non_essential_params(car_fingerprint).safetyConfigs
+  except (KeyError, AttributeError):
+    return False
+  return _ignores_ignition_line(configs)
+
+
+def ignition_onroad(states, car_fingerprint: str | None = None, fingerprint_ready: bool = False) -> bool:
+  """Use CAN after a resolved car's safety config says to ignore the ignition line."""
   known = [ps for ps in states if ps.pandaType != log.PandaState.PandaType.unknown]
-  return any(ps.ignitionCan for ps in known) if any(ps.safetyModel == CarParams.SafetyModel.proton and
-    ps.safetyParam & ProtonSafetyFlags.IGNORE_IGNITION_LINE for ps in known) else any(ps.ignitionLine or ps.ignitionCan for ps in known)
+  ignores_ignition_line = _ignores_ignition_line(known)
+  if fingerprint_ready and car_fingerprint:
+    ignores_ignition_line |= fingerprint_ignores_ignition_line(car_fingerprint)
+  return any(ps.ignitionCan for ps in known) if ignores_ignition_line else any(ps.ignitionLine or ps.ignitionCan for ps in known)
