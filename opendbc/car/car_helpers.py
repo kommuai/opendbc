@@ -260,7 +260,12 @@ def get_demo_car_params():
 
 
 def ignition_onroad(states) -> bool:
-  """Onroad ignition: line|CAN, or CAN-only when safetyParam ignores harness line."""
-  known = [ps for ps in states if ps.pandaType != log.PandaState.PandaType.unknown]
-  return any(ps.ignitionCan for ps in known) if any(ps.safetyModel == CarParams.SafetyModel.proton and
-    ps.safetyParam & ProtonSafetyFlags.IGNORE_IGNITION_LINE for ps in known) else any(ps.ignitionLine or ps.ignitionCan for ps in known)
+  """Use CAN before confirmation and the confirmed car ignition rule."""
+  if not (known := [ps for ps in states if ps.pandaType != log.PandaState.PandaType.unknown]):
+    return False
+  if (any(ps.safetyModel == CarParams.SafetyModel.proton
+          and ps.safetyParam & ProtonSafetyFlags.IGNORE_IGNITION_LINE for ps in known)
+      or all(ps.safetyModel == CarParams.SafetyModel.noOutput for ps in known)):
+    return any(ps.ignitionCan for ps in known)
+  return any(ps.ignitionLine or ps.ignitionCan for ps in known
+             if ps.safetyModel != CarParams.SafetyModel.noOutput)
