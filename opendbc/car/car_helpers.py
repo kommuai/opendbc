@@ -21,7 +21,7 @@ params = Params()
 
 # Brands are matched by module name and platform membership
 unsupported_brands = {
-  "body", "chrysler", "ford", "gm", "hyundai",
+  "body", "chrysler", "gm", "hyundai",
   "kia", "mazda", "nissan", "psa", "rivian",
   "subaru", "tesla", "volkswagen"
 }
