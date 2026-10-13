@@ -19,6 +19,7 @@ from opendbc.car.chery.values import (
   ICAUR_PT_PARSER_MSGS,
   ICAUR_STEERING_PRESSED_MIN_COUNT,
   ICAUR_STEERING_PRESSED_TORQUE,
+  J7_PETROL_PT_PARSER_MSGS,
   OMODA_BRAKE_PRESSURE_RAW_MAX,
   OMODA_BRAKE_PRESSURE_RAW_MIN,
   OMODA_CAM_PARSER_MSGS,
@@ -74,6 +75,7 @@ class CarState(CarStateBase):
     omoda = self.CP.carFingerprint == CAR.CHERY_OMODA_5
     icaur = self.CP.carFingerprint == CAR.CHERY_ICAUR_03
     tiggo22 = self.CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024
+    j7_petrol = self.CP.carFingerprint == CAR.CHERY_JAECOO_J7_PETROL
     steer_related_steer = icaur or tiggo22
 
     # --- Wheels / pedals / gear ---
@@ -135,7 +137,7 @@ class CarState(CarStateBase):
       ret.steeringTorqueEps = ret.steeringTorque * steer_dir
       ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > 5, 5)
       ret.gasPressed = cp.vl["GAS"]["GAS_PEDAL_PRESSURE"] > 0.01
-    if omoda or tiggo22:
+    if omoda or tiggo22 or j7_petrol:
       raw = int(cp.vl["OMODA_BRAKE"]["BRAKE_PRESSURE"] / 0.0188679)
       if raw <= OMODA_BRAKE_PRESSURE_RAW_MAX:
         ret.brake = raw / OMODA_BRAKE_PRESSURE_RAW_MAX
@@ -260,6 +262,8 @@ class CarState(CarStateBase):
       msgs = ICAUR_PT_PARSER_MSGS
     elif CP.carFingerprint == CAR.CHERY_TIGGO_8_PRO_2022_2024:
       msgs = TIGGO22_PT_PARSER_MSGS
+    elif CP.carFingerprint == CAR.CHERY_JAECOO_J7_PETROL:
+      msgs = J7_PETROL_PT_PARSER_MSGS
     else:
       msgs = PT_PARSER_MSGS
     return CANParser(DBC[CP.carFingerprint]["pt"], msgs, CANBUS.main_bus)

@@ -69,6 +69,15 @@ PT_PARSER_MSGS = [
   ("SEATBELT_287", 50), ("SEATBELT_430", 50), ("BCM_STAT_412", math.nan),
   ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
 ]
+# Jaecoo J7 petrol: same PT signals as the PHEV, except gear and brake are the
+# Omoda messages (0x300 / 0x2E9). The PHEV 0x10D / 0x29A frames are not on this car.
+J7_PETROL_PT_PARSER_MSGS = [
+  ("WHEELSPEED_1", 50), ("WHEELSPEED_2", 50), ("EPS", 100), ("GAS", 100),
+  ("OMODA_TRANSMISSION", 100), ("OMODA_BRAKE", 50), ("STALK", 50), ("PCM_BUTTONS", 20),
+  ("ADAS_RELATED", 100), ("SPEED_RELATED", 50), ("STEER_RELATED", 100),
+  ("SEATBELT_287", 50), ("SEATBELT_430", 50), ("BCM_STAT_412", math.nan),
+  ("BCM_STAT_465", math.nan), ("LKAS_INFO", 50),
+]
 CAM_PARSER_MSGS = [("HUD", 20), ("LANE_KEEP", 50), ("ACC_UNCERTAIN", 20)]
 # iCaur PT: only bus-0 signals CarState reads. Do NOT require HUD/LANE_KEEP on PT —
 # HUD now forwards natively (Omoda-style); LANE_KEEP is still blocked cam->PT and
@@ -198,6 +207,10 @@ class Footnote(Enum):
     "Support: under validation on chery_general_pt.dbc (Jaecoo J7 PHEV).",
     Column.LONGITUDINAL,
   )
+  J7_PETROL_NOTE = CarFootnote(
+    "Support: under validation on chery_general_pt.dbc (Jaecoo J7 petrol). Gear and brake use the Omoda messages.",
+    Column.LONGITUDINAL,
+  )
 
 
 class CAR(Platforms):
@@ -206,6 +219,23 @@ class CAR(Platforms):
       "Jaecoo J7 PHEV 2024-26", "ALL",
       car_parts=CUSTOM_CAR_PARTS(),
       footnotes=[Footnote.J7_NOTE],
+      variant="All",
+      kommu_supported=True,
+      acc_low_speed=True,
+      acc_speed_range="0 - 150",
+      acc_stop_and_go=True,
+      lkc_torque="TBD",
+      lkc_speed_range="0 - 150",
+      max_steering_angle="TBD",
+    )],
+    CarSpecs(mass=1980.0, wheelbase=2.67, steerRatio=16.0),
+    dbc_dict("chery_general_pt", None),
+  )
+  CHERY_JAECOO_J7_PETROL = PlatformConfig(
+    [CarDocs(
+      "Jaecoo J7 Petrol 2024-26", "ALL",
+      car_parts=CUSTOM_CAR_PARTS(),
+      footnotes=[Footnote.J7_PETROL_NOTE],
       variant="All",
       kommu_supported=True,
       acc_low_speed=True,

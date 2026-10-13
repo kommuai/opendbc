@@ -59,6 +59,7 @@ non_tested_cars = [
 
   # Chery (no comma.ai test route yet)
   CHERY.CHERY_JAECOO_J7_PHEV,
+  CHERY.CHERY_JAECOO_J7_PETROL,
   CHERY.CHERY_TIGGO_8_PRO_2025,
   CHERY.CHERY_TIGGO_8_PRO_2022_2024,
   CHERY.CHERY_OMODA_5,
