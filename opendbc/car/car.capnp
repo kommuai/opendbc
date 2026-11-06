@@ -233,6 +233,54 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from [0.0, 1.0]
   charging @43 :Bool;
 
+  # Additional BYD state retained for DM-i diagnostics. This does not authorize
+  # longitudinal or lateral control.
+  bydState @64 :BydState;
+
+  struct BydState {
+    # POWER_MODE is raw: this DBC has no value table or confirmed semantics.
+    powerModeRaw @0 :UInt8;
+    # Kept raw because value meanings are not confirmed in the current DBC.
+    driveModeRaw @1 :UInt8;
+    # Raw STILL_GENERATOR bit; semantics still need validation against more modes.
+    stillGeneratorRaw @2 :UInt8;
+    engineRpm @3 :Float32;
+    # ACC_AEB signal payload, kept opaque until its fields are identified.
+    accAebPayloadRaw @4 :UInt64;
+    # DBC-scaled value; zero and units still need validation on the vehicle.
+    lateralAccel @5 :Float32;
+    # Raw ACC_HUD_ADAS error code; enum meaning has not been confirmed.
+    accErrorRaw @6 :UInt8;
+    # Raw EPB_NG state; meaning of its multibit values has not been confirmed.
+    epbActiveRaw @7 :UInt8;
+    # DBC-scaled ESC speed. It differs from the wheel-speed signals in this log.
+    escVehicleSpeedRaw @8 :Float32;
+    pedalPressedActiveLowRaw @9 :UInt8;
+    ipbBrakePressedRaw @10 :UInt8;
+    # DBC-scaled SET_SPEED; units are not declared in the DBC.
+    accSetSpeedRaw @11 :Float32;
+    accSetDistanceRaw @12 :UInt8;
+    accHasLead @13 :Bool;
+    accLeadDistanceRaw @14 :UInt8;
+    accTooClose @15 :Bool;
+    accCmdControllableRaw @16 :UInt8;
+    accCmdReqNotStandstillRaw @17 :UInt8;
+    # STEER_MODULE_2 signal has an unresolved DBC note: torque or steer rate.
+    driverEpsTorqueOrRateRaw @18 :UInt8;
+    epbStatusRaw @19 :UInt8;
+    accCruiseStateRaw @20 :UInt8;
+    accHudOn1Raw @21 :UInt8;
+    accHudOn2Raw @22 :UInt8;
+    accHudControllableRaw @23 :UInt8;
+    accHudOverrideRaw @24 :UInt8;
+    driveStateThrottleRaw @25 :UInt8;
+    lkaHudSteerActiveActiveLowRaw @26 :UInt8;
+    lkaHudHandOnWheelWarningRaw @27 :UInt8;
+    lkaHudLssStateRaw @28 :UInt8;
+    epsOkRaw @29 :UInt8;
+    steerReqRaw @30 :UInt8;
+  }
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;

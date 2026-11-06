@@ -111,6 +111,8 @@ legend = ["LAT_ACCEL_FACTOR", "MAX_LAT_ACCEL_MEASURED", "FRICTION"]
 "BYD_SONG_PLUS_DMI_21" = [2.5, 2.5, 0.1]
 "BYD_SEAL" = [2.5, 2.5, 0.1]
 "BYD_SEALION7" = [2.5, 2.5, 0.1]
+# Placeholder only; Sealion 8 DMI is dashcam-only with no control tune.
+"BYD_SEALION8_DMI" = [2.5, 2.5, 0.1]
 "BYD_SEAL6" = [2.5, 2.5, 0.1]
 "BYD_SHARK" = [2.5, 2.5, 0.1]
 "CHERY_JAECOO_J7_PHEV" = [2.5, 2.5, 0.1]

@@ -65,7 +65,10 @@ class CarController(CarControllerBase):
     self.resume_sequence_next_frame = 0
     self.sng_saw_wait = False
     self.sng_tx_count = 0
-    self.sng = SngHelper(SNG_INITIAL_PRESS_DELAY_S) if CP.carFingerprint not in BYD_OP_LONG_PLATFORMS else None
+    self.sng = (
+      SngHelper(SNG_INITIAL_PRESS_DELAY_S)
+      if CP.carFingerprint not in BYD_OP_LONG_PLATFORMS and CP.carFingerprint != CAR.BYD_SEALION8_DMI else None
+    )
 
   def _start_sng_resume_sequence(self, CS):
     if not (idle := CS.sng_pcm_idle) or len(idle) < 8 or not (msgs := create_resume_sequence(self.packer, idle, self.button_send_bus)):
@@ -184,6 +187,11 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos):
     del now_nanos
+    if self.CP.carFingerprint == CAR.BYD_SEALION8_DMI:
+      # Diagnostic scaffold only: no steering, ACC, button, or spoof frames until
+      # control behavior and the Panda safety configuration are verified on-car.
+      return CC.actuators.as_builder(), []
+
     can_sends = []
     enabled = CC.latActive
     actuators = CC.actuators

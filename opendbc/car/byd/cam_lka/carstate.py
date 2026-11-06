@@ -20,6 +20,7 @@ class CarState(CarStateBase):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
     self.shifter_values = can_define.dv["DRIVE_STATE"]["GEAR"]
+    self.is_sealion8_dmi = CP.carFingerprint == CAR.BYD_SEALION8_DMI
 
     self.is_cruise_latch = False
     self.prev_angle = 0
@@ -76,11 +77,12 @@ class CarState(CarStateBase):
 
     parser_alt = self._select_long_parser(cp, cp_cam)
 
+    wheel_speed_msg = "WHEEL_SPEED_ALT" if self.is_sealion8_dmi else "WHEEL_SPEED"
     self.parse_wheel_speeds(ret,
-      cp.vl["WHEEL_SPEED"]["WHEELSPEED_FL"],
-      cp.vl["WHEEL_SPEED"]["WHEELSPEED_FR"],
-      cp.vl["WHEEL_SPEED"]["WHEELSPEED_BL"],
-      cp.vl["WHEEL_SPEED"]["WHEELSPEED_BR"],
+      cp.vl[wheel_speed_msg]["WHEELSPEED_FL"],
+      cp.vl[wheel_speed_msg]["WHEELSPEED_FR"],
+      cp.vl[wheel_speed_msg]["WHEELSPEED_BL"],
+      cp.vl[wheel_speed_msg]["WHEELSPEED_BR"],
     )
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
     ret.standstill = ret.vEgoRaw < 0.01
@@ -104,16 +106,67 @@ class CarState(CarStateBase):
 
     ret.brake = cp.vl["PEDAL"]["BRAKE_PEDAL"]
     ret.brakePressed = bool(cp.vl["DRIVE_STATE"]["BRAKE_PRESSED"]) or ret.brake > 0.01
+    if self.is_sealion8_dmi:
+      ret.parkingBrake = bool(cp.vl["STALKS"]["EPB_ACTIVE"])
+      ret.yawRate = cp.vl["YAW_SENSOR"]["YAW_RATE"]
+      # Keep the DMI mode bits raw: this DBC does not define their enum values.
+      ret.bydState.powerModeRaw = int(cp.vl["PEDAL"]["POWER_MODE"])
+      ret.bydState.driveModeRaw = int(cp.vl["PEDAL"]["DRIVE_MODE"])
+      ret.bydState.stillGeneratorRaw = int(cp.vl["PEDAL"]["STILL_GENERATOR"])
+      ret.bydState.engineRpm = float(cp.vl["ECM"]["ENG_RPM"])
+      ret.bydState.accAebPayloadRaw = int(parser_alt.vl["ACC_AEB"]["PAYLOAD"])
+      ret.bydState.lateralAccel = cp.vl["ACCEL_SENSOR"]["LATERAL"]
+      ret.bydState.epbActiveRaw = int(cp.vl["EPB_NG"]["EPB_ACTIVE"])
+      ret.bydState.epbStatusRaw = int(cp.vl["EPB_NG"]["EPB_STATUS"])
+      ret.bydState.escVehicleSpeedRaw = float(cp.vl["ESC"]["VEHICLE_SPEED"])
+      ret.bydState.pedalPressedActiveLowRaw = int(cp.vl["PEDAL_PRESSED"]["PEDAL_PRESSED_ACTIVE_LOW"])
+      ret.bydState.ipbBrakePressedRaw = int(cp.vl["IPB"]["BRAKE_PRESSED"])
+      ret.bydState.driveStateThrottleRaw = int(cp.vl["DRIVE_STATE"]["RAW_THROTTLE"])
+      ret.aEgo = cp.vl["ACCEL_SENSOR"]["LONGITUDE"]
+
+      # IPB and the active-low pedal contact independently track brake input in
+      # the available capture. Gate the contact by its timestamp so its default
+      # zero cannot look like a pressed brake before the first frame arrives.
+      if cp.ts_nanos["IPB"]["BRAKE_PRESSED"]:
+        ret.brakePressed |= bool(cp.vl["IPB"]["BRAKE_PRESSED"])
+      if cp.ts_nanos["PEDAL_PRESSED"]["PEDAL_PRESSED_ACTIVE_LOW"]:
+        ret.brakePressed |= not bool(cp.vl["PEDAL_PRESSED"]["PEDAL_PRESSED_ACTIVE_LOW"])
 
     ret.steeringAngleDeg = cp.vl["STEER_MODULE_2"]["STEER_ANGLE_2"]
     steer_dir = 1 if (ret.steeringAngleDeg - self.prev_angle >= 0) else -1
     self.prev_angle = ret.steeringAngleDeg
     ret.steeringTorque = cp.vl["STEERING_TORQUE"]["MAIN_TORQUE"]
-    ret.steeringTorqueEps = cp.vl["STEER_MODULE_2"]["DRIVER_EPS_TORQUE"] * steer_dir
-    ret.steeringPressed = bool(abs(ret.steeringTorqueEps) > 6)
+    driver_eps_torque = cp.vl["STEER_MODULE_2"]["DRIVER_EPS_TORQUE"]
+    if self.is_sealion8_dmi:
+      # This signal may be steer rate rather than driver torque. Keep its raw
+      # value for analysis instead of deriving steeringPressed from it.
+      ret.bydState.driverEpsTorqueOrRateRaw = int(driver_eps_torque)
+    else:
+      ret.steeringTorqueEps = driver_eps_torque * steer_dir
+      ret.steeringPressed = bool(abs(ret.steeringTorqueEps) > 6)
 
     ret.stockAeb = False
     ret.stockFcw = False
+    if self.is_sealion8_dmi:
+      ret.bydState.accErrorRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["ERROR"])
+      ret.bydState.accSetSpeedRaw = float(parser_alt.vl["ACC_HUD_ADAS"]["SET_SPEED"])
+      ret.bydState.accSetDistanceRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"])
+      ret.bydState.accHasLead = bool(parser_alt.vl["ACC_HUD_ADAS"]["HAS_LEAD"])
+      ret.bydState.accLeadDistanceRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["LEAD_DISTANCE"])
+      ret.bydState.accTooClose = bool(parser_alt.vl["ACC_HUD_ADAS"]["TOO_CLOSE"])
+      ret.bydState.accCmdControllableRaw = int(parser_alt.vl["ACC_CMD"]["ACC_CONTROLLABLE_AND_ON"])
+      ret.bydState.accCmdReqNotStandstillRaw = int(parser_alt.vl["ACC_CMD"]["ACC_REQ_NOT_STANDSTILL"])
+      ret.bydState.accCruiseStateRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"])
+      ret.bydState.accHudOn1Raw = int(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"])
+      ret.bydState.accHudOn2Raw = int(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON2"])
+      ret.bydState.accHudControllableRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"])
+      ret.bydState.accHudOverrideRaw = int(parser_alt.vl["ACC_HUD_ADAS"]["OVERRIDE"])
+      ret.stockLkas = bool(cp_cam.vl["LKAS_HUD_ADAS"]["LKAS_ENABLED"])
+      ret.stockAeb = bool(parser_alt.vl["ACC_HUD_ADAS"]["AEB"])
+      ret.stockFcw = bool(parser_alt.vl["ACC_HUD_ADAS"]["FCW"])
+      ret.stockAccelCmd = parser_alt.vl["ACC_CMD"]["ACCEL_CMD"]
+      ret.bydState.epsOkRaw = int(cp_cam.vl["STEERING_MODULE_ADAS"]["EPS_OK"])
+      ret.bydState.steerReqRaw = int(cp_cam.vl["STEERING_MODULE_ADAS"]["STEER_REQ"])
     hud_acc_on1 = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON1"])
     hud_acc_ctrl = bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_CONTROLLABLE_AND_ON"])
     ret.cruiseState.available = hud_acc_on1 or hud_acc_ctrl
@@ -121,7 +174,7 @@ class CarState(CarStateBase):
       ret.cruiseState.available |= bool(parser_alt.vl["ACC_HUD_ADAS"]["ACC_ON2"])
 
     prev_distance_val = self.distance_val
-    self.distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long else 1
+    self.distance_val = int(parser_alt.vl["ACC_HUD_ADAS"]["SET_DISTANCE"]) if self.op_long or self.is_sealion8_dmi else 1
     ret.personality = BYD_DISTANCE_TO_PERSONALITY.get(self.distance_val, -1)
     if self.distance_val != prev_distance_val:
       ret.buttonEvents = create_button_events(1, 0, {1: ButtonType.gapAdjustCruise}) + \
@@ -158,10 +211,12 @@ class CarState(CarStateBase):
     if hud_clears_latch or ret.brakePressed or acc_cmd_clears_latch:
       self.is_cruise_latch = False
 
-    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SEAL6, CAR.BYD_SHARK, CAR.BYD_M6):
+    if self.CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SEAL6, CAR.BYD_SHARK, CAR.BYD_M6, CAR.BYD_SEALION8_DMI):
       ret.cruiseState.enabled = (cruise_state := parser_alt.vl["ACC_HUD_ADAS"]["CRUISE_STATE"]) in (3, 5, 6, 7)
       self.cruise_standstill = cruise_state in (6, 7) and ret.standstill
       self.standstill_wait = cruise_state == 7
+      if self.is_sealion8_dmi:
+        ret.cruiseState.standstill = self.cruise_standstill
     else:
       ret.cruiseState.enabled = self.is_cruise_latch
 
@@ -175,6 +230,10 @@ class CarState(CarStateBase):
       ret.rightBlindspot = bool(cp.vl["BSM"]["RIGHT_APPROACH"])
 
     self.lss_state = cp_cam.vl["LKAS_HUD_ADAS"]["LSS_STATE"]
+    if self.is_sealion8_dmi:
+      ret.bydState.lkaHudSteerActiveActiveLowRaw = int(cp_cam.vl["LKAS_HUD_ADAS"]["STEER_ACTIVE_ACTIVE_LOW"])
+      ret.bydState.lkaHudHandOnWheelWarningRaw = int(cp_cam.vl["LKAS_HUD_ADAS"]["HAND_ON_WHEEL_WARNING"])
+      ret.bydState.lkaHudLssStateRaw = int(self.lss_state)
     self.lss_alert = cp_cam.vl["LKAS_HUD_ADAS"]["SETTINGS"]
     return ret
 
@@ -195,15 +254,26 @@ class CarState(CarStateBase):
       ("STEERING_TORQUE", 50),
       ("STALKS", math.nan),
       ("PCM_BUTTONS", math.nan),
-      ("WHEEL_SPEED", 50),
+      ("WHEEL_SPEED_ALT" if CP.carFingerprint == CAR.BYD_SEALION8_DMI else "WHEEL_SPEED", 50),
     ]
 
     if CP.enableBsm:
       signals.append(("BSM", 20))
 
-    if CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK):
+    if CP.carFingerprint in (CAR.BYD_SEAL, CAR.BYD_SEALION7, CAR.BYD_SHARK, CAR.BYD_SEALION8_DMI):
       signals.append(("ACC_CMD", 50))
       signals.append(("ACC_HUD_ADAS", 50))
+
+    if CP.carFingerprint == CAR.BYD_SEALION8_DMI:
+      # DMI telemetry only; frequency is unknown and must not determine CAN health.
+      signals.append(("ECM", math.nan))
+      signals.append(("ACCEL_SENSOR", math.nan))
+      signals.append(("ACC_AEB", math.nan))
+      signals.append(("EPB_NG", math.nan))
+      signals.append(("ESC", math.nan))
+      signals.append(("IPB", math.nan))
+      signals.append(("PEDAL_PRESSED", math.nan))
+      signals.append(("YAW_SENSOR", math.nan))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.main_bus)
 
@@ -218,4 +288,7 @@ class CarState(CarStateBase):
       signals.append(("ACC_CMD", 50))
       signals.append(("ACC_HUD_ADAS", 50))
 
-    return CANParser(DBC[CP.carFingerprint]["pt"], signals, CANBUS.cam_bus)
+    # This Sealion 8 capture has full-rate copies on the PT bus and sparse stale
+    # duplicates on bus 2. Keep reading these HUD/steering health fields from bus 0.
+    bus = CANBUS.main_bus if CP.carFingerprint == CAR.BYD_SEALION8_DMI else CANBUS.cam_bus
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, bus)

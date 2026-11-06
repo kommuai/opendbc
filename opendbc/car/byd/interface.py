@@ -6,7 +6,9 @@ from opendbc.car.byd.cam_lka.carstate import CarState as CamLkaCarState
 from opendbc.car.byd.mpc_lka.carcontroller import CarController as MpcLkaCarController
 from opendbc.car.byd.mpc_lka.carstate import CarState as MpcLkaCarState
 from opendbc.car.byd.radar_interface import RadarInterface
-from opendbc.car.byd.values import CAR, PLATFORM_MPC_LKA, BydFlags, BYD_ATTO_STYLE_PLATFORMS, CANBUS
+from opendbc.car.byd.values import (
+  CAR, PLATFORM_MPC_LKA, BydFlags, BYD_ATTO_STYLE_PLATFORMS, BYD_SEALION8_DMI_SAFETY_PARAM, CANBUS,
+)
 
 
 class CarInterface(CarInterfaceBase):
@@ -76,6 +78,17 @@ class CarInterface(CarInterfaceBase):
       ret.openpilotLongitudinalControl = False
       ret.radarUnavailable = True
       ret.wheelSpeedFactor = 0.6336
+    elif candidate == CAR.BYD_SEALION8_DMI:
+      # Use a dedicated lateral-only BYD safety profile for the observed DMI bus
+      # layout. Keep this diagnostic-only until state and control behavior are
+      # validated; the controller remains hard-disabled.
+      ret.steerControlType = car.CarParams.SteerControlType.angle
+      ret.openpilotLongitudinalControl = False
+      ret.pcmCruise = True
+      ret.radarUnavailable = True
+      ret.wheelSpeedFactor = 1.0  # raw DBC km/h conversion; not calibrated for control
+      ret.dashcamOnly = True
+      ret.safetyConfigs[0].safetyParam = BYD_SEALION8_DMI_SAFETY_PARAM
     else:
       ret.dashcamOnly = True
       ret.safetyModel = car.CarParams.SafetyModel.noOutput

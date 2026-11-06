@@ -37,6 +37,10 @@ class BydFlags(IntFlag):
   ACC_ON_ESC = 2
 
 
+# BYD safety mode parameter reserved for the Sealion 8 DM-i's observed bus layout.
+BYD_SEALION8_DMI_SAFETY_PARAM = 6
+
+
 class LKASConfig(IntEnum):
   DISABLE = 0
   ALARM = 1
@@ -134,6 +138,19 @@ class CAR(Platforms):
       **BYD_SUPPORT_COMMON_FIELDS,
     )],
     CarSpecs(mass=2340.0, wheelbase=2.93, steerRatio=16.0),
+  )
+  # Diagnostic-only scaffold. No auto-fingerprint or control path is enabled yet.
+  # Curb weight and wheelbase are from the published FWD DM-i spec; steer ratio is
+  # provisional and must be measured before this platform can control the vehicle.
+  BYD_SEALION8_DMI = CamLkaPlatformConfig(
+    [BYDCarDocs(
+      "BYD Sealion 8 DM-i 2025-26",
+      "ALL",
+      variant="DM-i FWD",
+      kommu_supported=False,
+    )],
+    CarSpecs(mass=2315.0, wheelbase=2.95, steerRatio=16.0),
+    dbc_dict=dbc_dict("byd_general_pt", None),
   )
   BYD_SEAL6 = CamLkaPlatformConfig(
     [BYDCarDocs(

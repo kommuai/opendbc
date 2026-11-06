@@ -15,6 +15,7 @@ static bool byd_steering_torque_spoof = false;
 static bool byd_mpc_lka_engage = false;
 static bool byd_relax_controls = false;
 static bool byd_stock_long = false;
+static bool byd_sealion8_dmi = false;
 
 static void byd_rx_hook(const CANPacket_t *msg) {
   int bus = (int)msg->bus;
@@ -32,7 +33,16 @@ static void byd_rx_hook(const CANPacket_t *msg) {
       brake_pressed = (msg->data[1] > 0U);
     }
 
-    if (addr == 496) {
+    if (byd_sealion8_dmi && (addr == 290)) {
+      // Sealion 8 DMI WHEEL_SPEED_ALT: four little-endian 0.1 km/h values.
+      uint16_t fl_raw = (uint16_t)(GET_BYTES(msg, 0, 2) & 0xFFFFU);
+      uint16_t fr_raw = (uint16_t)(GET_BYTES(msg, 2, 2) & 0xFFFFU);
+      uint16_t bl_raw = (uint16_t)(GET_BYTES(msg, 4, 2) & 0xFFFFU);
+      uint16_t br_raw = (uint16_t)(GET_BYTES(msg, 6, 2) & 0xFFFFU);
+      float speed = ((float)(fl_raw + fr_raw + bl_raw + br_raw) / 4.0f) * 0.1f * (1.0f / 3.6f);
+      vehicle_moving = SAFETY_ABS(speed) > 0.1f;
+      UPDATE_VEHICLE_SPEED(speed);
+    } else if (!byd_sealion8_dmi && (addr == 496)) {
       uint16_t fl_raw = (uint16_t)(((msg->data[1] & 0x0FU) << 8U) | msg->data[0]);
       uint16_t bl_raw = (uint16_t)(((msg->data[3] & 0x0FU) << 8U) | msg->data[2]);
       float fl_ms = ((float)fl_raw) * 0.1f * (1.0f / 3.6f);
@@ -64,7 +74,15 @@ static void byd_rx_hook(const CANPacket_t *msg) {
     }
   }
 
-  if (byd_mpc_lka_engage) {
+  if (byd_sealion8_dmi) {
+    // Sealion 8 DMI: ACC_HUD_ADAS is observed on the main/PT bus (0), with
+    // CRUISE_STATE matching the standard BYD camera-LKA engagement values.
+    if ((bus == 0) && (addr == 813)) {
+      uint8_t state = (msg->data[5] >> 4) & 0xFU;
+      bool engaged = (state == 3U) || (state == 5U) || (state == 6U) || (state == 7U);
+      pcm_cruise_check(engaged);
+    }
+  } else if (byd_mpc_lka_engage) {
     if ((bus == 0) && (addr == 813)) {
       uint8_t acc_state = (msg->data[2] >> 3) & 0x7U;
       bool engaged = (acc_state == 3U) || (acc_state == 5U);
@@ -179,8 +197,8 @@ static bool byd_fwd_hook(int bus_num, int addr) {
   } else if (bus_num == 2) {
     bool is_lkas_msg = (addr == 0x1E2) || (addr == 0x316);
     bool is_acc_msg = (addr == (int)BYD_ACC_CMD);
-    // Stock long: forward camera ACC_CMD. OP long: block it so we can TX our own.
-    block = is_lkas_msg || (is_acc_msg && !byd_stock_long);
+    // Stock long and Sealion 8 DMI: forward camera ACC_CMD. OP long: block it so we can TX our own.
+    block = is_lkas_msg || (is_acc_msg && !byd_stock_long && !byd_sealion8_dmi);
   } else {
     /* no action */
   }
@@ -194,6 +212,7 @@ static safety_config byd_init(uint16_t param) {
   byd_mpc_lka_engage = false;
   byd_relax_controls = false;
   byd_stock_long = false;
+  byd_sealion8_dmi = false;
 
   safety_config cfg;
   static const CanMsg BYD_TX_MSGS[] = {
@@ -248,6 +267,30 @@ static safety_config byd_init(uint16_t param) {
     byd_steering_torque_spoof = true;
     byd_stock_long = true;
     cfg = BUILD_SAFETY_CFG(byd_rx_checks, BYD_TX_MSGS_STOCK_LONG);
+  } else if (param == 6U) {
+    // Sealion 8 DM-i: main/PT bus carries ACC_HUD_ADAS and the standard
+    // camera-LKA state messages. Require its bus-0 ACC state for engagement,
+    // retain angle-steering/spoof checks, and allow ACC_CMD through the normal
+    // acceleration safety limits. Software longitudinal control stays disabled.
+    // Do not relax controls_allowed.
+    static const CanMsg BYD_TX_MSGS_SEALION8_DMI[] = {
+      {0x1E2, 0, 8, .check_relay = true},   // STEERING_MODULE_ADAS angle command
+      {0x316, 0, 8, .check_relay = true},   // LKAS_HUD_ADAS
+      {0x32E, 0, 8, .check_relay = false},   // ACC_CMD, bounded by byd_tx_hook
+      {0x3B0, 0, 8, .check_relay = false},  // PCM_BUTTONS
+      {0x1FC, 2, 8, .check_relay = false},  // STEERING_TORQUE spoof
+    };
+    static RxCheck byd_rx_checks_sealion8_dmi[] = {
+      {.msg = {{287, 0, 5, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{290, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{508, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{834, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{944, 0, 8, 20U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+      {.msg = {{813, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, {0}, {0}}},
+    };
+    byd_sealion8_dmi = true;
+    byd_steering_torque_spoof = true;
+    cfg = BUILD_SAFETY_CFG(byd_rx_checks_sealion8_dmi, BYD_TX_MSGS_SEALION8_DMI);
   } else if (param == 4U) {
     static const CanMsg BYD_MPC_LKA_TX_MSGS[] = {
       {0x316, 0, 8, .check_relay = true},   // ACC_MPC_STATE -> EPS
