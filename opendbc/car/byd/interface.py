@@ -86,7 +86,9 @@ class CarInterface(CarInterfaceBase):
       ret.openpilotLongitudinalControl = False
       ret.pcmCruise = True
       ret.radarUnavailable = True
-      ret.wheelSpeedFactor = 1.0  # raw DBC km/h conversion; not calibrated for control
+      # Calibrated against 34 GPS-matched samples with fresh CAN from route
+      # 2026-11-10--02-17-07; the WHEEL_SPEED_ALT factor is model-specific.
+      ret.wheelSpeedFactor = 0.696
       ret.dashcamOnly = True
       ret.safetyConfigs[0].safetyParam = BYD_SEALION8_DMI_SAFETY_PARAM
     else:

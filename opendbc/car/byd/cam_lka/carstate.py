@@ -8,6 +8,7 @@ from opendbc.car.interfaces import CarStateBase
 from opendbc.car.byd.values import DBC, CANBUS, HUD_MULTIPLIER, CAR, BYD_OP_LONG_PLATFORMS
 
 ButtonType = car.CarState.ButtonEvent.Type
+SEALION8_MAX_WHEEL_SPEED_KPH = 300.0
 BYD_DISTANCE_TO_PERSONALITY = {
   1: 0,  # 1 bar
   2: 1,  # 2 bar
@@ -78,12 +79,21 @@ class CarState(CarStateBase):
     parser_alt = self._select_long_parser(cp, cp_cam)
 
     wheel_speed_msg = "WHEEL_SPEED_ALT" if self.is_sealion8_dmi else "WHEEL_SPEED"
-    self.parse_wheel_speeds(ret,
+    wheel_speeds = [
       cp.vl[wheel_speed_msg]["WHEELSPEED_FL"],
       cp.vl[wheel_speed_msg]["WHEELSPEED_FR"],
       cp.vl[wheel_speed_msg]["WHEELSPEED_BL"],
       cp.vl[wheel_speed_msg]["WHEELSPEED_BR"],
-    )
+    ]
+    if self.is_sealion8_dmi:
+      # Ignore impossible wheel-speed sentinels observed in the Nov 11 capture.
+      valid_wheel_speeds = [
+        speed for speed in wheel_speeds
+        if math.isfinite(speed) and 0.0 <= speed <= SEALION8_MAX_WHEEL_SPEED_KPH
+      ]
+      wheel_speed = sum(valid_wheel_speeds) / len(valid_wheel_speeds) if valid_wheel_speeds else 0.0
+      wheel_speeds = [wheel_speed] * 4
+    self.parse_wheel_speeds(ret, *wheel_speeds)
     ret.vEgoCluster = ret.vEgo * HUD_MULTIPLIER
     ret.standstill = ret.vEgoRaw < 0.01
 
