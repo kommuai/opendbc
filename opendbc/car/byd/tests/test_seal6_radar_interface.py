@@ -39,19 +39,33 @@ class TestSeal6RadarInterface(unittest.TestCase):
     ri = make_interface()
     self.assertTrue(ri._seal6_low_speed_untrusted(0, 14.0, 0.1, 0.0, 2.0, 12.0))
 
-  def test_seal6_yrel_is_scaled_to_match_camera_frame_meters(self):
+  def test_seal6_uses_record_valid_flags_and_dbc_scaled_yrel(self):
     ri = make_interface()
     msg = {
-      "RECORD_VALIDITY_CODE": 1,
+      "VALID": 1,
+      "VALID_2": 0,
       "DREL": 10.0,
       "YREL": -0.60,
       "VREL": 0.0,
       "AREL": 0.0,
+      "DREL_2": 12.0,
+      "YREL_2": 0.30,
+      "VREL_2": 0.0,
+      "AREL_2": 0.0,
     }
 
-    _, _, _, y_rel, _, _ = ri._read_track(msg, 0.0, 0.0)
+    _, record1_measured, _, y_rel, _, _ = ri._read_track(msg, 0.0, 0.0, record_index=0)
+    _, record2_measured, _, y_rel_2, _, _ = ri._read_track(msg, 0.0, 0.0, record_index=1)
 
-    self.assertAlmostEqual(y_rel, -1.875)
+    self.assertTrue(record1_measured)
+    self.assertFalse(record2_measured)
+    self.assertAlmostEqual(y_rel, -0.60)
+    self.assertAlmostEqual(y_rel_2, 0.30)
+
+    msg["VALID"] = 0
+    msg["VALID_2"] = 1
+    self.assertFalse(ri._read_track(msg, 0.0, 0.0, record_index=0)[1])
+    self.assertTrue(ri._read_track(msg, 0.0, 0.0, record_index=1)[1])
 
   def test_closer_side_return_dropped_if_confirmed_centered_radar_target_exists(self):
     ri = make_interface()

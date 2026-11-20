@@ -215,14 +215,12 @@ class RadarInterface(RadarInterfaceBase):
   def _read_track(self, msg, v_ego, a_ego, slot: int | None = None, record_index: int = 0):
     if self.seal6_radar:
       suffix = "_2" if record_index == 1 else ""
-      record_validity_code = int(msg.get(f"RECORD_VALIDITY_CODE{suffix}", 0))
+      valid = bool(msg.get(f"VALID{suffix}", 0))
       dRel = float(msg.get(f"DREL{suffix}", 0.0)) + SEAL6_DREL_VISION_BIAS_M
       yRel = float(msg.get(f"YREL{suffix}", 0.0))
       vRel = float(msg.get(f"VREL{suffix}", 0.0))
       aRel = float(msg.get(f"AREL{suffix}", 0.0))
-      # The six-bit code only marks a populated record; no stable sensor ID
-      # was identified. openpilot IDs are generated from short-term tracking.
-      meas_ok = record_validity_code > 0 and self._seal6_drel_plausible(dRel)
+      meas_ok = valid and self._seal6_drel_plausible(dRel)
       conf = 0.95 if meas_ok else 0.0
       if slot is not None and meas_ok:
         self.seal6_prev_drel[slot] = dRel
