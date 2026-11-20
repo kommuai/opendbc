@@ -1,19 +1,13 @@
 VERSION ""
 
 # BYD Seal 6 front radar (CAN-FD bus 1).
-# Reverse-engineered from stock logs (2026-07-16--06-20-47).
-# 16 object frames per cycle: 0x670..0x67f (64 bytes each), trigger on 0x67f.
-# Header/status: 0x64e (8B), 0x66f (16B) — not required for track parsing.
-#
-# VLEAD_KPH @ bit 112: DO NOT USE for control. Route 2026-07-17--01-30-08 shows
-# ~71% of "valid" tracks stuck at raw 11775 (~117.8 kph) and many at ~2560 (~25.6 kph)
-# sentinels. Treating these as absolute speed caused phantom braking. openpilot derives
-# vRel from LONG_DIST rate instead (see radar_interface.py).
-#
-# Range filtering (radar_interface.py):
-# - Publish dRel up to 160m with stricter lateral/persistence above 100m.
-# - Reject empty-slot sentinels: LONG_DIST >= 175m (~183–636m cluster).
-# - Reject ~144m ghost band (LONG_DIST 138–153m) — correlates with near vision, not far leads.
+# Replay-calibrated layout for 16 messages at 0x670..0x67f, 64 bytes each.
+# Each message contains two coherent object records; record 2 starts 136 bits after record 1.
+# DREL/YREL/VREL/AREL scales were checked against route 2026-11-19--10-48-02.
+# VREL is radial relative speed and follows the time derivative of its DREL record.
+# AREL follows VREL's time derivative. YVREL remains a candidate, not interface input.
+# The 6-bit record validity codes mark populated records; no stable sensor ID was identified.
+# Bits 86 and 222 remain unscaled raw fields.
 
 NS_ :
     NS_DESC_
@@ -56,113 +50,321 @@ BO_ 1647 RADAR_STATUS_B: 16 RADAR
  SG_ STATUS_INDEX : 0|8@1+ (1,0) [0|255] "" XXX
 
 BO_ 1648 RADAR_TRACK_00: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1649 RADAR_TRACK_01: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1650 RADAR_TRACK_02: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1651 RADAR_TRACK_03: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1652 RADAR_TRACK_04: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1653 RADAR_TRACK_05: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1654 RADAR_TRACK_06: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1655 RADAR_TRACK_07: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1656 RADAR_TRACK_08: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1657 RADAR_TRACK_09: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1658 RADAR_TRACK_10: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1659 RADAR_TRACK_11: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1660 RADAR_TRACK_12: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1661 RADAR_TRACK_13: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1662 RADAR_TRACK_14: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
 
 BO_ 1663 RADAR_TRACK_15: 64 RADAR
- SG_ SCAN_INDEX : 0|16@1+ (1,0) [0|65535] "" XXX
- SG_ TRACK_ID : 32|8@1+ (1,0) [0|255] "" XXX
- SG_ LONG_DIST : 64|16@1+ (0.01,0) [0|655.35] "m" XXX
- SG_ VLEAD_KPH : 112|16@1+ (0.01,0) [0|655.35] "kph" XXX
- SG_ LAT_DIST : 240|16@1- (0.01,0) [-327.68|327.67] "m" XXX
+ SG_ CHECKSUM_RADAR : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_8BIT : 15|8@0+ (1,0) [0|255] "" XXX
+ SG_ SLOW_COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
+ SG_ COUNTER_12BIT : 27|12@0+ (1,0) [0|4095] "" XXX
+ SG_ DREL : 50|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL : 64|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL : 76|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_86_RAW : 86|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL : 96|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_CANDIDATE : 112|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE : 120|6@1+ (1,0) [0|63] "" XXX
+ SG_ DREL_2 : 186|12@1+ (0.0625,0) [0|255.9375] "m" XXX
+ SG_ YREL_2 : 200|10@1- (0.01,0) [-5.12|5.11] "m" XXX
+ SG_ AREL_2 : 212|8@1- (0.03125,0) [-4|3.96875] "m/s2" XXX
+ SG_ UNKNOWN_222_RAW : 222|8@1- (1,0) [-128|127] "raw" XXX
+ SG_ VREL_2 : 232|10@1- (0.03125,0) [-16|15.96875] "m/s" XXX
+ SG_ YVREL_2_CANDIDATE : 248|8@1- (0.0625,0) [-8|7.9375] "m/s" XXX
+ SG_ RECORD_VALIDITY_CODE_2 : 256|6@1+ (1,0) [0|63] "" XXX
